@@ -68,3 +68,11 @@ YOLO는 가려짐이 없는 데이터에서 Loss를 강하게 계산하고 가�
 
 AI_HUB에도 이러한 값이 있는데 2와 1만 있고 0은 없다. 이를 가져와서 사용한다.
 
+## 5. YOLO의 구조 파악하기
+
+check_yoloLayer.py를 통해 YOLO의 Backbone, Neck, Head 구조를 파악하고자 한다.
+
+SPPF 모듈이 나오면 backbone의 끝 부분인데, 이 위치를 파악하는 코드를 작성한다.
+
+Neck 부분은 Backbone과 Head의 사이 부분이고, Head는 Pose 모듈이다. 따라서 Backbone과 Head 부분만 찾으면 Neck은 자동으로 나온다.
+
