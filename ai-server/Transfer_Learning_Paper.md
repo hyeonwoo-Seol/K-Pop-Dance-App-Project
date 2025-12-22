@@ -76,3 +76,8 @@ SPPF 모듈이 나오면 backbone의 끝 부분인데, 이 위치를 파악하�
 
 Neck 부분은 Backbone과 Head의 사이 부분이고, Head는 Pose 모듈이다. 따라서 Backbone과 Head 부분만 찾으면 Neck은 자동으로 나온다.
 
+출력 결과, Backbone은 0 ~ 9까지, Head는 23이다. 따라서 Neck은 10 ~ 22이다.
+
+## 파인 튜닝 결과
+
+Backbone과 Neck을 Freeze 하지 않고 파인튜닝할 때보다 현재 방법이 사람을 더 잘 인식하고 관절을 추출했으나, 그럼에도 불구하고 YOLO 기본 모델보다 파인튜닝 한 모델의 성능이 더 저하되었다. 특히 관절이 좌우로 튀는 현상이 더 심해졌다.
