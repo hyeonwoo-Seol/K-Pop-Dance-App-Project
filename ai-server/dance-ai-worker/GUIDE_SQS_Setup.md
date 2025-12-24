@@ -26,13 +26,15 @@ Worker를 Conda 환경에서 실행한다.
 
 `celery -A celery_app worker --loglevel=info -P solo`
 
-# SQS Bridge를 실행한다.
+# 새 터미널을 열고 SQS Bridge를 실행한다.
 
 `python sqs_bridge.py`
 
 # 테스트한다.
 
-AWS 콘솔에서 SQS에 들어간 뒤 대기열에 접속한다.
+이것만 성공하면, 추후 팀원이 AWS를 구축했을 때 .env 설정 한 줄만 바꾸면 바로 연동이 끝난다.
+
+AWS가 구축되어 .env 설정을 바꾼 뒤, AWS 콘솔에서 SQS에 들어간 뒤 대기열에 접속한다.
 
 메시지 전송 및 수신 버튼을 클릭한다.
 

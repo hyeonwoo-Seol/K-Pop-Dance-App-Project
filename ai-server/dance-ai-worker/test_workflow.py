@@ -4,7 +4,7 @@ from tasks import download_video_task, pose_estimation_task
 import os
 import shutil
 
-TEST_VIDEO_FILENAME = "IVE원영_AfterLike.mp4"
+TEST_VIDEO_FILENAME = "[576]IVE원영_AfterLike_h264.mp4"
 
 # >> 저장한 테스트 영상이 data/raw_videos 폴더에 실제로 있는지 확인한다.
 def check_video_exists():
