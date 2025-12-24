@@ -5,9 +5,11 @@ import time
 
 # ==========================================
 # [설정] 전문가 안무 영상이 들어있는 폴더 경로
-# 변환할 영상들을 이 폴더에 몰아넣고 실행하세요.
 # 예: "data/expert_videos" 또는 절대 경로 사용 가능
 TARGET_FOLDER = "data/expert_videos"
+
+# 변환된 파일이 저장될 하위 폴더 이름
+OUTPUT_SUBFOLDER = "converted_h264"
 
 # 변환된 파일명 뒤에 붙을 접미사 (예: 영상.mp4 -> 영상_h264.mp4)
 SUFFIX = "_h264"
@@ -15,7 +17,7 @@ SUFFIX = "_h264"
 
 def convert_to_h264(input_path):
     """
-    단일 파일을 H.264로 변환하는 함수 (GPU 가속 사용)
+    단일 파일을 H.264로 변환하여 하위 폴더에 저장하는 함수
     """
     if not os.path.exists(input_path):
         print(f"❌ 파일 없음: {input_path}")
@@ -25,16 +27,22 @@ def convert_to_h264(input_path):
     dir_name, full_filename = os.path.split(input_path)
     filename, ext = os.path.splitext(full_filename)
 
-    # 이미 변환된 파일이면 건너뛰기
-    if filename.endswith(SUFFIX):
-        print(f"⏭️  건너뜀 (이미 변환됨): {full_filename}")
-        return True
+    # 출력 폴더 경로 생성 (원본 폴더 내부의 하위 폴더)
+    output_dir = os.path.join(dir_name, OUTPUT_SUBFOLDER)
+    
+    # 출력 폴더가 없으면 생성
+    os.makedirs(output_dir, exist_ok=True)
 
     # 출력 파일명 생성
     output_filename = f"{filename}{SUFFIX}.mp4"
-    output_path = os.path.join(dir_name, output_filename)
+    output_path = os.path.join(output_dir, output_filename)
 
-    print(f"🔥 변환 시작: {full_filename} --> {output_filename}")
+    # 이미 변환된 파일이 출력 폴더에 존재하는지 확인
+    if os.path.exists(output_path):
+        print(f"⏭️  건너뜀 (이미 변환됨): {output_filename}")
+        return True
+
+    print(f"🔥 변환 시작: {full_filename} --> {OUTPUT_SUBFOLDER}/{output_filename}")
 
     # FFmpeg 명령어 구성 (RTX 5060 Ti 가속 최적화)
     command_gpu = [
@@ -42,8 +50,8 @@ def convert_to_h264(input_path):
         '-i', input_path,         # 입력 파일
         '-c:v', 'h264_nvenc',     # NVIDIA GPU 인코딩
         '-preset', 'p4',          # 속도/화질 균형 프리셋
-        '-b:v', '5M',             # 비트레이트 (5Mbps 정도면 모바일/태블릿에 충분히 고화질)
-        '-c:a', 'aac',            # 오디오 코덱 (AAC가 호환성이 가장 좋음)
+        '-b:v', '5M',             # 비트레이트
+        '-c:a', 'aac',            # 오디오 코덱
         '-b:a', '192k',           # 오디오 음질
         '-y',                     # 덮어쓰기 허용
         output_path
@@ -76,6 +84,9 @@ def convert_to_h264(input_path):
             return True
         except subprocess.CalledProcessError as e:
             print(f"   ❌ [실패] 변환 불가: {e}")
+            # 실패 시 생성된 불완전한 파일이 있다면 삭제
+            if os.path.exists(output_path):
+                os.remove(output_path)
             return False
 
 def process_directory(target_dir):
@@ -85,7 +96,6 @@ def process_directory(target_dir):
     # 1. 폴더 확인
     if not os.path.exists(target_dir):
         print(f"❌ 폴더를 찾을 수 없습니다: {target_dir}")
-        print(f"📂 '{target_dir}' 폴더를 만들고 전문가 영상을 넣어주세요.")
         return
 
     # 2. 변환 대상 확장자 목록
@@ -93,17 +103,22 @@ def process_directory(target_dir):
     video_files = []
 
     for ext in extensions:
-        # 하위 폴더까지 검색하고 싶으면 recursive=True 옵션 사용
         video_files.extend(glob.glob(os.path.join(target_dir, ext)))
 
     # 중복 제거 및 정렬
     video_files = sorted(list(set(video_files)))
+    
+    # 이미 생성된 하위 폴더(converted_h264) 안에 있는 파일이 리스트에 포함되지 않도록 필터링
+    # (원본 폴더 안에 하위 폴더가 생기므로 glob이 그것까지 읽을 수 있음을 방지)
+    video_files = [f for f in video_files if OUTPUT_SUBFOLDER not in f]
+    
     total_files = len(video_files)
 
     print("="*60)
     print(f"🎬 전문가 안무 영상 일괄 변환기 (AV1 -> H.264)")
     print(f"📂 대상 폴더: {target_dir}")
-    print(f"🔢 발견된 파일: {total_files}개")
+    print(f"📂 저장 폴더: {os.path.join(target_dir, OUTPUT_SUBFOLDER)}")
+    print(f"🔢 발견된 원본 파일: {total_files}개")
     print("="*60)
 
     if total_files == 0:
@@ -120,18 +135,13 @@ def process_directory(target_dir):
     print("\n" + "="*60)
     print(f"🎉 모든 작업 완료!")
     print(f"📊 성공: {success_count} / 전체: {total_files}")
-    print(f"📂 변환된 파일들은 '{target_dir}' 폴더에 '_h264'가 붙어서 저장되었습니다.")
+    print(f"📂 변환된 파일들은 '{os.path.join(target_dir, OUTPUT_SUBFOLDER)}' 폴더에 저장되었습니다.")
     print("="*60)
 
 if __name__ == "__main__":
-    # 사용자가 경로를 직접 입력하지 않도록 상단 설정을 사용
-    # 필요하면 여기에 절대 경로를 직접 적어도 됨
-    
-    # 예: 윈도우 경로인 경우 r"C:\Users\User\Videos\Kpop" 처럼 r을 붙여 사용
     base_dir = os.path.dirname(os.path.abspath(__file__))
     target_full_path = os.path.join(base_dir, TARGET_FOLDER)
     
-    # 폴더가 없으면 생성 (안내용)
     if not os.path.exists(target_full_path):
         os.makedirs(target_full_path, exist_ok=True)
         print(f"📁 '{TARGET_FOLDER}' 폴더가 생성되었습니다. 여기에 전문가 영상을 넣고 다시 실행하세요.")
