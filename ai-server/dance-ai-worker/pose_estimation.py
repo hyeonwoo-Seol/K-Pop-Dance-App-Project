@@ -1,3 +1,8 @@
+# >> pose_estimation.py
+# >> 영상 프레임을 추출하고, 키포인트를 탐지하고, 데이터 정규화를 수행한다.
+# >> 초기 추론 시 발생하는 지연을 방지하기 위해 더미 데이터를 통해 GPU Warm Up 작업을 수행한다.
+# >> 영상 해상도에 의존적인 픽셀 좌표를 0 ~ 1 사이의 상대 좌표로 변환하여 해상도 불변성을 확보한다.
+# >> YOLO의 기본 17개 키포인트 이외에 좌우 어깨 좌표의 평균값을 계산하여 Neck 좌표를 보간하는 커스텀 로직이다.
 import cv2
 import json
 import os
@@ -47,10 +52,8 @@ class PoseEstimator:
         except Exception as e:
             print(f"[Warning] 워밍업 중 오류 발생: {e}")
 
+    # >> 영상을 프레임 단위로 분석하여 정규화된 JSON 데이터를 생성하고 저장한다.
     def process_video(self, video_path, output_dir):
-        """
-        영상을 프레임 단위로 분석하여 정규화된 JSON 데이터를 생성 및 저장
-        """
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"영상을 찾을 수 없습니다: {video_path}")
 
