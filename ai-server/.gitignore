@@ -24,5 +24,6 @@ build/
 *.m4a
 *.py~
 *.*~
+*.json
 checkpoints/
 *.skeleton

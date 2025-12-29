@@ -1,12 +1,13 @@
-# >> Celery 애플리케이션 객체를 초기화하는 파일이다.
+# >> celery_app.py
+# >> 비동기 작업 큐 시스템의 인스턴스를 생성하고, Broker와 Backend를 설정한다.
+# >> 작업 메시지를 중개할 Redis Broker와 작업 결과를 저장할 Redis Backend를 연결한다.
+# >> 작업 데이터의 직렬화 포멧을 json으로 강제하여 시스템 간 데이터 호환성을 보장한다.
+# >> include=['task'] 설정을 통해 실행 가능한 작업 모듈을 등록한다.
 
 from celery import Celery
 from config import Config
 
 # Celery 인스턴스 생성
-# 이름: 'dance_ai_worker'
-# broker: 일감을 받는 우체통 (Redis)
-# backend: 처리 결과를 저장하는 곳 (Redis)
 app = Celery(
     'dance_ai_worker',
     broker=Config.CELERY_BROKER_URL,
