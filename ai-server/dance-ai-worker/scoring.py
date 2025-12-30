@@ -7,13 +7,7 @@ import json
 import math
 import os
 from scipy.spatial.distance import euclidean
-
-# fastdtw가 설치되어 있으면 사용하고, 없으면 scipy cdist를 이용한 자체 구현이나 경고를 띄운다.
-try:
-    from fastdtw import fastdtw
-except ImportError:
-    fastdtw = None
-    print("[Warning] fastdtw 라이브러리가 없습니다. DTW 성능이 저하될 수 있습니다.")
+from fastdtw import fastdtw
 
 class Scoring:
     # >> 관절 인덱스 매핑 (YOLO v11 기준)
@@ -68,6 +62,7 @@ class Scoring:
         expert_norm = [self._normalize_skeleton(f) for f in expert_frames]
 
         # 4. 특징 벡터 추출 (각도 계산)
+        # 개선사항2 적용: 전역 각도(몸통 기울기)가 추가된 특징 벡터를 추출한다.
         user_features = [self._extract_angles(f) for f in user_norm]
         expert_features = [self._extract_angles(f) for f in expert_norm]
         
@@ -75,12 +70,24 @@ class Scoring:
         distance, path = self._calculate_dtw(user_features, expert_features)
         
         # 6. 점수 변환 (Scoring)
-        final_score = self._convert_distance_to_score(distance, len(path))
+        # 개선사항1 적용: 모양 점수와 타이밍 점수를 가중 합산한다.
+        
+        # 6-1. 모양 점수 (Shape Score) - 동작의 정확도
+        shape_score = self._convert_distance_to_score(distance, len(path))
+        
+        # 6-2. 타이밍 점수 (Timing Score) - 박자의 정확도
+        timing_score = self._calculate_timing_score(path)
+        
+        # 6-3. 최종 점수 (Weighted Sum)
+        # 구현 아이디어: 모양 점수 * 0.8 + 타이밍 점수 * 0.2
+        final_score = (shape_score * 0.8) + (timing_score * 0.2)
+        
+        print(f"[Scoring] 세부 점수 - Shape: {shape_score:.1f}, Timing: {timing_score:.1f} -> Final: {final_score:.1f}")
         
         # 7. 취약 부위, 잘한 부위, 타임라인 분석 및 프레임별 점수 계산
         worst_part, best_part, timeline, frame_scores = self._analyze_errors(path, user_features, expert_features, user_data["frames"])
 
-        print(f"[Scoring] 분석 완료 - 점수: {final_score:.1f}, 취약 부위: {worst_part}, 잘한 부위: {best_part}")
+        print(f"[Scoring] 분석 완료 - 종합 점수: {final_score:.1f}, 취약 부위: {worst_part}")
 
         return {
             "total_score": int(final_score),
@@ -101,7 +108,7 @@ class Scoring:
 
     # >> 스켈레톤 정규화 (Step 2)
     # >> 1. Translation: 골반(Hips) 중심을 (0,0)으로 이동
-    # >> 2. Scaling: 목(Neck)부터 발목(Ankle) 중점까지의 길이를 1로 맞춤
+    # >> 2. Scaling: 척추 길이(Neck ~ Hip Center)를 1로 맞춤
     def _normalize_skeleton(self, keypoints):
         # keypoints format: [[x, y, conf], ...]
         kp = np.array(keypoints)[:, :2] # 좌표만 사용 (conf 제외)
@@ -112,16 +119,9 @@ class Scoring:
         # Translation
         kp -= hip_center
         
-        # 2. 스케일링 기준 길이 계산
-        # 개선사항: 기존 Neck~Ankle 거리는 앉는 동작(Squat) 시 변화가 심해 불안정함.
-        # 따라서 변화가 적은 척추 길이(Neck ~ Hip Center)를 기준으로 변경하여 안정성을 확보함.
-        
+        # 2. 스케일링 기준 길이 계산 (척추 길이 기준)
         # Neck: 17
         neck = kp[17]
-        
-        # 기존: 발목 기준 (삭제 또는 주석 처리)
-        # ankle_center = (kp[15] + kp[16]) / 2.0
-        # height = np.linalg.norm(neck - ankle_center)
         
         # 수정: 골반 중심(척추 길이) 기준 사용
         height = np.linalg.norm(neck - hip_center)
@@ -135,20 +135,26 @@ class Scoring:
         return kp * scale_factor
 
     # >> 각도 특징 추출 (Step 3 보완)
-    # >> 좌표값 직접 비교보다 각도가 체형 차이에 강건함
+    # >> 개선사항2: 전역 각도(Global Angle) 추가
     def _extract_angles(self, keypoints):
         angles = []
+        # 1. 기존 내부 관절 각도 (8개)
         for name, indices in self.ANGLES_DEF.items():
             idx_a, idx_b, idx_c = indices
-            
-            # 각 키포인트 가져오기
             a = keypoints[idx_a]
             b = keypoints[idx_b]
             c = keypoints[idx_c]
-            
-            # 각도 계산
             angle = self._calculate_angle_3points(a, b, c)
             angles.append(angle)
+            
+        # 2. 전역 각도 (Torso Angle) 추가
+        # 몸통이 수직선(Vertical)에서 얼마나 기울어졌는지 측정
+        # 정규화된 데이터에서 Hips는 (0,0)이므로 Neck(17)의 좌표 자체가 척추 벡터임
+        neck_vec = keypoints[17] 
+        vertical_vec = np.array([0, -1]) # 이미지 좌표계에서 위쪽 방향 (Y 감소 방향)
+        
+        torso_angle = self._calculate_angle_vector(neck_vec, vertical_vec)
+        angles.append(torso_angle)
             
         return np.array(angles)
 
@@ -156,41 +162,55 @@ class Scoring:
     def _calculate_angle_3points(self, a, b, c):
         ba = a - b
         bc = c - b
+        return self._calculate_angle_vector(ba, bc)
+
+    # >> 두 벡터 사이의 각도 계산 (Helper)
+    def _calculate_angle_vector(self, v1, v2):
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
         
-        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc) + 1e-6)
+        if norm_v1 < 1e-6 or norm_v2 < 1e-6:
+            return 0.0
+            
+        cosine_angle = np.dot(v1, v2) / (norm_v1 * norm_v2)
         angle = np.arccos(np.clip(cosine_angle, -1.0, 1.0))
-        
         return np.degrees(angle)
 
     # >> DTW 거리 계산 (Step 3)
     def _calculate_dtw(self, user_seq, expert_seq):
-        if fastdtw:
-            # fastdtw 사용 (추천)
-            distance, path = fastdtw(user_seq, expert_seq, dist=euclidean)
-        else:
-            # fastdtw가 없으면 단순 유클리드 거리 합 (Fallback, 길이가 같다고 가정하거나 간단히 처리)
-            # 여기서는 길이가 다르면 잘라서 비교하는 단순 로직 적용 (임시)
-            min_len = min(len(user_seq), len(expert_seq))
-            u = np.array(user_seq)[:min_len]
-            e = np.array(expert_seq)[:min_len]
-            distance = np.sum([euclidean(u[i], e[i]) for i in range(min_len)])
-            path = list(zip(range(min_len), range(min_len)))
-            
+        # fastdtw 사용 (추천)
+        distance, path = fastdtw(user_seq, expert_seq, dist=euclidean)
         return distance, path
 
-    # >> 점수 변환 (Step 4)
-    # >> 지수 함수(Exponential Decay)를 사용하여 거리가 멀어질수록 점수 급감
+    # >> 모양 점수 변환 (Shape Score)
     def _convert_distance_to_score(self, total_distance, path_length):
         if path_length == 0: return 0
         
         avg_distance = total_distance / path_length
         
-        # Alpha 값은 관대함의 정도. 값이 클수록 관대함.
-        # 각도 기반이므로 평균 오차가 10도일 때 약 80점이 나오도록 튜닝 필요
-        # 예: avg_dist = 10 -> exp(-10/alpha) = 0.8 -> -10/alpha = ln(0.8) -> alpha = -10/ln(0.8) ~= 45
+        # Alpha 값 튜닝: 평균 오차가 10도일 때 약 80점
         alpha = 45.0 
         
         score = 100 * np.exp(-avg_distance / alpha)
+        return max(0, min(100, score))
+
+    # >> 개선사항1: 타이밍 점수 계산 (Timing Score)
+    # >> DTW 경로가 대각선(y=x)에서 얼마나 벗어났는지를(Temporal Cost) 계산
+    def _calculate_timing_score(self, path):
+        if not path: return 0
+        
+        temporal_cost = 0
+        for u_idx, e_idx in path:
+            # 시간 차이(프레임 차이)의 절대값 누적
+            temporal_cost += abs(u_idx - e_idx)
+            
+        avg_temporal_cost = temporal_cost / len(path)
+        
+        # Beta 값 튜닝: 평균 1초(30프레임) 밀리면 약 36점, 0.5초(15프레임) 밀리면 약 60점
+        # 100 * exp(-30 / beta) = 36  => beta ~= 30
+        beta = 30.0
+        
+        score = 100 * np.exp(-avg_temporal_cost / beta)
         return max(0, min(100, score))
 
     # >> 취약 부위 및 구간별 피드백 생성 (Step 4-1)
@@ -208,40 +228,39 @@ class Scoring:
             e_vec = expert_features[e_idx]
             
             # 각 관절(각도)별 차이 계산
+            # 주의: u_vec에는 전역 각도가 추가되어 길이가 9지만,
+            # angle_names는 기존 8개이므로 인덱싱 에러 없이 앞부분만 매핑된다.
             diffs = np.abs(u_vec - e_vec)
-            mean_diff = np.mean(diffs)
+            mean_diff = np.mean(diffs) # 전체적인 모양 오차 평균
             
-            # 부위별로 오차 합산
+            # 부위별로 오차 합산 (Torso Angle은 특정 부위에 할당하지 않음)
             for part_name, angles_in_part in self.BODY_PARTS.items():
                 for angle_name in angles_in_part:
                     idx = angle_names.index(angle_name)
                     part_errors[part_name] += diffs[idx]
             
-            # 프레임별 점수 기록
+            # 프레임별 점수 기록 (프레임 단위 점수는 모양 정확도 위주로 표출)
             if u_idx < len(raw_frames):
                 frame_score = self._convert_distance_to_score(mean_diff, 1)
                 frame_scores[u_idx] = float(f"{frame_score:.1f}")
 
                 frame_info = raw_frames[u_idx]
                 
-                # 타임라인 생성 (1초 단위로 샘플링하여 구간 정보 생성)
-                # 규격서 요구사항: start_sec, end_sec, score, error_part_index
-                if frame_info['frame_index'] % 30 == 0: # 30프레임마다 기록 (약 1초 간격)
+                # 타임라인 생성 (1초 단위)
+                if frame_info['frame_index'] % 30 == 0:
                     start_sec = frame_info['timestamp']
-                    end_sec = start_sec + 1.0 # 1초 구간으로 설정
+                    end_sec = start_sec + 1.0
                     
                     timeline.append({
                         "start_sec": float(f"{start_sec:.2f}"),
                         "end_sec": float(f"{end_sec:.2f}"),
                         "score": int(frame_score),
-                        "comment": "자세 정확도가 떨어집니다.", # 기본 코멘트
-                        "error_part_index": [i for i, d in enumerate(diffs) if d > 15.0] # 15도 이상 차이나는 인덱스
+                        "comment": "자세 정확도가 떨어집니다.",
+                        "error_part_index": [i for i, d in enumerate(diffs[:8]) if d > 15.0] # 15도 이상 차이나는 인덱스 (전역각도 제외)
                     })
 
-        # 가장 많이 틀린 부위 찾기 (오차가 가장 큰 부위)
+        # 가장 많이 틀린 부위 찾기
         worst_part = max(part_errors, key=part_errors.get)
-        
-        # 가장 잘한 부위 찾기 (오차가 가장 작은 부위)
         best_part = min(part_errors, key=part_errors.get)
         
         return worst_part, best_part, timeline, frame_scores
