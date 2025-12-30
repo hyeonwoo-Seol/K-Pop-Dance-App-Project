@@ -103,9 +103,12 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             _send_error_callback(user_id, video_id, f"Model load failed: {str(e)}")
             return {"status": "error", "message": str(e)}
 
-    # >> 결과 파일명 규칙: {video_id}_result.json
+    # >> 결과 파일명 규칙: {video_id}_result.json (규격 준수)
     result_filename = f"{video_id}_result.json"
     result_json_path = os.path.join(Config.RESULT_DIR, result_filename)
+
+    # >> 중간 임시 파일 경로 변수 (나중에 삭제하기 위해 저장)
+    temp_json_path = ""
 
     try:
         # >> Pose Estimation 실행 (User Video)
@@ -132,12 +135,22 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             final_data = json.load(f)
         
         if score_data:
+            # Summary 정보 업데이트
             final_data["summary"]["total_score"] = score_data["total_score"]
             final_data["summary"]["worst_part"] = score_data["worst_part"]
+            final_data["summary"]["best_part"] = score_data["best_part"]  # Best Part 업데이트
             final_data["summary"]["accuracy_grade"] = _calculate_grade(score_data["total_score"])
+            
+            # Timeline Feedback 업데이트 (규격에 맞게 수정됨)
             final_data["timeline_feedback"] = score_data["timeline"]
+
+            # Frames별 Score 업데이트
+            frame_scores = score_data["frame_scores"]
+            for i, frame in enumerate(final_data["frames"]):
+                if i < len(frame_scores) and frame["is_valid"]:
+                    frame["score"] = frame_scores[i]
         
-        # >> 최종 파일 저장
+        # >> 최종 파일 저장 ({video_id}_result.json)
         with open(result_json_path, 'w', encoding='utf-8') as f:
             json.dump(final_data, f, indent=None)
 
@@ -163,6 +176,14 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
         # >> AWS API Gateway로 완료 통보
         _send_callback(user_id, video_id, song_id, final_data, s3_url)
         
+        # >> 임시 파일 삭제 로직 (규격 외 파일 정리)
+        if temp_json_path and os.path.exists(temp_json_path):
+            try:
+                os.remove(temp_json_path)
+                print(f"[Info] 중간 임시 파일 삭제됨: {temp_json_path}")
+            except Exception as e:
+                print(f"[Warning] 임시 파일 삭제 실패: {e}")
+
         return {
             "status": "success",
             "video_path": video_path,

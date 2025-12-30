@@ -77,15 +77,17 @@ class Scoring:
         # 6. 점수 변환 (Scoring)
         final_score = self._convert_distance_to_score(distance, len(path))
         
-        # 7. 취약 부위 및 타임라인 분석
-        worst_part, timeline = self._analyze_errors(path, user_features, expert_features, user_data["frames"])
+        # 7. 취약 부위, 잘한 부위, 타임라인 분석 및 프레임별 점수 계산
+        worst_part, best_part, timeline, frame_scores = self._analyze_errors(path, user_features, expert_features, user_data["frames"])
 
-        print(f"[Scoring] 분석 완료 - 점수: {final_score:.1f}, 취약 부위: {worst_part}")
+        print(f"[Scoring] 분석 완료 - 점수: {final_score:.1f}, 취약 부위: {worst_part}, 잘한 부위: {best_part}")
 
         return {
             "total_score": int(final_score),
             "worst_part": worst_part,
-            "timeline": timeline
+            "best_part": best_part,
+            "timeline": timeline,
+            "frame_scores": frame_scores
         }
 
     # >> JSON 파일 로드 헬퍼
@@ -191,6 +193,7 @@ class Scoring:
         angle_names = list(self.ANGLES_DEF.keys())
         
         timeline = []
+        frame_scores = [0.0] * len(raw_frames)
         
         # DTW 경로를 따라 오차 분석
         for u_idx, e_idx in path:
@@ -199,6 +202,7 @@ class Scoring:
             
             # 각 관절(각도)별 차이 계산
             diffs = np.abs(u_vec - e_vec)
+            mean_diff = np.mean(diffs)
             
             # 부위별로 오차 합산
             for part_name, angles_in_part in self.BODY_PARTS.items():
@@ -206,18 +210,31 @@ class Scoring:
                     idx = angle_names.index(angle_name)
                     part_errors[part_name] += diffs[idx]
             
-            # 타임라인 생성 (1초 단위 또는 특정 프레임 간격으로 샘플링)
-            # 원본 프레임 정보 매핑
+            # 프레임별 점수 기록
             if u_idx < len(raw_frames):
+                frame_score = self._convert_distance_to_score(mean_diff, 1)
+                frame_scores[u_idx] = float(f"{frame_score:.1f}")
+
                 frame_info = raw_frames[u_idx]
-                if frame_info['frame_index'] % 30 == 0: # 30프레임마다 기록 (약 1초)
+                
+                # 타임라인 생성 (1초 단위로 샘플링하여 구간 정보 생성)
+                # 규격서 요구사항: start_sec, end_sec, score, error_part_index
+                if frame_info['frame_index'] % 30 == 0: # 30프레임마다 기록 (약 1초 간격)
+                    start_sec = frame_info['timestamp']
+                    end_sec = start_sec + 1.0 # 1초 구간으로 설정
+                    
                     timeline.append({
-                        "timestamp": frame_info['timestamp'],
-                        "score": self._convert_distance_to_score(np.mean(diffs), 1), # 해당 프레임 점수
-                        "error_indices": [i for i, d in enumerate(diffs) if d > 15.0] # 15도 이상 차이나면 오류
+                        "start_sec": float(f"{start_sec:.2f}"),
+                        "end_sec": float(f"{end_sec:.2f}"),
+                        "score": int(frame_score),
+                        "comment": "자세 정확도가 떨어집니다.", # 기본 코멘트
+                        "error_part_index": [i for i, d in enumerate(diffs) if d > 15.0] # 15도 이상 차이나는 인덱스
                     })
 
-        # 가장 많이 틀린 부위 찾기
+        # 가장 많이 틀린 부위 찾기 (오차가 가장 큰 부위)
         worst_part = max(part_errors, key=part_errors.get)
         
-        return worst_part, timeline
+        # 가장 잘한 부위 찾기 (오차가 가장 작은 부위)
+        best_part = min(part_errors, key=part_errors.get)
+        
+        return worst_part, best_part, timeline, frame_scores
