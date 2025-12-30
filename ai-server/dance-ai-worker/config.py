@@ -1,3 +1,8 @@
+# >> config.py
+# >> 시스템 전체의 환경 변수 및 상수를 관리한다.
+# >> USE_AWS 변수를 통해 실제 배포 모드와 로컬 테스트 모드를 전환할 수 있다.
+# >> AWS Access Key, Region, SQS URL 등의 정보를 .env로부터 불러온다.
+# >> os.path 설정을 통해 파일 입출력 경로를 표준화한다.
 import os
 from dotenv import load_dotenv
 
@@ -5,14 +10,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 class Config:
-    # ==========================================
-    # [스위치] AWS 연결 여부 (True: 실제 연결, False: 테스트 모드)
-    # 팀원이 AWS를 구축하기 전까지는 False로 두고 개발하시면 됩니다.
-    # ==========================================
+    # >> 이 값이 True이면 AWS와 실제 연결하는 것이고, False이면 로컬에서 테스트하는 것이다.
     USE_AWS = os.getenv('USE_AWS', 'False').lower() == 'true'
 
     # 1. AWS 설정 (IAM 사용자 키)
-    # USE_AWS가 True일 때만 실제 값이 필요합니다.
     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
     AWS_REGION = os.getenv('AWS_REGION', 'ap-northeast-2')
