@@ -5,22 +5,24 @@
 # >> 다운로드된 경로를 인자로 받아서, AI 추론 엔진을 호출하고 결과를 반환한다.
 import os
 import time
+import json
 import boto3
 from botocore.exceptions import ClientError
 from celery.signals import worker_process_init
 from celery_app import app
 from config import Config
 from pose_estimation import PoseEstimator
+from scoring import Scoring  # >> Scoring 모듈 추가
 
 # AI 모델 전역 변수
 pose_estimator = None
-
+scoring_engine = None # >> Scoring 엔진 전역 변수
 
 # >> Celery 워커 초기화 시그널 (생명 주기 연동)
 # >> 워커 프로세스가 시작될 때(부모에서 분기된 직후) 실행된다.
 @worker_process_init.connect
 def init_worker(**kwargs):
-    global pose_estimator
+    global pose_estimator, scoring_engine
     print("\n [Worker] 워커 프로세스 초기화 감지! 모델 로드를 시작합니다...")
     
     try:
@@ -29,6 +31,7 @@ def init_worker(**kwargs):
             # 독립적인 모델 인스턴스와 GPU 컨텍스트를 가지게 된다.
             # PoseEstimator 생성자 내부에서 warmup()이 자동 실행된다.
             pose_estimator = PoseEstimator(model_path='yolo11l-pose.pt')
+            scoring_engine = Scoring() # >> Scoring 엔진 초기화
             print("[Worker] 모델 로드 및 워밍업 완료, 작업을 기다립니다.\n")
     except Exception as e:
         print(f"[Worker] 모델 초기화 실패: {e}")
@@ -81,13 +84,13 @@ def download_video_task(self, bucket_name, video_key):
 
 
 
-# >> Task 2: AI 분석 (YOLO v11)
+# >> Task 2: AI 분석 및 채점 (YOLO v11 + DTW)
 @app.task(name='tasks.pose_estimation_task')
-# >> 다운로드 된 영상을 받아서 YOLO를 사용해 분석을 수행한다.
+# >> 다운로드 된 영상을 받아서 YOLO를 사용해 분석하고 점수를 매긴다.
 def pose_estimation_task(video_path):
-    global pose_estimator
+    global pose_estimator, scoring_engine
     
-    print(f"\n[Task 2] AI 분석 시작: {video_path}")
+    print(f"\n[Task 2] AI 분석 및 채점 시작: {video_path}")
 
     # [안전장치] 만약 워커 초기화 시점에 모델 로드가 실패했거나, 
     # 워커가 아닌 방식으로 실행되었을 경우를 대비한 Fallback 로직
@@ -95,13 +98,47 @@ def pose_estimation_task(video_path):
         print("[Warning] 모델이 미리 로드되지 않았습니다. 지금 로드합니다 (지연 발생 가능).")
         try:
             pose_estimator = PoseEstimator(model_path='yolo11l-pose.pt')
+            scoring_engine = Scoring()
         except Exception as e:
             return {"status": "error", "error_message": f"Model load failed: {str(e)}"}
 
     try:
-        # 분석 실행
+        # 1. Pose Estimation 실행 (User Video)
         result_json_path = pose_estimator.process_video(video_path, Config.RESULT_DIR)
         
+        # >> [Step 5] Scoring 파이프라인 연결
+        # >> Sprint 2 테스트용 전문가 데이터 경로 (임시 하드코딩)
+        # >> 실제 구현 시에는 요청 파라미터나 파일명 매핑을 통해 동적으로 가져와야 함
+        expert_json_path = os.path.join(Config.BASE_DIR, 'data', 'expert_videos', 'expert_data.json')
+        
+        # 전문가 데이터가 없으면 테스트를 위해 사용자 데이터를 전문가 데이터로 사용 (Self-Comparison Test)
+        if not os.path.exists(expert_json_path):
+            print(f"[Info] 전문가 데이터({expert_json_path})가 없어 사용자 데이터를 비교 대상으로 사용합니다 (Test Mode).")
+            expert_json_path = result_json_path
+
+        # 2. Scoring 수행
+        if scoring_engine:
+            score_result = scoring_engine.compare(result_json_path, expert_json_path)
+            
+            if score_result:
+                # 3. 결과 JSON 업데이트
+                with open(result_json_path, 'r+', encoding='utf-8') as f:
+                    data = json.load(f)
+                    
+                    # 요약 정보 업데이트
+                    data["summary"]["total_score"] = score_result["total_score"]
+                    data["summary"]["worst_part"] = score_result["worst_part"]
+                    data["summary"]["accuracy_grade"] = _calculate_grade(score_result["total_score"])
+                    
+                    # 타임라인 피드백 업데이트
+                    data["timeline_feedback"] = score_result["timeline"]
+                    
+                    # 파일 덮어쓰기
+                    f.seek(0)
+                    json.dump(data, f, indent=None)
+                    f.truncate()
+                print(f"[Task 2] 점수 기록 완료: {score_result['total_score']}점")
+
         print(f"모든 작업 완료, 결과 파일: {result_json_path}")
         
         return {
@@ -113,3 +150,10 @@ def pose_estimation_task(video_path):
     except Exception as e:
         print(f"분석 중 치명적 오류: {e}")
         return {"status": "error", "error_message": str(e)}
+
+# >> 점수에 따른 등급 계산 헬퍼
+def _calculate_grade(score):
+    if score >= 90: return "S"
+    elif score >= 80: return "A"
+    elif score >= 70: return "B"
+    else: return "C"
