@@ -116,12 +116,17 @@ class PoseEstimator:
                 normalized_keypoints = []
                 
                 # 1. 기존 17개 키포인트 정규화
+                # 개선사항: 화면 비율 왜곡을 방지하기 위해 max_dim(더 긴 변)을 기준으로 나눈다.
+                max_dim = max(width, height)
+                
                 for kp in keypoints_raw:
                     x, y, conf = kp
                     
                     # >> 좌표 정규화 (0.0 ~ 1.0)
-                    norm_x = x / width if width > 0 else 0
-                    norm_y = y / height if height > 0 else 0
+                    # 기존 로직: norm_x = x / width, norm_y = y / height (비율 왜곡 발생)
+                    # 수정 로직: 비율 유지를 위해 max_dim 사용
+                    norm_x = x / max_dim if max_dim > 0 else 0
+                    norm_y = y / max_dim if max_dim > 0 else 0
                     
                     # 소수점 5자리까지만 저장 (용량 최적화)
                     normalized_keypoints.append([

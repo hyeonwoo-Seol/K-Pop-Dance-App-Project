@@ -112,12 +112,19 @@ class Scoring:
         # Translation
         kp -= hip_center
         
-        # 2. 스케일링 기준 길이 계산 (Neck: 17, Ankles: 15, 16)
-        # Neck 좌표가 없으면(0,0) 어깨 중점 사용
-        neck = kp[17]
-        ankle_center = (kp[15] + kp[16]) / 2.0
+        # 2. 스케일링 기준 길이 계산
+        # 개선사항: 기존 Neck~Ankle 거리는 앉는 동작(Squat) 시 변화가 심해 불안정함.
+        # 따라서 변화가 적은 척추 길이(Neck ~ Hip Center)를 기준으로 변경하여 안정성을 확보함.
         
-        height = np.linalg.norm(neck - ankle_center)
+        # Neck: 17
+        neck = kp[17]
+        
+        # 기존: 발목 기준 (삭제 또는 주석 처리)
+        # ankle_center = (kp[15] + kp[16]) / 2.0
+        # height = np.linalg.norm(neck - ankle_center)
+        
+        # 수정: 골반 중심(척추 길이) 기준 사용
+        height = np.linalg.norm(neck - hip_center)
         
         # 예외 처리: 높이가 너무 작거나 0이면 스케일링 건너뜀 (ZeroDivision 방지)
         if height < 0.05: 
