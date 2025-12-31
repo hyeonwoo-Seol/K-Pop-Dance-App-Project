@@ -179,7 +179,9 @@ class Scoring:
     # >> DTW 거리 계산 (Step 3)
     def _calculate_dtw(self, user_seq, expert_seq):
         # fastdtw 사용 (추천)
-        distance, path = fastdtw(user_seq, expert_seq, dist=euclidean)
+        # radius 매개변수를 추가하여 탐색 범위를 제한한다.
+        # 30프레임(약 1초) 이상 차이나는 프레임은 매칭하지 않도록 강제한다.
+        distance, path = fastdtw(user_seq, expert_seq, radius=30, dist=euclidean)
         return distance, path
 
     # >> 모양 점수 변환 (Shape Score)
