@@ -16,12 +16,19 @@ app = Celery(
 )
 
 # Celery 추가 설정
+# >> task_routes 설정을 추가하여 작업별로 전송될 큐를 분리한다.
+# >> 이를 통해 I/O 작업과 GPU 작업을 서로 다른 워커 프로세스가 처리하도록 유도한다.
 app.conf.update(
     task_serializer='json',
     accept_content=['json'],
     result_serializer='json',
     timezone='Asia/Seoul',
     enable_utc=True,
+    task_default_queue='default',
+    task_routes={
+        'tasks.download_video_task': {'queue': 'io_queue'},
+        'tasks.pose_estimation_task': {'queue': 'gpu_queue'},
+    }
 )
 
 if __name__ == '__main__':

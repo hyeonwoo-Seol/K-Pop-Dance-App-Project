@@ -24,6 +24,12 @@ scoring_engine = None
 @worker_process_init.connect
 def init_worker(**kwargs):
     global pose_estimator, scoring_engine
+    
+    # >> 큐 분리에 따라 GPU 큐를 처리하는 워커에서만 모델을 로드하도록 조건부 처리할 수 있으나,
+    # >> 현재 구조에서는 tasks.py가 로드될 때 모든 코드가 실행되므로
+    # >> GPU 큐를 담당하는 워커 프로세스(Concurrency=1)에서만 이 초기화가 유의미하게 동작한다.
+    # >> I/O 워커에서는 모델 로드 오버헤드가 발생하지만 실제 추론은 하지 않으므로 큰 문제는 아니다.
+    # >> (최적화를 위해선 환경변수 등으로 GPU 워커 여부를 판단할 수 있음)
     print("\n [Worker] 워커 프로세스 초기화 감지! 모델 로드를 시작합니다...")
     
     try:
@@ -39,15 +45,18 @@ def init_worker(**kwargs):
 
 
 # >> Task 1: 영상 다운로드 (S3 <-> Local)
+# >> queue='io_queue'를 명시하여 이 작업이 I/O 전용 큐로 들어가도록 설정한다.
+# >> I/O 워커는 Concurrency를 높게(예: 4~8) 설정하여 동시에 여러 다운로드를 처리할 수 있다.
 @app.task(
     name='tasks.download_video_task',
+    queue='io_queue',
     bind=True,             
     max_retries=3,         
     default_retry_delay=5  
 )
 # >> S3에서 영상을 다운로드 하거나, 로컬 테스트 파일을 반환한다.
 def download_video_task(self, bucket_name, video_key):
-    print(f"\n[Task 1] 다운로드 요청 시작: {video_key}")
+    print(f"\n[Task 1] 다운로드 요청 시작 (IO Queue): {video_key}")
     
     file_name = os.path.basename(video_key)
     local_file_path = os.path.join(Config.DOWNLOAD_DIR, file_name)
@@ -84,12 +93,17 @@ def download_video_task(self, bucket_name, video_key):
 
 
 # >> Task 2: AI 분석 및 채점 (YOLO v11 + DTW)
-@app.task(name='tasks.pose_estimation_task')
+# >> queue='gpu_queue'를 명시하여 이 작업이 GPU 전용 큐로 들어가도록 설정한다.
+# >> GPU 워커는 Concurrency를 1로 설정하여 VRAM 부족(OOM) 문제를 방지하고 GPU 효율을 극대화한다.
+@app.task(
+    name='tasks.pose_estimation_task',
+    queue='gpu_queue'
+)
 # >> 다운로드 된 영상을 받아서 YOLO를 사용해 분석하고 점수를 매긴다.
 def pose_estimation_task(video_path, song_id, user_id, video_id):
     global pose_estimator, scoring_engine
     
-    print(f"\n[Task 2] AI 분석 및 채점 시작: {video_path}")
+    print(f"\n[Task 2] AI 분석 및 채점 시작 (GPU Queue): {video_path}")
     print(f"요청 정보 | Song: {song_id} | User: {user_id}")
 
     # [안전장치] 만약 워커 초기화 시점에 모델 로드가 실패했거나, 
