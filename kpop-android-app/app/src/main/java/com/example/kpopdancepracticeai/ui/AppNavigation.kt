@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
@@ -86,6 +87,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
         "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}",
         "댄스 연습",
         Icons.Default.MusicNote
+    )
+    //  [추가] 녹화 화면 경로 정의 (인자 전달 포함)
+    object Record : Screen(
+        "record/{songTitle}/{artistPart}/{difficulty}",
+        "녹화",
+        Icons.Default.CameraAlt
     )
 
     // 연습 결과 화면 경로
@@ -482,6 +489,14 @@ fun AppNavHost(
                         popUpTo(Screen.DancePractice.route) { inclusive = true }
                     }
                 },
+                //  [추가] '따라하기' 버튼 클릭 시 녹화 화면으로 이동하는 로직 연결
+                onRecordClick = {
+                    val encodedTitle = Screen.encodeArg(songTitle)
+                    val encodedArtistPart = Screen.encodeArg(artistPart)
+                    val encodedDifficulty = Screen.encodeArg(difficulty)
+
+                    navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty")
+                },
                 onSettingsClick = {
                     navController.navigate(Screen.PracticeSettings.route)
                 }
@@ -495,6 +510,38 @@ fun AppNavHost(
                 onCompareClick = { /* TODO: 시각적 비교 화면으로 이동 */ },
                 onRetryClick = { songId -> navController.navigate("songPartSelect/$songId") }, // 파트 선택 화면으로 돌아가기
                 onNextPartClick = { songId -> navController.navigate("songPartSelect/$songId") } // 다음 파트 선택 화면으로 돌아가기
+            )
+        }
+
+        // ⭐️ [추가] 녹화 화면 (RecordScreen) 연결
+        composable(
+            route = Screen.Record.route,
+            arguments = listOf(
+                navArgument("songTitle") { type = NavType.StringType },
+                navArgument("artistPart") { type = NavType.StringType },
+                navArgument("difficulty") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: "제목 없음"
+            val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: "정보 없음"
+            val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: "보통"
+
+            // artistPart 문자열(예: "BTS · Part 2")을 분리해서 전달 (임시 로직)
+            val parts = artistPart.split("·").map { it.trim() }
+            val artistName = parts.getOrNull(0) ?: "Unknown"
+            val partName = parts.getOrNull(1) ?: artistPart
+
+            RecordScreen(
+                songTitle = songTitle,
+                difficulty = difficulty,
+                artist = artistName,
+                part = partName,
+                onBack = { navController.popBackStack() },
+                onRecordingComplete = { s3Key ->
+                    // 녹화 완료 후 처리 (예: 결과 화면으로 이동하거나 토스트 메시지)
+                    // 현재는 간단히 뒤로 가기
+                    navController.popBackStack()
+                }
             )
         }
     }

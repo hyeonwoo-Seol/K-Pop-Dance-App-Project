@@ -11,6 +11,7 @@
     <!-- 외부 저장소 쓰기 권한 (API 28 이하) -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
+    <uses-feature android:name="android.hardware.camera.any" />
 
 
     <uses-feature android:name="android.hardware.camera" android:required="true" />

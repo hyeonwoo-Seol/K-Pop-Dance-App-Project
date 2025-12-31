@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -48,14 +47,16 @@ private val ColorSpeedTextInactive = Color(0xFFD1D5DC) // 비활성화된 속도
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PracticeScreenMobile(
-    songTitle: String, // ⭐️ [추가] 곡 제목
-    artistPart: String, // ⭐️ [추가] 아티스트 및 파트 정보
-    difficulty: String, // ⭐️ [추가] 난이도
-    length: String, // ⭐️ [추가] 곡/파트 길이
+    songTitle: String, //  [추가] 곡 제목
+    artistPart: String, //  [추가] 아티스트 및 파트 정보
+    difficulty: String, //  [추가] 난이도
+    length: String, //  [추가] 곡/파트 길이
     onBackClick: () -> Unit = {},
-    onSettingsClick: () -> Unit = {}
+    //  [추가] 녹화 화면 이동을 위한 콜백 파라미터 추가
+    onRecordClick: () -> Unit = {},
+    onSettingsClick: () -> Unit = {},
 ) {
-    // ⭐️ 상태 관리 (경고 사항은 수정하지 않음)
+    // 상태 관리 (경고 사항은 수정하지 않음)
     var currentPosition by remember { mutableStateOf(0.1f) } // ⚠️ [경고] 그대로 유지
     var isPlaying by remember { mutableStateOf(false) }
     var selectedSpeed by remember { mutableStateOf(1.0f) } // ⚠️ [경고] 그대로 유지
@@ -170,7 +171,7 @@ fun PracticeScreenMobile(
                 isPlaying = isPlaying,
                 onRefreshClick = { currentPosition = 0.0f },
                 onPlayPauseClick = { isPlaying = !isPlaying },
-                onFollowClick = { /* TODO: 따라하기 모드 시작 */ }
+                onFollowClick = onRecordClick
             )
         }
     }
@@ -481,7 +482,7 @@ fun PracticeScreenMobilePreview() {
             songTitle = "Dynamite",
             artistPart = "BTS · Part 2: 메인 파트",
             difficulty = "보통",
-            length = "2:15"
+            length = "2:15",
         )
     }
 }

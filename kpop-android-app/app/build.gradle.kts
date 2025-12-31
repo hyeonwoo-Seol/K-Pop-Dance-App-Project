@@ -72,4 +72,7 @@ dependencies {
 
     // AWS SDK S3
     implementation("com.amazonaws:aws-android-sdk-s3:2.77.0")
+
+    // AWS Mobile Client (Cognito 인증용)
+    implementation("com.amazonaws:aws-android-sdk-mobile-client:2.77.0")
 }
