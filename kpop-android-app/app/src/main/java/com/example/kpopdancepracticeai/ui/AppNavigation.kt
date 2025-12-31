@@ -98,6 +98,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     // 연습 결과 화면 경로
     object PracticeResult : Screen("practiceResult", "연습 결과", Icons.Default.Analytics)
 
+    object AnalysisLoading : Screen("analysisLoading", "분석 중", Icons.Default.Analytics)
     companion object {
         fun encodeArg(arg: String): String {
             return URLEncoder.encode(arg, StandardCharsets.UTF_8.toString())
@@ -135,7 +136,8 @@ fun KpopDancePracticeApp() {
         Screen.SongDetail.route,
         Screen.SongPartSelect.route,
         Screen.DancePractice.route,
-        Screen.PracticeResult.route
+        Screen.PracticeResult.route,
+        Screen.AnalysisLoading.route // 로딩 화면에서도 바 숨김
     )
     val showMainBars = currentRoute !in screensToHideBars
 
@@ -484,8 +486,8 @@ fun AppNavHost(
                 difficulty = difficulty,
                 length = length,
                 onBackClick = {
-                    // 연습 화면에서 뒤로 가기 시 결과 화면으로 이동 (임시)
-                    navController.navigate(Screen.PracticeResult.route) {
+                    // [수정] 연습이 끝나면(뒤로가기/완료 시) 분석 대기 화면으로 이동
+                    navController.navigate(Screen.AnalysisLoading.route) {
                         popUpTo(Screen.DancePractice.route) { inclusive = true }
                     }
                 },
@@ -503,6 +505,18 @@ fun AppNavHost(
             )
         }
 
+        // 로딩 화면 (분석 대기)
+        composable(Screen.AnalysisLoading.route) {
+            // [수정] AnalysisWaitingScreen으로 교체 및 연결
+            AnalysisWaitingScreen(
+                onAnalysisComplete = {
+                    // 분석 완료 시 결과 화면으로 이동
+                    navController.navigate(Screen.PracticeResult.route) {
+                        popUpTo(Screen.AnalysisLoading.route) { inclusive = true }
+                    }
+                }
+            )
+        }
         // 연습 결과 화면
         composable(Screen.PracticeResult.route) {
             PracticeResultScreen(
