@@ -92,10 +92,39 @@ fun RecordScreen(
             recordingTime = 0
         }
     }
-
+    // 권한이 없을 때의 화면 처리
     if (!hasPermissions) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.Black), contentAlignment = Alignment.Center) {
-            Text("카메라 및 오디오 권한이 필요합니다.", color = Color.White)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black)
+        ) {
+            // 1. 뒤로가기 버튼 추가 (툴바가 없으므로 필수)
+            IconButton(
+                onClick = onBack,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding() // 상태바와 겹치지 않게 패딩
+                    .padding(16.dp)
+            ) {
+                Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
+            }
+
+            // 2. 권한 요청 안내 및 버튼
+            Column(
+                modifier = Modifier.align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text("카메라 및 오디오 권한이 필요합니다.", color = Color.White)
+                Button(
+                    onClick = {
+                        launcher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO))
+                    }
+                ) {
+                    Text("권한 허용하기")
+                }
+            }
         }
         return
     }

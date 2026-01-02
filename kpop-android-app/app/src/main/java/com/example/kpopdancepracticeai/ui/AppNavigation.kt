@@ -137,7 +137,8 @@ fun KpopDancePracticeApp() {
         Screen.SongPartSelect.route,
         Screen.DancePractice.route,
         Screen.PracticeResult.route,
-        Screen.AnalysisLoading.route // 로딩 화면에서도 바 숨김
+        Screen.AnalysisLoading.route, // 로딩 화면에서도 바 숨김
+        Screen.Record.route // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
     )
     val showMainBars = currentRoute !in screensToHideBars
 
@@ -214,7 +215,7 @@ fun AppBottomNavigationBar(navController: NavController) {
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = 16.dp, vertical = 12.dp) // 플로팅 여백
-            .height(64.dp) // ⭐️ [높이 고정] 64dp로 얇게 설정
+            .height(64.dp) //  [높이 고정] 64dp로 얇게 설정
             .clip(RoundedCornerShape(50.dp)), // 둥근 모서리
         tonalElevation = 4.dp
     ) {
@@ -527,7 +528,7 @@ fun AppNavHost(
             )
         }
 
-        // ⭐️ [추가] 녹화 화면 (RecordScreen) 연결
+        //  [추가] 녹화 화면 (RecordScreen) 연결
         composable(
             route = Screen.Record.route,
             arguments = listOf(
