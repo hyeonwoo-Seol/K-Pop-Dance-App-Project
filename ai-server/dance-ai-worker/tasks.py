@@ -153,7 +153,10 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             final_data["summary"]["total_score"] = score_data["total_score"]
             final_data["summary"]["worst_part"] = score_data["worst_part"]
             final_data["summary"]["best_part"] = score_data["best_part"]  # Best Part 업데이트
-            final_data["summary"]["accuracy_grade"] = _calculate_grade(score_data["total_score"])
+            
+            # >> [보완] 등급 계산 시 Visibility Ratio에 따른 강등 로직 적용
+            visibility_ratio = score_data.get("visibility_ratio", 1.0)
+            final_data["summary"]["accuracy_grade"] = _calculate_grade(score_data["total_score"], visibility_ratio)
             
             # Timeline Feedback 업데이트 (규격에 맞게 수정됨)
             final_data["timeline_feedback"] = score_data["timeline"]
@@ -168,7 +171,7 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
         with open(result_json_path, 'w', encoding='utf-8') as f:
             json.dump(final_data, f, indent=None)
 
-        print(f"[Task 2] 분석 및 점수 계산 완료: {final_data['summary']['total_score']}점")
+        print(f"[Task 2] 분석 및 점수 계산 완료: {final_data['summary']['total_score']}점 (Grade: {final_data['summary']['accuracy_grade']})")
 
         # >> 분석 결과 S3 업로드
         s3_url = ""
@@ -209,12 +212,28 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
         _send_error_callback(user_id, video_id, str(e))
         return {"status": "error", "error_message": str(e)}
 
-# >> 점수에 따른 등급 계산 헬퍼
-def _calculate_grade(score):
-    if score >= 90: return "S"
-    elif score >= 80: return "A"
-    elif score >= 70: return "B"
-    else: return "C"
+# >> 점수에 따른 등급 계산 헬퍼 (보완: 페널티 적용)
+def _calculate_grade(score, visibility_ratio=1.0):
+    # 1차 등급 산정
+    if score >= 90: grade = "S"
+    elif score >= 80: grade = "A"
+    elif score >= 70: grade = "B"
+    else: grade = "C"
+
+    # >> [보완 Step 2-2] 소실된 시간(1 - visibility_ratio)이 30%를 넘으면 등급 강등
+    # >> 즉, visibility_ratio가 0.7 미만이면 페널티 적용
+    if visibility_ratio < 0.7:
+        print(f"[Grade] 페널티 적용됨 (Ratio: {visibility_ratio:.2f}) -> 등급 하향 조정")
+        grades_order = ["S", "A", "B", "C"]
+        try:
+            current_idx = grades_order.index(grade)
+            # 한 단계 강등 (C 밑으로는 유지)
+            new_idx = min(current_idx + 1, len(grades_order) - 1)
+            grade = grades_order[new_idx]
+        except ValueError:
+            pass # 예기치 못한 등급 문자열일 경우 유지
+            
+    return grade
 
 # >> 성공 콜백 (규격 5.1)
 def _send_callback(user_id, video_id, song_id, result_data, s3_url):
