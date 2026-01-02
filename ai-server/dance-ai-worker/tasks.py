@@ -212,12 +212,12 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
         _send_error_callback(user_id, video_id, str(e))
         return {"status": "error", "error_message": str(e)}
 
-# >> 점수에 따른 등급 계산 헬퍼 (보완: 페널티 적용)
+# >> 점수에 따른 등급 계산 헬퍼 (보완: 페널티 적용 및 등급 컷 수정)
 def _calculate_grade(score, visibility_ratio=1.0):
-    # 1차 등급 산정
-    if score >= 90: grade = "S"
-    elif score >= 80: grade = "A"
-    elif score >= 70: grade = "B"
+    # 1차 등급 산정 (S:85이상, A:75~84, B:60~74, C:60미만)
+    if score >= 85: grade = "S"
+    elif score >= 75: grade = "A"
+    elif score >= 60: grade = "B"
     else: grade = "C"
 
     # >> [보완 Step 2-2] 소실된 시간(1 - visibility_ratio)이 30%를 넘으면 등급 강등
