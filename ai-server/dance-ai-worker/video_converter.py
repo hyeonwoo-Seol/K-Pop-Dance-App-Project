@@ -9,15 +9,19 @@ import time
 TARGET_FOLDER = "data/expert_videos"
 
 # 변환된 파일이 저장될 하위 폴더 이름
-OUTPUT_SUBFOLDER = "converted_h264"
+OUTPUT_SUBFOLDER = "converted_h264_30fps"
 
-# 변환된 파일명 뒤에 붙을 접미사 (예: 영상.mp4 -> 영상_h264.mp4)
-SUFFIX = "_h264"
+# 변환된 파일명 뒤에 붙을 접미사 (예: 영상.mp4 -> 영상_h264_30fps.mp4)
+SUFFIX = "_h264_30fps"
+
+# [추가] 목표 프레임 레이트 (FPS)
+# 60fps 영상을 30fps로 줄이려면 30으로 설정
+TARGET_FPS = 30
 # ==========================================
 
 def convert_to_h264(input_path):
     """
-    단일 파일을 H.264로 변환하여 하위 폴더에 저장하는 함수
+    단일 파일을 H.264로 변환(FPS 조정 포함)하여 하위 폴더에 저장하는 함수
     """
     if not os.path.exists(input_path):
         print(f"❌ 파일 없음: {input_path}")
@@ -42,15 +46,17 @@ def convert_to_h264(input_path):
         print(f"⏭️  건너뜀 (이미 변환됨): {output_filename}")
         return True
 
-    print(f"🔥 변환 시작: {full_filename} --> {OUTPUT_SUBFOLDER}/{output_filename}")
+    print(f"🔥 변환 시작 ({TARGET_FPS}fps): {full_filename} --> {OUTPUT_SUBFOLDER}/{output_filename}")
 
     # FFmpeg 명령어 구성 (RTX 5060 Ti 가속 최적화)
+    # -r 옵션을 사용하여 출력 FPS를 강제 조정합니다.
     command_gpu = [
         'ffmpeg',
         '-i', input_path,         # 입력 파일
         '-c:v', 'h264_nvenc',     # NVIDIA GPU 인코딩
         '-preset', 'p4',          # 속도/화질 균형 프리셋
         '-b:v', '5M',             # 비트레이트
+        '-r', str(TARGET_FPS),    # [변경] 목표 FPS 설정 (예: 30)
         '-c:a', 'aac',            # 오디오 코덱
         '-b:a', '192k',           # 오디오 음질
         '-y',                     # 덮어쓰기 허용
@@ -61,6 +67,7 @@ def convert_to_h264(input_path):
     command_cpu = [
         'ffmpeg', '-i', input_path,
         '-c:v', 'libx264', '-crf', '23', '-preset', 'fast',
+        '-r', str(TARGET_FPS),    # [변경] 목표 FPS 설정
         '-c:a', 'aac', '-b:a', '192k',
         '-y', output_path
     ]
@@ -108,14 +115,13 @@ def process_directory(target_dir):
     # 중복 제거 및 정렬
     video_files = sorted(list(set(video_files)))
     
-    # 이미 생성된 하위 폴더(converted_h264) 안에 있는 파일이 리스트에 포함되지 않도록 필터링
-    # (원본 폴더 안에 하위 폴더가 생기므로 glob이 그것까지 읽을 수 있음을 방지)
+    # 이미 생성된 하위 폴더(converted_h264_30fps) 안에 있는 파일이 리스트에 포함되지 않도록 필터링
     video_files = [f for f in video_files if OUTPUT_SUBFOLDER not in f]
     
     total_files = len(video_files)
 
     print("="*60)
-    print(f"🎬 전문가 안무 영상 일괄 변환기 (AV1 -> H.264)")
+    print(f"🎬 전문가 안무 영상 일괄 변환기 (FPS 변환: {TARGET_FPS})")
     print(f"📂 대상 폴더: {target_dir}")
     print(f"📂 저장 폴더: {os.path.join(target_dir, OUTPUT_SUBFOLDER)}")
     print(f"🔢 발견된 원본 파일: {total_files}개")
