@@ -13,6 +13,16 @@ from fastdtw import fastdtw
 
 class Scoring:
     # >> 관절 인덱스 매핑 (YOLO v11 기준)
+    # >> Index_이름매핑.txt 내용을 바탕으로 매핑
+    KEYPOINT_NAMES = {
+        0: "Nose", 1: "Left Eye", 2: "Right Eye", 3: "Left Ear", 4: "Right Ear",
+        5: "Left Shoulder", 6: "Right Shoulder", 7: "Left Elbow", 8: "Right Elbow",
+        9: "Left Wrist", 10: "Right Wrist", 11: "Left Hip", 12: "Right Hip",
+        13: "Left Knee", 14: "Right Knee", 15: "Left Ankle", 16: "Right Ankle",
+        17: "Neck" # 17번은 내부적으로 계산하여 추가한 Neck
+    }
+
+    # >> 각도 계산을 위한 관절 조합 정의
     ANGLES_DEF = {
         "left_elbow": (5, 7, 9),      
         "right_elbow": (6, 8, 10),    
@@ -24,11 +34,14 @@ class Scoring:
         "right_hip": (6, 12, 14)      
     }
 
-    BODY_PARTS = {
+    # >> 부위별 각도 그룹 정의 (정확도 계산용)
+    # >> "Torso"는 _extract_angles에서 마지막(인덱스 8)에 추가되는 각도를 사용함
+    BODY_PARTS_GROUPS = {
         "Left Arm": ["left_elbow", "left_shoulder"],
         "Right Arm": ["right_elbow", "right_shoulder"],
         "Left Leg": ["left_knee", "left_hip"],
-        "Right Leg": ["right_knee", "right_hip"]
+        "Right Leg": ["right_knee", "right_hip"],
+        "Torso": ["torso_angle"]
     }
 
     def __init__(self):
@@ -78,6 +91,14 @@ class Scoring:
             user_features, expert_features, search_range=90
         )
         
+        # Keypoint 데이터도 Sync에 맞춰 자름 (Worst Index 계산용)
+        # offset 적용하여 user/expert의 해당 구간 추출
+        u_start_final = max(0, offset)
+        e_start_final = max(0, -offset)
+        
+        synced_user_norm = user_norm[u_start_final:]
+        synced_expert_norm = expert_norm[e_start_final:]
+        
         if len(synced_user_feat) < 30 or len(synced_expert_feat) < 30:
             print("[Error] 싱크를 맞춘 후 비교할 프레임이 너무 적습니다.")
             return None
@@ -96,15 +117,18 @@ class Scoring:
         
         print(f"[Scoring] 세부 점수 - Shape: {shape_score:.1f}, Timing: {timing_score:.1f} -> Final: {final_score:.1f}")
         
-        # 에러 분석
+        # 에러 분석 (타임라인 피드백, 부위별 정확도, Worst Index 3)
         user_start_idx_in_raw = 0
         if offset > 0:
             user_start_idx_in_raw = offset
         
         aligned_user_frames = user_frames_raw[user_start_idx_in_raw:]
         
-        worst_part, best_part, timeline, frame_scores = self._analyze_errors(
-            path, synced_user_feat, synced_expert_feat, aligned_user_frames
+        worst_indices, part_accuracies, timeline, frame_scores = self._analyze_details(
+            path, 
+            synced_user_feat, synced_expert_feat, 
+            synced_user_norm, synced_expert_norm,
+            aligned_user_frames
         )
 
         full_frame_scores = [0.0] * total_user_frames
@@ -116,8 +140,8 @@ class Scoring:
 
         return {
             "total_score": int(final_score),
-            "worst_part": worst_part,
-            "best_part": best_part,
+            "part_accuracies": part_accuracies, # 부위별 정확도 추가
+            "worst_points": worst_indices,      # 상위 3개 안 좋은 Index 추가
             "timeline": timeline,
             "frame_scores": full_frame_scores,
             "visibility_ratio": visibility_ratio 
@@ -204,10 +228,13 @@ class Scoring:
             a, b, c = keypoints[idx_a], keypoints[idx_b], keypoints[idx_c]
             angle = self._calculate_angle_3points(a, b, c)
             angles.append(angle)
-        neck_vec = keypoints[17]
+        
+        # Torso Angle (Body) - 9번째 각도 (Index 8)
+        neck_vec = keypoints[17] # 정규화시 0,0(골반) 기준 neck 위치 벡터
         vertical_vec = np.array([0, -1]) 
         torso_angle = self._calculate_angle_vector(neck_vec, vertical_vec)
         angles.append(torso_angle)
+        
         return np.array(angles)
 
     def _calculate_angle_3points(self, a, b, c):
@@ -226,38 +253,34 @@ class Scoring:
         distance, path = fastdtw(user_seq, expert_seq, radius=30, dist=euclidean)
         return distance, path
 
-    # >> [보정됨] 거리 -> 점수 변환 (Sensitivity Tuning)
     def _convert_distance_to_score(self, total_distance, path_length):
         if path_length == 0: return 0
         avg_distance = total_distance / path_length
-        
-        # [기존] alpha = 45.0 (너무 엄격함)
-        # [변경] alpha = 150.0 (관용적)
-        # -> 평균 오차가 28도일 때: exp(-28/150) = exp(-0.18) ≈ 0.83 -> 83점
-        # -> 평균 오차가 15도일 때: exp(-15/150) = exp(-0.1) ≈ 0.90 -> 90점 (S등급 컷)
         alpha = 150.0 
-        
         score = 100 * np.exp(-avg_distance / alpha)
         return max(0, min(100, score))
 
-    # >> [보정됨] 타이밍 점수 계산
     def _calculate_timing_score(self, path):
         if not path: return 0
         temporal_cost = 0
         for u, e in path:
             temporal_cost += abs(u - e)
         avg_cost = temporal_cost / len(path)
-        
-        # [기존] beta = 30.0 (너무 엄격함)
-        # [변경] beta = 100.0 (관용적)
         beta = 100.0
-        
         score = 100 * np.exp(-avg_cost / beta)
         return max(0, min(100, score))
 
-    def _analyze_errors(self, path, user_features, expert_features, aligned_user_frames):
-        part_errors = {name: 0.0 for name in self.BODY_PARTS.keys()}
-        angle_names = list(self.ANGLES_DEF.keys())
+    # >> [수정됨] 상세 분석: 부위별 정확도, Worst Indices(Top 3)
+    def _analyze_details(self, path, user_features, expert_features, user_norm_kps, expert_norm_kps, aligned_user_frames):
+        # 1. 부위별 각도 에러 누적 변수 초기화
+        part_error_accum = {name: 0.0 for name in self.BODY_PARTS_GROUPS.keys()}
+        part_count = {name: 0 for name in self.BODY_PARTS_GROUPS.keys()}
+        
+        # 2. 관절(Index)별 거리 에러 누적 변수 초기화 (18개: 0~16 + 17(Neck))
+        # Index 0~16만 실제 사용 (Neck은 제외하거나 포함 가능하나, 보통 말단부위가 중요함)
+        kp_error_accum = np.zeros(18)
+        
+        angle_names = list(self.ANGLES_DEF.keys()) + ["torso_angle"] # 순서 중요 (9개)
         timeline = []
         frame_scores = [] 
         
@@ -265,19 +288,36 @@ class Scoring:
              frame_scores = [0.0] * len(aligned_user_frames)
 
         for u_idx, e_idx in path:
-            diffs = np.abs(user_features[u_idx] - expert_features[e_idx])
-            mean_diff = np.mean(diffs)
+            # === Feature(각도) 비교 ===
+            feat_diffs = np.abs(user_features[u_idx] - expert_features[e_idx])
+            mean_diff = np.mean(feat_diffs)
             
-            for part_name, angles in self.BODY_PARTS.items():
-                for angle_name in angles:
-                    idx = angle_names.index(angle_name)
-                    part_errors[part_name] += diffs[idx]
+            # 부위별 각도 오차 누적
+            for part_name, angle_list in self.BODY_PARTS_GROUPS.items():
+                for angle_name in angle_list:
+                    # 해당 각도의 인덱스 찾기
+                    if angle_name in angle_names:
+                        idx = angle_names.index(angle_name)
+                        part_error_accum[part_name] += feat_diffs[idx]
+                        part_count[part_name] += 1
             
+            # === Keypoint(좌표) 비교 ===
+            # 정규화된 좌표 간의 유클리드 거리 계산 -> 많이 틀린 관절 찾기용
+            # u_idx, e_idx가 각 배열 길이를 넘지 않도록 안전장치 필요 (DTW path 특성상 안전하긴 함)
+            if u_idx < len(user_norm_kps) and e_idx < len(expert_norm_kps):
+                u_kp = user_norm_kps[u_idx]
+                e_kp = expert_norm_kps[e_idx]
+                # 각 관절별 거리 (norm)
+                kp_dists = np.linalg.norm(u_kp - e_kp, axis=1) # Shape (18,)
+                kp_error_accum += kp_dists
+
+            # === 타임라인 및 프레임 점수 기록 ===
             if u_idx < len(frame_scores):
                 frame_score = self._convert_distance_to_score(mean_diff, 1)
                 frame_scores[u_idx] = float(f"{frame_score:.1f}")
 
                 frame_info = aligned_user_frames[u_idx]
+                # 1초(약 30프레임) 단위로 피드백 생성
                 if frame_info['frame_index'] % 30 == 0:
                     start = frame_info['timestamp']
                     timeline.append({
@@ -285,10 +325,33 @@ class Scoring:
                         "end_sec": float(f"{start + 1.0:.2f}"),
                         "score": int(frame_score),
                         "comment": "자세 정확도가 떨어집니다.",
-                        "error_part_index": [i for i, d in enumerate(diffs[:8]) if d > 20.0] # 20도 이상으로 기준 완화
+                        # 해당 시점에서 오차가 20도 이상인 각도 인덱스들
+                        "error_part_index": [i for i, d in enumerate(feat_diffs[:8]) if d > 20.0] 
                     })
 
-        worst_part = max(part_errors, key=part_errors.get)
-        best_part = min(part_errors, key=part_errors.get)
+        # 1. 부위별 정확도 점수 환산 (0~100점)
+        part_accuracies = {}
+        for name in self.BODY_PARTS_GROUPS.keys():
+            if part_count[name] > 0:
+                avg_err = part_error_accum[name] / part_count[name]
+                # 기존 점수 변환 공식 재사용
+                score = self._convert_distance_to_score(avg_err, 1)
+                part_accuracies[name] = int(score)
+            else:
+                part_accuracies[name] = 0
+
+        # 2. Worst Index Top 3 추출
+        # Neck(17)은 제외하고 0~16 사이에서 찾기
+        valid_kp_indices = range(17) 
+        kp_errors_dict = {i: kp_error_accum[i] for i in valid_kp_indices}
         
-        return worst_part, best_part, timeline, frame_scores
+        # 에러 내림차순 정렬
+        sorted_kps = sorted(kp_errors_dict.items(), key=lambda x: x[1], reverse=True)
+        
+        worst_indices = []
+        for i in range(min(3, len(sorted_kps))):
+            idx = sorted_kps[i][0]
+            kp_name = self.KEYPOINT_NAMES.get(idx, f"Unknown({idx})")
+            worst_indices.append(kp_name)
+        
+        return worst_indices, part_accuracies, timeline, frame_scores

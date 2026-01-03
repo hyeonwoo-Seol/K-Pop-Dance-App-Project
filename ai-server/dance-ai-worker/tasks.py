@@ -8,6 +8,8 @@ import os
 import json
 import boto3
 import requests
+import gzip
+import shutil
 from botocore.exceptions import ClientError
 from celery.signals import worker_process_init
 from celery_app import app
@@ -133,6 +135,25 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
         # >> song_id를 기반으로 전문가 데이터 경로 설정
         expert_json_path = os.path.join(Config.EXPERT_DIR, f"{song_id}.json")
         
+        # >> [추가] 전문가 데이터가 로컬에 없으면 S3에서 다운로드 시도
+        if not os.path.exists(expert_json_path) and Config.USE_AWS:
+            print(f"[Info] 전문가 데이터가 로컬에 없습니다. S3 다운로드 시도: {song_id}.json")
+            try:
+                s3_dl_client = boto3.client(
+                    's3',
+                    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
+                    region_name=Config.AWS_REGION
+                )
+                # 전문가 데이터 버킷 및 경로 설정 (가정: kpop-dance-app-data 버킷의 expert/ 폴더)
+                expert_bucket = "kpop-dance-app-data" 
+                expert_key = f"expert/{song_id}.json"
+                s3_dl_client.download_file(expert_bucket, expert_key, expert_json_path)
+                print(f"[Info] 전문가 데이터 다운로드 성공: {expert_json_path}")
+            except Exception as dl_err:
+                print(f"[Warning] 전문가 데이터 다운로드 실패: {dl_err}")
+                # 실패 시 아래 로직에서 사용자 데이터를 대신 사용하여 에러 방지
+
         # >> 전문가 데이터가 없으면 테스트를 위해 사용자 데이터를 전문가 데이터로 사용 (Self-Comparison Test)
         if not os.path.exists(expert_json_path):
             print(f"[Info] 전문가 데이터({expert_json_path})가 없어 사용자 데이터를 비교 대상으로 사용합니다 (Test Mode).")
@@ -173,7 +194,7 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
 
         print(f"[Task 2] 분석 및 점수 계산 완료: {final_data['summary']['total_score']}점 (Grade: {final_data['summary']['accuracy_grade']})")
 
-        # >> 분석 결과 S3 업로드
+        # >> 분석 결과 S3 업로드 (GZIP 압축 적용)
         s3_url = ""
         if Config.USE_AWS:
             s3 = boto3.client(
@@ -186,9 +207,36 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             bucket = "kpop-dance-app-data"
             s3_key = f"analyzed/{user_id}/{video_id}_result.json"
             
-            print(f"[Upload] S3 업로드 중: {s3_key}")
-            s3.upload_file(result_json_path, bucket, s3_key)
-            s3_url = f"https://{bucket}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_key}"
+            # >> [추가] GZIP 압축 및 업로드
+            gz_path = result_json_path + ".gz"
+            try:
+                # 1. 로컬에서 GZIP 압축 파일 생성
+                with open(result_json_path, 'rb') as f_in:
+                    with gzip.open(gz_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                
+                print(f"[Upload] S3 업로드 중 (GZIP): {s3_key}")
+                
+                # 2. 압축된 파일 업로드 (ContentEncoding='gzip' 헤더 설정 필수)
+                s3.upload_file(
+                    gz_path, 
+                    bucket, 
+                    s3_key,
+                    ExtraArgs={
+                        'ContentType': 'application/json',
+                        'ContentEncoding': 'gzip'
+                    }
+                )
+                
+                # S3 URL 생성 (압축 여부와 상관없이 URL은 동일)
+                s3_url = f"https://{bucket}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_key}"
+                
+                # 3. 임시 압축 파일 삭제
+                os.remove(gz_path)
+                
+            except Exception as upload_err:
+                print(f"[Error] S3 업로드 실패: {upload_err}")
+                # 업로드 실패 시에도 일단 진행 (혹은 재시도 로직 추가 가능)
 
         # >> AWS API Gateway로 완료 통보
         _send_callback(user_id, video_id, song_id, final_data, s3_url)
