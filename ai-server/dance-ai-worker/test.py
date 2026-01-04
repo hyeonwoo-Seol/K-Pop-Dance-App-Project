@@ -1,75 +1,23 @@
-# >> pose_estimation.py
-# >> 영상 프레임을 추출하고, 키포인트를 탐지하고, 데이터 정규화를 수행한다.
-# >> 초기 추론 시 발생하는 지연을 방지하기 위해 더미 데이터를 통해 GPU Warm Up 작업을 수행한다.
-# >> 영상 해상도에 의존적인 픽셀 좌표를 0 ~ 1 사이의 상대 좌표로 변환하여 해상도 불변성을 확보한다.
-# >> YOLO의 기본 17개 키포인트 이외에 좌우 어깨 좌표의 평균값을 계산하여 Neck 좌표를 보간하는 커스텀 로직이다.
-# >> [최종 수정] 배치 처리를 제거하고, ID가 변경되더라도 위치 기반으로 추적을 복구(Re-ID)하는 로직을 통합한다.
-# >> [수정] 색상 히스토그램 로직 제거. 초기 타겟(Max Area) 선정 후 ID 기반 추적 및 거리 기반 Re-ID 적용.
-# >> [긴급 수정] Predict 모드 시 임의 ID 할당 제거.
-# >> [긴급 수정] YOLO ID 의존성 제거. 오직 "거리(Distance)" 5% 이내 법칙만 따름.
-# >> [추가 수정] ID 우선 추적(Hybrid) 방식 적용 및 거리 임계값 20%로 상향 조정.
-# >> [안정화] None ID 업데이트 방지 및 Fallback 방어 로직 적용.
-
 import cv2
 import json
 import os
-import torch
 import numpy as np
 from ultralytics import YOLO
+from pose_estimation import PoseEstimator
+from scoring import Scoring
 
-# >> YOLO 모델 초기화 및 WarmUP
-# >> model_path는 사용할 YOLO 모델 파일 경로다.
-class PoseEstimator:
-    def __init__(self, model_path='yolo11l-pose.pt'):
-        print(f"\n[AI] YOLO 모델 로딩 중... ({model_path})")
-        
-        # GPU 사용 가능 여부 확인
-        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        print(f"[AI] 실행 디바이스: {self.device}")
-        
-        # 모델 로드
-        try:
-            self.model = YOLO(model_path)
-            print("[AI] 모델 가중치 로드 완료!")
-        except Exception as e:
-            print(f"[Error] 모델 로드 실패: {e}")
-            raise e
-
-        # 워밍업 실행 (첫 실행 렉 방지)
-        self.warmup()
-
-
-    # >> 더미 데이터를 사용하여 모델을 WarmUp하고 VRAM 상태를 점검한다.
-    def warmup(self):
-        print("[AI] 모델 워밍업 시작 (Dummy Inference)...")
-        try:
-            # 1. 더미 이미지 생성 (YOLO 입력 크기인 640x640, 검은 화면)
-            dummy_frame = np.zeros((640, 640, 3), dtype=np.uint8)
-            
-            # 2. 추론 실행 (결과는 버림)
-            # track() 대신 predict()를 사용하여 트래커 상태를 초기화하지 않음 (KeyError 방지)
-            self.model.predict(source=dummy_frame, device=self.device, verbose=False)
-            
-            print("[AI] 모델 워밍업 완료!")
-
-            # 3. VRAM 상태 로그
-            if self.device == 'cuda':
-                reserved_bytes = torch.cuda.memory_reserved()
-                print(f"[GPU Status] 예약된 VRAM: {reserved_bytes / 1024 / 1024:.2f} MB")
-                
-        except Exception as e:
-            print(f"[Warning] 워밍업 중 오류 발생: {e}")
-
-    # >> 영상을 프레임 단위로 분석하여 정규화된 JSON 데이터를 생성하고 저장한다.
-    def process_video(self, video_path, output_dir):
+class TestPoseEstimator(PoseEstimator):
+    def process_video(self, video_path, output_dir, is_user_video=False):
+        """
+        PoseEstimator의 process_video를 오버라이딩하여
+        사용자 영상일 경우 수동으로 타겟을 선택하는 기능을 추가함.
+        """
         if not os.path.exists(video_path):
             raise FileNotFoundError(f"영상을 찾을 수 없습니다: {video_path}")
 
         video_name = os.path.splitext(os.path.basename(video_path))[0]
-        # >> [변경] 생성된 사용자 JSON 파일 이름은 userID_songID_Artist_PartNumber_result.json으로 할거야.
         output_json_path = os.path.join(output_dir, f"{video_name}_result.json")
         
-        # 영상 정보 읽기
         cap = cv2.VideoCapture(video_path)
         fps = cap.get(cv2.CAP_PROP_FPS)
         total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
@@ -169,26 +117,70 @@ class PoseEstimator:
                 # [로직 1] 초기 타겟 선정 (추적이 아직 시작 안 됐을 때만!)
                 # -----------------------------------------------------------------
                 if not tracking_started and target_track_id is None:
-                    max_area = 0
-                    best_id = -1
-                    best_idx = -1
                     
-                    for idx, t_id in enumerate(track_ids):
-                        w, h = boxes_xywh[idx][2], boxes_xywh[idx][3]
-                        area = w * h
+                    # === [Test.py 추가] 사용자 영상일 경우 ROI 수동 선택 ===
+                    if is_user_video:
+                        print("\n========================================================")
+                        print("[Test] 사용자 영상입니다. 추적할 대상을 선택해야 합니다.")
+                        print("1. 마우스로 추적할 사람을 드래그하여 박스를 그리세요.")
+                        print("2. 선택 후 SPACE 또는 ENTER 키를 누르세요.")
+                        print("========================================================")
                         
-                        # 가장 큰 사람을 찾는다 (첫 프레임 기준)
-                        if area > max_area:
-                            max_area = area
-                            best_id = t_id
-                            best_idx = idx
-                    
-                    if best_idx != -1:
-                        target_track_id = best_id
-                        last_center_x = boxes_xywh[best_idx][0]
-                        last_center_y = boxes_xywh[best_idx][1]
-                        tracking_started = True 
-                        print(f"[AI] 초기 타겟 설정됨 (Frame {processed_frame_count}): ID {target_track_id}")
+                        # ROI 선택창 띄우기
+                        roi = cv2.selectROI("Select Target", frame, fromCenter=False, showCrosshair=True)
+                        cv2.destroyWindow("Select Target")
+                        
+                        # roi: (x, y, w, h) -> Top-Left 기준
+                        rx, ry, rw, rh = roi
+                        # ROI의 중심 좌표 계산
+                        rcx, rcy = rx + rw / 2, ry + rh / 2
+                        
+                        # ROI 중심과 가장 가까운 YOLO 감지 객체 찾기
+                        min_roi_dist = float('inf')
+                        best_match_id = -1
+                        best_match_idx = -1
+                        
+                        for idx, t_id in enumerate(track_ids):
+                            bx, by, bw, bh = boxes_xywh[idx] # YOLO는 xywh가 중심좌표임
+                            # 거리 계산
+                            dist = ((bx - rcx)**2 + (by - rcy)**2)**0.5
+                            if dist < min_roi_dist:
+                                min_roi_dist = dist
+                                best_match_id = t_id
+                                best_match_idx = idx
+                        
+                        if best_match_idx != -1:
+                            target_track_id = best_match_id
+                            last_center_x = boxes_xywh[best_match_idx][0]
+                            last_center_y = boxes_xywh[best_match_idx][1]
+                            tracking_started = True
+                            print(f"[Test] 사용자가 선택한 타겟 매칭 성공: ID {target_track_id} (거리차: {min_roi_dist:.2f})")
+                        else:
+                            print("[Warning] 선택한 영역 근처에서 사람을 감지하지 못했습니다. 자동 모드(가장 큰 사람)로 전환합니다.")
+                            is_user_video = False # 실패 시 자동 로직으로 Fallback
+
+                    # === [기존 로직] 가장 큰 사람 자동 선택 (전문가 영상 or 선택 실패 시) ===
+                    if not tracking_started:
+                        max_area = 0
+                        best_id = -1
+                        best_idx = -1
+                        
+                        for idx, t_id in enumerate(track_ids):
+                            w, h = boxes_xywh[idx][2], boxes_xywh[idx][3]
+                            area = w * h
+                            
+                            # 가장 큰 사람을 찾는다 (첫 프레임 기준)
+                            if area > max_area:
+                                max_area = area
+                                best_id = t_id
+                                best_idx = idx
+                        
+                        if best_idx != -1:
+                            target_track_id = best_id
+                            last_center_x = boxes_xywh[best_idx][0]
+                            last_center_y = boxes_xywh[best_idx][1]
+                            tracking_started = True 
+                            print(f"[AI] 초기 타겟 설정됨 (Frame {processed_frame_count}): ID {target_track_id}")
 
                 # -----------------------------------------------------------------
                 # [로직 2] 하이브리드 추적 (ID 우선 -> 거리 기반 Handover)
@@ -201,7 +193,7 @@ class PoseEstimator:
                 if tracking_started and last_center_x is not None:
                     # Case A: 기존 ID가 현재 프레임에 존재하는지 확인
                     if target_track_id in track_ids and target_track_id is not None:
-                         # [추가] target_track_id가 None이 아닐 때만 인덱스 찾기 (안전장치)
+                        # [추가] target_track_id가 None이 아닐 때만 인덱스 찾기 (안전장치)
                         best_match_idx = track_ids.index(target_track_id)
                     
                     # Case B: ID 소실 -> 거리 기반으로 새로운 타겟 탐색 (Re-ID)
@@ -293,5 +285,144 @@ class PoseEstimator:
         print(f"[AI] 분석 완료 및 JSON 저장: {output_json_path}")
         return output_json_path
 
+def create_overlay(video_path, json_path, output_path):
+    """
+    영상 위에 JSON의 Keypoint를 오버레이하여 저장하는 함수.
+    정규화된 좌표를 역변환(Normalization Reversal)하여 그린다.
+    """
+    if not os.path.exists(video_path) or not os.path.exists(json_path):
+        print(f"[Overlay] 파일 없음: {video_path} 또는 {json_path}")
+        return
+
+    print(f"[Overlay] 생성 시작: {output_path}")
+    
+    with open(json_path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+    
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    
+    # 코덱 설정 (mp4v)
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
+    out = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    
+    frames_data = data["frames"]
+    max_dim = max(width, height)
+    
+    # 스켈레톤 연결 정보 (COCO 형식 + Neck)
+    # (p1, p2) 인덱스 쌍
+    skeleton = [
+        (0, 1), (0, 2), (1, 3), (2, 4),           # 얼굴
+        (5, 7), (7, 9), (6, 8), (8, 10),          # 팔
+        (5, 6), (5, 11), (6, 12), (11, 12),       # 몸통
+        (11, 13), (13, 15), (12, 14), (14, 16),   # 다리
+        (5, 17), (6, 17), (11, 17), (12, 17)      # 목 연결 (시각적 보완)
+    ]
+    
+    frame_idx = 0
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
+            
+        # 해당 프레임의 데이터 찾기
+        if frame_idx < len(frames_data):
+            f_data = frames_data[frame_idx]
+            
+            if f_data["is_valid"]:
+                kps = f_data["keypoints"]
+                
+                # 좌표 역변환 및 저장
+                pixel_points = []
+                for kp in kps:
+                    nx, ny, conf = kp
+                    px = int(nx * max_dim)
+                    py = int(ny * max_dim)
+                    pixel_points.append((px, py, conf))
+                
+                # 스켈레톤 그리기 (Line)
+                for p1_i, p2_i in skeleton:
+                    if p1_i < len(pixel_points) and p2_i < len(pixel_points):
+                        pt1 = pixel_points[p1_i]
+                        pt2 = pixel_points[p2_i]
+                        
+                        # 신뢰도가 0.3 이상일 때만 그림
+                        if pt1[2] > 0.3 and pt2[2] > 0.3:
+                            cv2.line(frame, (pt1[0], pt1[1]), (pt2[0], pt2[1]), (255, 255, 0), 2)
+                
+                # 관절 포인트 그리기 (Circle)
+                for i, (px, py, conf) in enumerate(pixel_points):
+                    if conf > 0.3:
+                        color = (0, 0, 255) if i == 17 else (0, 255, 0) # 목은 빨간색
+                        cv2.circle(frame, (px, py), 4, color, -1)
+
+        out.write(frame)
+        frame_idx += 1
+        
+        if frame_idx % 100 == 0:
+            print(f"Overlay Frame {frame_idx} processed")
+            
+    cap.release()
+    out.release()
+    print("[Overlay] 생성 완료!")
+
 if __name__ == "__main__":
-    estimator = PoseEstimator()
+    # 1. 디렉토리 설정
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    sample_mp4_dir = os.path.join(base_dir, "sampleMP4")
+    sample_json_dir = os.path.join(base_dir, "sampleJSON")
+    overlay_dir = os.path.join(base_dir, "overLay")
+    
+    # 폴더가 없으면 생성
+    os.makedirs(sample_json_dir, exist_ok=True)
+    os.makedirs(overlay_dir, exist_ok=True)
+    
+    # 2. 파일 경로 설정
+    source_video_path = os.path.join(sample_mp4_dir, "Cut_AfterLike_source.mp4")
+    user_video_path = os.path.join(sample_mp4_dir, "Cut_AfterLike_user.mp4")
+    
+    print(f"Source Video Path: {source_video_path}")
+    print(f"User Video Path: {user_video_path}")
+    
+    # 3. Estimator 초기화
+    estimator = TestPoseEstimator()
+    
+    # 4. 전문가 영상 처리 (자동 모드)
+    print("\n[Step 1] 전문가 영상 처리 시작...")
+    try:
+        source_json_path = estimator.process_video(source_video_path, sample_json_dir, is_user_video=False)
+    except Exception as e:
+        print(f"전문가 영상 처리 중 오류: {e}")
+        source_json_path = None
+
+    # 5. 사용자 영상 처리 (수동 선택 모드)
+    print("\n[Step 2] 사용자 영상 처리 시작...")
+    try:
+        user_json_path = estimator.process_video(user_video_path, sample_json_dir, is_user_video=True)
+    except Exception as e:
+        print(f"사용자 영상 처리 중 오류: {e}")
+        user_json_path = None
+    
+    # 6. 점수 계산
+    if source_json_path and user_json_path:
+        print("\n[Step 3] 점수 계산 시작...")
+        scorer = Scoring()
+        # 주의: scoring.py의 compare 함수는 (user_path, expert_path) 순서임
+        result = scorer.compare(user_json_path, source_json_path)
+        
+        if result:
+            print("\n---------------------------------------------------")
+            print(f"최종 점수: {result['total_score']}점")
+            print("---------------------------------------------------")
+    
+    # 7. 오버레이 생성
+    print("\n[Step 4] 오버레이 영상 생성 시작...")
+    if source_json_path:
+        create_overlay(source_video_path, source_json_path, os.path.join(overlay_dir, "source_overlay.mp4"))
+    
+    if user_json_path:
+        create_overlay(user_video_path, user_json_path, os.path.join(overlay_dir, "user_overlay.mp4"))
+
+    print("\n[Test] 모든 과정이 완료되었습니다.")

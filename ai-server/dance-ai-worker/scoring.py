@@ -400,5 +400,3 @@ class Scoring:
             worst_indices.append(kp_name)
         
         return worst_indices, part_accuracies, timeline, frame_scores, final_frame_errors
-
-}
