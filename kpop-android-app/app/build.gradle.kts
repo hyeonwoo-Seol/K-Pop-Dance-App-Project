@@ -62,13 +62,14 @@ dependencies {
     implementation("androidx.navigation:navigation-compose:2.9.6")
     implementation("androidx.compose.material:material-icons-extended-android")
 
-    // CameraX
-    implementation("androidx.camera:camera-core:1.3.4")
-    implementation("androidx.camera:camera-camera2:1.3.4")
-    implementation("androidx.camera:camera-lifecycle:1.3.4")
-    implementation("androidx.camera:camera-video:1.3.4")
-    implementation("androidx.camera:camera-view:1.3.4")
-    implementation("androidx.camera:camera-extensions:1.3.4")
+    // CameraX (16KB 호환성을 위해 1.4.1 버전으로 업데이트)
+    val cameraVersion = "1.4.1"
+    implementation("androidx.camera:camera-core:$cameraVersion")
+    implementation("androidx.camera:camera-camera2:$cameraVersion")
+    implementation("androidx.camera:camera-lifecycle:$cameraVersion")
+    implementation("androidx.camera:camera-video:$cameraVersion")
+    implementation("androidx.camera:camera-view:$cameraVersion")
+    implementation("androidx.camera:camera-extensions:$cameraVersion")
 
     // AWS SDK S3
     implementation("com.amazonaws:aws-android-sdk-s3:2.77.0")
