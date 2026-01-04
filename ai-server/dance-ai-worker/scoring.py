@@ -91,7 +91,7 @@ class Scoring:
             user_features, expert_features, search_range=90
         )
         
-        # Keypoint 데이터도 Sync에 맞춰 자름 (Worst Index 계산용)
+        # Keypoint 데이터도 Sync에 맞춰 자름 (Worst Index 및 Errors 계산용)
         # offset 적용하여 user/expert의 해당 구간 추출
         u_start_final = max(0, offset)
         e_start_final = max(0, -offset)
@@ -117,14 +117,15 @@ class Scoring:
         
         print(f"[Scoring] 세부 점수 - Shape: {shape_score:.1f}, Timing: {timing_score:.1f} -> Final: {final_score:.1f}")
         
-        # 에러 분석 (타임라인 피드백, 부위별 정확도, Worst Index 3)
+        # 에러 분석 (타임라인 피드백, 부위별 정확도, Worst Index 3, Frame별 Errors)
         user_start_idx_in_raw = 0
         if offset > 0:
             user_start_idx_in_raw = offset
         
         aligned_user_frames = user_frames_raw[user_start_idx_in_raw:]
         
-        worst_indices, part_accuracies, timeline, frame_scores = self._analyze_details(
+        # [수정] frame_errors 반환 추가
+        worst_indices, part_accuracies, timeline, frame_scores, frame_errors = self._analyze_details(
             path, 
             synced_user_feat, synced_expert_feat, 
             synced_user_norm, synced_expert_norm,
@@ -132,11 +133,16 @@ class Scoring:
         )
 
         full_frame_scores = [0.0] * total_user_frames
+        full_frame_errors = [[] for _ in range(total_user_frames)] # [수정] 전체 프레임 에러 배열 초기화
+
         for i, score in enumerate(frame_scores):
             if i < len(aligned_user_frames):
                 original_idx = aligned_user_frames[i]['frame_index']
                 if original_idx < len(full_frame_scores):
                     full_frame_scores[original_idx] = score
+                    # [수정] 해당 프레임의 에러 리스트 할당
+                    if i < len(frame_errors):
+                        full_frame_errors[original_idx] = frame_errors[i]
 
         return {
             "total_score": int(final_score),
@@ -144,6 +150,7 @@ class Scoring:
             "worst_points": worst_indices,      # 상위 3개 안 좋은 Index 추가
             "timeline": timeline,
             "frame_scores": full_frame_scores,
+            "frame_errors": full_frame_errors,  # [수정] 프레임별 에러 리스트 추가
             "visibility_ratio": visibility_ratio 
         }
 
@@ -270,7 +277,7 @@ class Scoring:
         score = 100 * np.exp(-avg_cost / beta)
         return max(0, min(100, score))
 
-    # >> [수정됨] 상세 분석: 부위별 정확도, Worst Indices(Top 3)
+    # >> [수정됨] 상세 분석: 부위별 정확도, Worst Indices(Top 3), Frame Errors
     def _analyze_details(self, path, user_features, expert_features, user_norm_kps, expert_norm_kps, aligned_user_frames):
         # 1. 부위별 각도 에러 누적 변수 초기화
         part_error_accum = {name: 0.0 for name in self.BODY_PARTS_GROUPS.keys()}
@@ -283,9 +290,14 @@ class Scoring:
         angle_names = list(self.ANGLES_DEF.keys()) + ["torso_angle"] # 순서 중요 (9개)
         timeline = []
         frame_scores = [] 
+        frame_errors_list = [] # [수정] 프레임별 에러 리스트 (0 or 1)
         
         if aligned_user_frames:
              frame_scores = [0.0] * len(aligned_user_frames)
+
+        # 에러 판별 임계값 (정규화된 좌표 기준)
+        # 키(Spine)를 1.0으로 정규화했으므로, 0.15는 키의 15% 정도 벗어난 오차
+        ERROR_THRESHOLD = 0.15 
 
         for u_idx, e_idx in path:
             # === Feature(각도) 비교 ===
@@ -301,7 +313,9 @@ class Scoring:
                         part_error_accum[part_name] += feat_diffs[idx]
                         part_count[part_name] += 1
             
-            # === Keypoint(좌표) 비교 ===
+            # === Keypoint(좌표) 비교 및 에러 마킹 ===
+            current_frame_error = [0] * 18 # [수정] 현재 프레임의 관절별 에러 (기본 0)
+            
             # 정규화된 좌표 간의 유클리드 거리 계산 -> 많이 틀린 관절 찾기용
             # u_idx, e_idx가 각 배열 길이를 넘지 않도록 안전장치 필요 (DTW path 특성상 안전하긴 함)
             if u_idx < len(user_norm_kps) and e_idx < len(expert_norm_kps):
@@ -310,11 +324,29 @@ class Scoring:
                 # 각 관절별 거리 (norm)
                 kp_dists = np.linalg.norm(u_kp - e_kp, axis=1) # Shape (18,)
                 kp_error_accum += kp_dists
+                
+                # [수정] 임계값 초과 시 1로 마킹
+                for k in range(18):
+                    if kp_dists[k] > ERROR_THRESHOLD:
+                        current_frame_error[k] = 1
+            
+            # 해당 user 프레임에 대한 에러 배열 저장 (DTW 경로상 중복될 수 있으나 순서대로 append)
+            # 여기서는 u_idx가 진행됨에 따라 저장해야 하는데, DTW path는 u_idx가 반복될 수 있음.
+            # 그러나 tasks.py에서 리스트 길이만큼 매핑하므로, 단순 append 보다는 u_idx에 매핑하는게 정확함.
+            # 아래에서 frame_scores 처럼 처리해야 하나, 여기서는 순회 순서대로 쌓고 나중에 매핑하는 방식 사용 불가 (path 순서가 섞이지는 않지만 u_idx 반복됨)
+            # 따라서 임시 딕셔너리에 저장 후 나중에 리스트로 변환하거나, 
+            # 단순히 user frame 길이만큼의 리스트를 미리 만들고 채우는 방식이 안전함.
+            # 현재 구조상 frame_scores 리스트를 미리 만들었으므로 frame_errors_list도 동일하게 처리해야 함.
 
             # === 타임라인 및 프레임 점수 기록 ===
             if u_idx < len(frame_scores):
                 frame_score = self._convert_distance_to_score(mean_diff, 1)
                 frame_scores[u_idx] = float(f"{frame_score:.1f}")
+                
+                # [수정] 에러 리스트가 아직 없으면 추가 (리스트 초기화는 위에서 안했으므로 동적 확장 또는 딕셔너리 사용)
+                # 안전하게 미리 할당된 리스트를 사용하지 않고 있으므로, 여기서 처리
+                # 하지만 로직 단순화를 위해 frame_errors_list를 전체 길이만큼 0으로 초기화하고 덮어쓰는게 좋음
+                pass
 
                 frame_info = aligned_user_frames[u_idx]
                 # 1초(약 30프레임) 단위로 피드백 생성
@@ -328,6 +360,19 @@ class Scoring:
                         # 해당 시점에서 오차가 20도 이상인 각도 인덱스들
                         "error_part_index": [i for i, d in enumerate(feat_diffs[:8]) if d > 20.0] 
                     })
+        
+        # [수정] DTW Path 순회 후, 각 프레임별 Max Error를 에러 리스트로 확정
+        # u_idx가 여러 번 등장할 수 있으므로, 등장할 때마다 에러를 OR 연산하거나 Max 값 사용
+        final_frame_errors = [[0]*18 for _ in range(len(aligned_user_frames))]
+        
+        for (u_idx, e_idx) in path:
+             if u_idx < len(aligned_user_frames) and e_idx < len(expert_norm_kps):
+                u_kp = user_norm_kps[u_idx]
+                e_kp = expert_norm_kps[e_idx]
+                dists = np.linalg.norm(u_kp - e_kp, axis=1)
+                for k in range(18):
+                    if dists[k] > ERROR_THRESHOLD:
+                        final_frame_errors[u_idx][k] = 1
 
         # 1. 부위별 정확도 점수 환산 (0~100점)
         part_accuracies = {}
@@ -354,4 +399,6 @@ class Scoring:
             kp_name = self.KEYPOINT_NAMES.get(idx, f"Unknown({idx})")
             worst_indices.append(kp_name)
         
-        return worst_indices, part_accuracies, timeline, frame_scores
+        return worst_indices, part_accuracies, timeline, frame_scores, final_frame_errors
+
+}

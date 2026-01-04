@@ -61,7 +61,8 @@ class PoseEstimator:
             raise FileNotFoundError(f"영상을 찾을 수 없습니다: {video_path}")
 
         video_name = os.path.splitext(os.path.basename(video_path))[0]
-        output_json_path = os.path.join(output_dir, f"{video_name}_analysis.json")
+        # >> [변경] 생성된 사용자 JSON 파일 이름은 userID_songID_Artist_PartNumber_result.json으로 할거야.
+        output_json_path = os.path.join(output_dir, f"{video_name}_result.json")
         
         # 영상 정보 읽기
         cap = cv2.VideoCapture(video_path)
@@ -78,6 +79,7 @@ class PoseEstimator:
             self.model.predictor.trackers = {} 
 
         # JSON 구조: 규격서(Contract) v1.1
+        # >> [수정] S3 저장 규격에 맞춰 summary 필드 초기화 수정 및 errors 추가
         results_data = {
             "metadata": {
                 "version": "1.1",
@@ -91,9 +93,8 @@ class PoseEstimator:
             "summary": {
                 "total_score": 0,          
                 "accuracy_grade": "Pending", 
-                "worst_part": "None",
-                "best_part": "None",
-                "practice_time_sec": float(f"{duration_sec:.2f}")
+                "part_accuracies": {},     # 부위별 정확도 딕셔너리
+                "worst_points": []         # 가장 많이 틀린 관절 이름 리스트
             },
             "timeline_feedback": [],
             "frames": []
@@ -131,7 +132,8 @@ class PoseEstimator:
                 "timestamp": float(f"{timestamp:.4f}"),
                 "is_valid": False,
                 "score": 0.0,
-                "keypoints": []
+                "keypoints": [],
+                "errors": [] # [수정] 프레임별 관절 에러 마킹 배열 초기화
             }
 
             boxes = result.boxes
