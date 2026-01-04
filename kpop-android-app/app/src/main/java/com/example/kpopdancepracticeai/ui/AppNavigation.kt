@@ -160,7 +160,11 @@ fun KpopDancePracticeApp() {
             containerColor = Color.Transparent, // Scaffold 배경을 투명하게
             topBar = {
                 AnimatedVisibility(
-                    visible = showMainBars,
+                    // [수정됨] 홈, 프로필, 검색 화면일 때는 상단 바를 숨깁니다 (스크롤 가능한 타이틀 사용을 위해)
+                    visible = showMainBars &&
+                            currentRoute != Screen.Home.route &&
+                            currentRoute != Screen.Profile.route &&
+                            currentRoute != Screen.Search.route,
                     enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
                 ) {
