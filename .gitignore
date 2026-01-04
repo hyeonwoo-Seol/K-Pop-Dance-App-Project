@@ -17,7 +17,8 @@
 local.properties
 *:Zone.Identifier
 *:RVContext
-code_to_txt.py
+code_to_python.py
+code_to_kotlin.py
 compiled_python_1.txt
 compiled_python_2.txt
 compiled_python_3.txt
@@ -28,3 +29,8 @@ compiled_code_2.txt
 compiled_code_3.txt
 compiled_code_4.txt
 compiled_code_5.txt
+compiled_kotlin_1.txt
+compiled_kotlin_2.txt 
+compiled_kotlin_3.txt
+compiled_kotlin_4.txt
+compiled_kotlin_5.txt
