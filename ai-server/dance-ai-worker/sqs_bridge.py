@@ -23,21 +23,20 @@ def get_sqs_client():
         # AWS 없이 테스트할 때는 클라이언트 생성을 건너뜁니다.
         return None
 
-# >> 규격서 3.1에 따른 메시지 파싱
+# >> 규격서에 따른 메시지 파싱
 def parse_analysis_request(body_json):
     """
     {
       "bucket_name": "...",
-      "file_key": "...",
-      "song_id": "...",
-      "user_id": "...",
-      "video_id": "..."
+      "file_key": "raw/userID_songID_Artist_PartNumber.mp4",
+      "song_id": "songID_Artist_PartNumber",
+      "user_id": "userID"
     }
     """
     try:
         data = json.loads(body_json)
-        # >> 필수 필드 확인
-        required_keys = ['bucket_name', 'file_key', 'song_id', 'user_id', 'video_id']
+        # >> 필수 필드 확인 (video_id 제거됨)
+        required_keys = ['bucket_name', 'file_key', 'song_id', 'user_id']
         if all(key in data for key in required_keys):
             return data
     except Exception:
@@ -53,18 +52,19 @@ def run_bridge():
         print("SQS를 감시하는 대신, 로컬 테스트 영상을 강제로 작업 큐에 넣습니다.")
         
         # >> 테스트할 가짜 데이터 (통신 규격에 맞춤)
+        # >> video_id 필드는 제거되었고, song_id와 user_id를 통해 식별한다.
         test_payload = {
             "bucket_name": "test-bucket",
-            "file_key": "IVE원영_AfterLike.mp4", # data/raw_videos 폴더에 이 파일이 있어야 한다.
-            "song_id": "song_001",
-            "user_id": "test_user",
-            "video_id": "test_video_01"
+            "file_key": "raw/test_user_song_001_IVE_Part1.mp4", 
+            "song_id": "song_001_IVE_Part1",
+            "user_id": "test_user"
         }
         
         print(f"테스트 요청 전송: {test_payload}")
         
         # >> Chain: 다운로드 Task -> 분석 Task 연결
         # >> download_video_task의 리턴값(파일경로)이 pose_estimation_task의 첫 번째 인자로 자동 전달됨
+        # >> pose_estimation_task에서 video_id 인자 제거
         workflow = chain(
             download_video_task.s(
                 test_payload['bucket_name'], 
@@ -72,8 +72,7 @@ def run_bridge():
             ) | 
             pose_estimation_task.s(
                 test_payload['song_id'],
-                test_payload['user_id'],
-                test_payload['video_id']
+                test_payload['user_id']
             )
         )
         
@@ -100,7 +99,7 @@ def run_bridge():
                         print(f"\n메시지 수신 ID: {message['MessageId']}")
                         print(f"분석 요청: Song={req_data['song_id']}, User={req_data['user_id']}")
                         
-                        # >> 체인으로 연결하여 실행
+                        # >> 체인으로 연결하여 실행 (video_id 제거)
                         chain(
                             download_video_task.s(
                                 req_data['bucket_name'], 
@@ -108,8 +107,7 @@ def run_bridge():
                             ) | 
                             pose_estimation_task.s(
                                 req_data['song_id'],
-                                req_data['user_id'],
-                                req_data['video_id']
+                                req_data['user_id']
                             )
                         ).delay()
                         

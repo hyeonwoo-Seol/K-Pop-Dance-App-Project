@@ -8,6 +8,8 @@ import os
 import json
 import boto3
 import requests
+import gzip
+import shutil
 from botocore.exceptions import ClientError
 from celery.signals import worker_process_init
 from celery_app import app
@@ -100,11 +102,41 @@ def download_video_task(self, bucket_name, video_key):
     queue='gpu_queue'
 )
 # >> 다운로드 된 영상을 받아서 YOLO를 사용해 분석하고 점수를 매긴다.
-def pose_estimation_task(video_path, song_id, user_id, video_id):
+# >> [변경] video_id 인자가 제거되었고, song_id와 user_id를 사용한다.
+def pose_estimation_task(video_path, song_id, user_id):
     global pose_estimator, scoring_engine
     
     print(f"\n[Task 2] AI 분석 및 채점 시작 (GPU Queue): {video_path}")
     print(f"요청 정보 | Song: {song_id} | User: {user_id}")
+    
+    # >> [변경] 파일명에서 정보 파싱
+    # >> 영상 파일명 예시: userID_songID_Artist_PartNumber.mp4
+    video_filename = os.path.basename(video_path)
+    video_name_no_ext = os.path.splitext(video_filename)[0]
+    
+    # >> [변경] 전문가 JSON 파일 이름은 songID_Artist_PartNumber.json으로 저장할거야.
+    # >> 영상 이름에서 userID_ 부분을 파싱해서 제거해야 함.
+    # >> song_id(SQS에서 온 값)가 정확하다면 그대로 써도 되지만, 요청대로 영상 이름에서 파싱 시도
+    # >> user_id + "_" 길이만큼 잘라내기 (단, user_id에 _가 포함될 수 있으므로 주의)
+    
+    expert_json_filename = ""
+    full_song_identifier = "" # 이것이 나중에 결과 통보시 사용할 ID가 됨 (userID_songID_Artist_PartNumber)
+
+    # 1. Full ID 설정 (userID_songID_Artist_PartNumber)
+    full_song_identifier = video_name_no_ext
+
+    # 2. 전문가 파일명 파싱 (userID_ 접두사 제거)
+    prefix = f"{user_id}_"
+    if video_name_no_ext.startswith(prefix):
+        parsed_song_part = video_name_no_ext[len(prefix):]
+        expert_json_filename = f"{parsed_song_part}.json"
+    else:
+        # 파싱 실패 시 SQS에서 받은 song_id 사용 (Fallback)
+        print(f"[Info] 파일명 파싱 실패(prefix 불일치), SQS song_id 사용: {song_id}")
+        expert_json_filename = f"{song_id}.json"
+
+    print(f"[Info] 타겟 전문가 데이터 파일: {expert_json_filename}")
+
 
     # [안전장치] 만약 워커 초기화 시점에 모델 로드가 실패했거나, 
     # 워커가 아닌 방식으로 실행되었을 경우를 대비한 Fallback 로직
@@ -114,11 +146,11 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             pose_estimator = PoseEstimator(model_path='yolo11l-pose.pt')
             scoring_engine = Scoring()
         except Exception as e:
-            _send_error_callback(user_id, video_id, f"Model load failed: {str(e)}")
+            _send_error_callback(user_id, full_song_identifier, f"Model load failed: {str(e)}")
             return {"status": "error", "message": str(e)}
 
-    # >> 결과 파일명 규칙: {video_id}_result.json (규격 준수)
-    result_filename = f"{video_id}_result.json"
+    # >> [변경] 결과 파일명 규칙: userID_songID_Artist_PartNumber_result.json
+    result_filename = f"{full_song_identifier}_result.json"
     result_json_path = os.path.join(Config.RESULT_DIR, result_filename)
 
     # >> 중간 임시 파일 경로 변수 (나중에 삭제하기 위해 저장)
@@ -126,13 +158,31 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
 
     try:
         # >> Pose Estimation 실행 (User Video)
-        # >> process_video는 임시 경로에 파일을 저장하므로, 나중에 최종 경로로 저장해야 함
+        # >> process_video는 내부적으로 _result.json을 생성함
         temp_json_path = pose_estimator.process_video(video_path, Config.RESULT_DIR)
         
         # >> Scoring 파이프라인 연결
-        # >> song_id를 기반으로 전문가 데이터 경로 설정
-        expert_json_path = os.path.join(Config.EXPERT_DIR, f"{song_id}.json")
+        expert_json_path = os.path.join(Config.EXPERT_DIR, expert_json_filename)
         
+        # >> [추가] 전문가 데이터가 로컬에 없으면 S3에서 다운로드 시도
+        if not os.path.exists(expert_json_path) and Config.USE_AWS:
+            print(f"[Info] 전문가 데이터가 로컬에 없습니다. S3 다운로드 시도: {expert_json_filename}")
+            try:
+                s3_dl_client = boto3.client(
+                    's3',
+                    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
+                    region_name=Config.AWS_REGION
+                )
+                # 전문가 데이터 버킷 및 경로 설정 (가정: kpop-dance-app-data 버킷의 expert/ 폴더)
+                expert_bucket = "kpop-dance-app-data" 
+                expert_key = f"expert/{expert_json_filename}"
+                s3_dl_client.download_file(expert_bucket, expert_key, expert_json_path)
+                print(f"[Info] 전문가 데이터 다운로드 성공: {expert_json_path}")
+            except Exception as dl_err:
+                print(f"[Warning] 전문가 데이터 다운로드 실패: {dl_err}")
+                # 실패 시 아래 로직에서 사용자 데이터를 대신 사용하여 에러 방지
+
         # >> 전문가 데이터가 없으면 테스트를 위해 사용자 데이터를 전문가 데이터로 사용 (Self-Comparison Test)
         if not os.path.exists(expert_json_path):
             print(f"[Info] 전문가 데이터({expert_json_path})가 없어 사용자 데이터를 비교 대상으로 사용합니다 (Test Mode).")
@@ -150,9 +200,11 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
         
         if score_data:
             # Summary 정보 업데이트
+            # [수정] S3 저장 내용 규격 반영 (worst_part -> worst_points, part_accuracies 추가)
             final_data["summary"]["total_score"] = score_data["total_score"]
-            final_data["summary"]["worst_part"] = score_data["worst_part"]
-            final_data["summary"]["best_part"] = score_data["best_part"]  # Best Part 업데이트
+            final_data["summary"]["worst_points"] = score_data["worst_points"]
+            final_data["summary"]["part_accuracies"] = score_data["part_accuracies"]
+            # best_part 제거됨
             
             # >> [보완] 등급 계산 시 Visibility Ratio에 따른 강등 로직 적용
             visibility_ratio = score_data.get("visibility_ratio", 1.0)
@@ -161,19 +213,24 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             # Timeline Feedback 업데이트 (규격에 맞게 수정됨)
             final_data["timeline_feedback"] = score_data["timeline"]
 
-            # Frames별 Score 업데이트
+            # Frames별 Score 및 Errors 업데이트
             frame_scores = score_data["frame_scores"]
+            frame_errors = score_data["frame_errors"] # [수정] 프레임 에러 데이터 로드
+            
             for i, frame in enumerate(final_data["frames"]):
                 if i < len(frame_scores) and frame["is_valid"]:
                     frame["score"] = frame_scores[i]
+                    # [수정] 해당 프레임의 에러 리스트 추가 (범위 체크)
+                    if i < len(frame_errors):
+                        frame["errors"] = frame_errors[i]
         
-        # >> 최종 파일 저장 ({video_id}_result.json)
+        # >> 최종 파일 저장 (이름이 이미 맞지만, 내용을 업데이트해서 다시 저장)
         with open(result_json_path, 'w', encoding='utf-8') as f:
             json.dump(final_data, f, indent=None)
 
         print(f"[Task 2] 분석 및 점수 계산 완료: {final_data['summary']['total_score']}점 (Grade: {final_data['summary']['accuracy_grade']})")
 
-        # >> 분석 결과 S3 업로드
+        # >> 분석 결과 S3 업로드 (GZIP 압축 적용)
         s3_url = ""
         if Config.USE_AWS:
             s3 = boto3.client(
@@ -184,17 +241,46 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
             )
             # >> 버킷 이름은 규격에 따라 'kpop-dance-app-data'로 가정하거나 Config에서 관리
             bucket = "kpop-dance-app-data"
-            s3_key = f"analyzed/{user_id}/{video_id}_result.json"
+            # >> [변경] S3 키 구조: analyzed/userID/userID_songID_Artist_PartNumber_result.json
+            s3_key = f"analyzed/{user_id}/{result_filename}"
             
-            print(f"[Upload] S3 업로드 중: {s3_key}")
-            s3.upload_file(result_json_path, bucket, s3_key)
-            s3_url = f"https://{bucket}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_key}"
+            # >> [추가] GZIP 압축 및 업로드
+            gz_path = result_json_path + ".gz"
+            try:
+                # 1. 로컬에서 GZIP 압축 파일 생성
+                with open(result_json_path, 'rb') as f_in:
+                    with gzip.open(gz_path, 'wb') as f_out:
+                        shutil.copyfileobj(f_in, f_out)
+                
+                print(f"[Upload] S3 업로드 중 (GZIP): {s3_key}")
+                
+                # 2. 압축된 파일 업로드 (ContentEncoding='gzip' 헤더 설정 필수)
+                s3.upload_file(
+                    gz_path, 
+                    bucket, 
+                    s3_key,
+                    ExtraArgs={
+                        'ContentType': 'application/json',
+                        'ContentEncoding': 'gzip'
+                    }
+                )
+                
+                # S3 URL 생성 (압축 여부와 상관없이 URL은 동일)
+                s3_url = f"https://{bucket}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_key}"
+                
+                # 3. 임시 압축 파일 삭제
+                os.remove(gz_path)
+                
+            except Exception as upload_err:
+                print(f"[Error] S3 업로드 실패: {upload_err}")
+                # 업로드 실패 시에도 일단 진행 (혹은 재시도 로직 추가 가능)
 
         # >> AWS API Gateway로 완료 통보
-        _send_callback(user_id, video_id, song_id, final_data, s3_url)
+        _send_callback(user_id, full_song_identifier, final_data, s3_url)
         
         # >> 임시 파일 삭제 로직 (규격 외 파일 정리)
-        if temp_json_path and os.path.exists(temp_json_path):
+        # result_json_path가 temp_json_path와 같다면 삭제하면 안됨
+        if temp_json_path and os.path.exists(temp_json_path) and temp_json_path != result_json_path:
             try:
                 os.remove(temp_json_path)
                 print(f"[Info] 중간 임시 파일 삭제됨: {temp_json_path}")
@@ -209,7 +295,7 @@ def pose_estimation_task(video_path, song_id, user_id, video_id):
 
     except Exception as e:
         print(f"분석 중 치명적 오류: {e}")
-        _send_error_callback(user_id, video_id, str(e))
+        _send_error_callback(user_id, full_song_identifier, str(e))
         return {"status": "error", "error_message": str(e)}
 
 # >> 점수에 따른 등급 계산 헬퍼 (보완: 페널티 적용 및 등급 컷 수정)
@@ -236,43 +322,43 @@ def _calculate_grade(score, visibility_ratio=1.0):
     return grade
 
 # >> 성공 콜백 (규격 5.1)
-def _send_callback(user_id, video_id, song_id, result_data, s3_url):
+def _send_callback(user_id, full_song_identifier, result_data, s3_url):
     if not Config.USE_AWS: return
 
     url = f"{Config.API_GATEWAY_URL}/analysis/complete"
+    # >> [변경] 완료 통보 API 규격에서, video_id를 "song_id": "userID_songID_Artist_PartNumber"로 바꿔서 사용
     payload = {
         "status": "success",
         "user_id": user_id,
-        "video_id": video_id,
-        "song_id": song_id,
+        "song_id": full_song_identifier, # 여기서는 video_id 대신 이 값을 사용
         "data": {
             "total_score": result_data["summary"]["total_score"],
             "grade": result_data["summary"]["accuracy_grade"],
-            "practice_time": result_data["summary"]["practice_time_sec"],
             "s3_json_url": s3_url,
             "s3_thumbnail_url": "" 
         }
     }
     try:
         requests.post(url, json=payload)
-        print(f"[API] 완료 통보 전송 성공")
+        print(f"[API] 완료 통보 전송 성공: {payload}")
     except Exception as e:
         print(f"[API] 통보 실패: {e}")
 
 # >> 실패 콜백 (규격 5.2)
-def _send_error_callback(user_id, video_id, error_msg):
+def _send_error_callback(user_id, full_song_identifier, error_msg):
     if not Config.USE_AWS: return
     
     url = f"{Config.API_GATEWAY_URL}/analysis/complete"
+    # >> [변경] 실패 시 video_id를 "song_id": "userID_songID_Artist_PartNumber"로 바꿔서 사용
     payload = {
         "status": "fail",
         "user_id": user_id,
-        "video_id": video_id,
+        "song_id": full_song_identifier, 
         "error_code": "ANALYSIS_ERROR",
         "message": error_msg
     }
     try:
         requests.post(url, json=payload)
-        print(f"[API] 에러 통보 전송")
+        print(f"[API] 에러 통보 전송: {payload}")
     except Exception:
         pass
