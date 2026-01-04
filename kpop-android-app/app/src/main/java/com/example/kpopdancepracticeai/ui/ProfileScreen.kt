@@ -15,6 +15,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable // 이 문제를 해결하기 위해 추가된 import입니다.
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,13 +42,29 @@ fun ProfileScreen(
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit
 ) {
-    var selectedTab by remember { mutableStateOf("통계") }
+    // remember 대신 rememberSaveable을 사용하여 화면 재진입 시에도 탭 상태를 유지합니다.
+    // 이것은 네비게이션 이동 등으로 화면이 일시적으로 사라져도 그 상태를 번들(Bundle)에 저장해 두었다가 복구해줍니다.
+    var selectedTab by rememberSaveable { mutableStateOf("통계") }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
         contentPadding = paddingValues,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+        // [추가됨] 1. 타이틀을 스크롤 가능한 영역의 첫 번째 아이템으로 추가
+        item {
+            Text(
+                text = "KPOP 댄스 연습 앱",
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 8.dp),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.headlineSmall, // 기존 앱 바와 유사한 크기
+                fontWeight = FontWeight.Bold,
+                color = Color.Black
+            )
+        }
+
         item { ProfileHeaderCard(onDetailClick = onNavigateToAnalysis) }
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
 
