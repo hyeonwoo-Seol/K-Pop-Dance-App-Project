@@ -1,7 +1,9 @@
 package com.example.kpopdancepracticeai.ui
 
-import androidx.compose.foundation.BorderStroke // ⭐️ [수정] BorderStroke 임포트
+import androidx.compose.foundation.BorderStroke 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -11,8 +13,11 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -20,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kpopdancepracticeai.R
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 
 @Composable
@@ -147,21 +153,17 @@ fun LoginScreen(
                         Text("Google 계정으로 로그인", fontSize = 16.sp)
                     }
 
-                    // Apple 로그인 버튼 (검은색)
-                    Button(
-                        onClick = { /* TODO: Apple 로그인 로직 */ },
+                    // 카카오 로그인 버튼 (이미지 리소스 사용)
+                    Image(
+                        painter = painterResource(id = R.drawable.kakao_login_large_wide),
+                        contentDescription = "카카오로 시작하기",
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp),
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.Black,
-                            contentColor = Color.White
-                        ),
-                        shape = RoundedCornerShape(8.dp)
-                    ) {
-                        // TODO: Apple 아이콘 추가
-                        Text("Apple 계정으로 계속하기", fontSize = 16.sp)
-                    }
+                            .height(50.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { /* TODO: Kakao 로그인 로직 */ },
+                        contentScale = ContentScale.FillBounds
+                    )
 
                     // 약관 안내
                     Text(
