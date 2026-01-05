@@ -87,7 +87,13 @@ fun HomeScreen(
         }
 
         item {
-            SectionTitle(title = "인기 급상승 안무") // Components.kt의 SectionTitle 사용
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                SectionTitle(title = "인기 급상승 안무") // Components.kt의 SectionTitle 사용
+            }
         }
         item {
             LazyRow(
@@ -106,7 +112,13 @@ fun HomeScreen(
         }
 
         item {
-            SectionTitle(title = "인기 급상승 챌린지") // Components.kt의 SectionTitle 사용
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                SectionTitle(title = "인기 급상승 챌린지") // Components.kt의 SectionTitle 사용
+            }
         }
         item {
             LazyRow(
@@ -125,7 +137,13 @@ fun HomeScreen(
         }
 
         item {
-            SectionTitle(title = "최근 내가 조회한 안무") // Components.kt의 SectionTitle 사용
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+            ) {
+                SectionTitle(title = "최근 내가 조회한 안무") // Components.kt의 SectionTitle 사용
+            }
         }
         item {
             LazyRow(
@@ -144,8 +162,6 @@ fun HomeScreen(
         }
     }
 }
-
-// ⭐️ 여기에 있던 SectionTitle 함수 삭제됨!
 
 @Composable
 fun SongCard(
