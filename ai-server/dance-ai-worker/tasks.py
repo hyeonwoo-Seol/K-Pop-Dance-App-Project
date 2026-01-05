@@ -290,7 +290,8 @@ def pose_estimation_task(video_path, song_id, user_id):
         if not os.path.exists(expert_json_path) and Config.USE_AWS:
             logger.info(f"[Info] 전문가 데이터가 로컬에 없습니다. S3 다운로드 시도: {expert_json_filename}")
             try:
-                expert_bucket = "kpop-dance-app-data" 
+                # expert_bucket = "kpop-dance-app-data"
+                expert_bucket = Config.S3_BUCKET_NAME
                 expert_key = f"expert/{expert_json_filename}"
                 s3_manager.download_file(expert_bucket, expert_key, expert_json_path)
             except Exception as dl_err:
@@ -343,7 +344,8 @@ def pose_estimation_task(video_path, song_id, user_id):
         # 6. 결과 업로드 (S3 Manager 사용)
         s3_url = ""
         if Config.USE_AWS:
-            bucket = "kpop-dance-app-data"
+            # bucket = "kpop-dance-app-data"
+            bucket = Config.S3_BUCKET_NAME
             s3_key = f"analyzed/{user_id}/{result_filename}"
             s3_url = s3_manager.upload_json_gzipped(result_json_path, bucket, s3_key)
 
