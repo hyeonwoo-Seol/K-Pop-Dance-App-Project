@@ -29,4 +29,8 @@ interface UserDao {
     // 완료 곡 수 1 증가
     @Query("UPDATE user_stats SET completedSongCount = completedSongCount + 1 WHERE userId = :userId")
     suspend fun incrementSongCount(userId: String)
+
+    // 사용자의 평균 정확도 업데이트
+    @Query("UPDATE user_stats SET averageAccuracy = :newAverage WHERE userId = :userId")
+    suspend fun updateAverageAccuracy(userId: String, newAverage: Double)
 }

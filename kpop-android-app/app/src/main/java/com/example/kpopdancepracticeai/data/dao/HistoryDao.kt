@@ -22,6 +22,14 @@ interface HistoryDao {
     @Query("SELECT * FROM practice_history WHERE songId = :songId ORDER BY practiceDate DESC")
     fun getHistoryBySong(songId: String): Flow<List<PracticeHistory>>
 
+    // 특정 유저의 모든 연습 기록 조회 (날짜 오름차순 - 그래프용)
+    @Query("SELECT * FROM practice_history WHERE userId = :userId ORDER BY practiceDate ASC")
+    fun getAllHistoryByUser(userId: String): Flow<List<PracticeHistory>>
+
+    // 특정 유저의 전체 연습 정확도 평균 계산 (DB 자체 집계 함수 사용)
+    @Query("SELECT AVG(accuracy) FROM practice_history WHERE userId = :userId")
+    suspend fun getAverageAccuracy(userId: String): Double?
+
     // AWS로 전송되지 않은(미동기화) 데이터만 조회
     @Query("SELECT * FROM practice_history WHERE isSynced = 0")
     suspend fun getUnsyncedData(): List<PracticeHistory>
