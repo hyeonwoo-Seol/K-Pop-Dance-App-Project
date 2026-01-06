@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.kotlin.android) apply false
     alias(libs.plugins.kotlin.compose) apply false
-    // Room Database를 위한 KSP 플러그인 추가 (버전은 프로젝트의 Kotlin 버전에 맞춰 조정 필요, 여기선 1.9.0 기준 예시)
-    id("com.google.devtools.ksp") version "1.9.22-1.0.17" apply false
+    // Room Database를 위한 KSP 플러그인 추가
+    // [수정됨] Kotlin 2.0.21 버전에 맞춰 호환되는 KSP 버전(2.0.21-1.0.28)으로 변경했습니다.
+    id("com.google.devtools.ksp") version "2.0.21-1.0.28" apply false
 }
