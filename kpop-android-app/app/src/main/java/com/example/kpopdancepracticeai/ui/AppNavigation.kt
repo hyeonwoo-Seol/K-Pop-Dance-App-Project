@@ -138,7 +138,8 @@ fun KpopDancePracticeApp() {
         Screen.DancePractice.route,
         Screen.PracticeResult.route,
         Screen.AnalysisLoading.route, // 로딩 화면에서도 바 숨김
-        Screen.Record.route // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
+        Screen.Record.route, // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
+        Screen.Analysis.route // [수정됨] 분석 화면에서도 상단 바 숨김
     )
     val showMainBars = currentRoute !in screensToHideBars
 
@@ -327,8 +328,13 @@ fun AppNavHost(
 
         // 분석 화면
         composable(Screen.Analysis.route) {
-            AnalysisScreen(paddingValues = innerPadding
-                    ,onBackClick = {})
+            AnalysisScreen(
+                paddingValues = innerPadding,
+                onBackClick = {
+                    // [수정됨] 뒤로 가기 동작 연결
+                    navController.popBackStack()
+                }
+            )
         }
 
         // 프로필 화면 (Scaffold 패딩 적용)

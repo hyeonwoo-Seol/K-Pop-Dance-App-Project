@@ -67,18 +67,19 @@ fun AnalysisScreen(
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            //  뒤로가기 버튼과 타이틀을 Row로 묶어서 배치
+            //  뒤로가기 버튼과 타이틀을 Box로 묶어서 배치 (타이틀 중앙 정렬, 버튼 좌측 정렬)
             item {
-                Row(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 8.dp), // 상단 여백
-                    verticalAlignment = Alignment.CenterVertically // 수직 중앙 정렬
+                        .padding(top = 16.dp, bottom = 8.dp) // 상단 여백
                 ) {
-                    // 뒤로가기 버튼
+                    // 뒤로가기 버튼 (좌측 정렬)
                     IconButton(
                         onClick = onBackClick,
-                        modifier = Modifier.size(24.dp) // 버튼 크기 조절 (필요 시)
+                        modifier = Modifier
+                            .size(24.dp) // 버튼 크기 조절 (필요 시)
+                            .align(Alignment.CenterStart)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
@@ -87,9 +88,7 @@ fun AnalysisScreen(
                         )
                     }
 
-                    Spacer(modifier = Modifier.width(12.dp)) // 버튼과 텍스트 사이 간격
-
-                    // 타이틀 텍스트
+                    // 타이틀 텍스트 (중앙 정렬)
                     Text(
                         text = "상세 통계",
                         style = TextStyle(
@@ -97,7 +96,8 @@ fun AnalysisScreen(
                             fontSize = 24.sp,
                             lineHeight = 36.sp
                         ),
-                        color = TextDark
+                        color = TextDark,
+                        modifier = Modifier.align(Alignment.Center)
                     )
                 }
             }
