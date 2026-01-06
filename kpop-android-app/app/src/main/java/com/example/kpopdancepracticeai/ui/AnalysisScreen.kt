@@ -67,7 +67,7 @@ fun AnalysisScreen(
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            // ⭐️ [수정] 뒤로가기 버튼과 타이틀을 Row로 묶어서 배치
+            //  뒤로가기 버튼과 타이틀을 Row로 묶어서 배치
             item {
                 Row(
                     modifier = Modifier
@@ -83,7 +83,7 @@ fun AnalysisScreen(
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "뒤로가기",
-                            tint = TextDark // 아이콘 색상 (검정 계열)
+                            tint = TextDark // 아이콘 색상
                         )
                     }
 

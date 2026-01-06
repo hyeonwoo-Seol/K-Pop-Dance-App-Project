@@ -1,0 +1,91 @@
+import os
+import math
+
+def collect_and_split_kt_files():
+    # 설정: 대상 확장자와 출력 파일명 리스트
+    target_extension = '.kt'
+    output_files = ['compiled_code_1.txt', 'compiled_code_2.txt', 'compiled_code_3.txt']
+    
+    # 현재 스크립트가 위치한 디렉토리 파악
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    all_kt_files = []
+
+    print(f"검색 시작 위치: {current_dir}")
+
+    # 1. 하위 디렉토리를 포함한 모든 .kt 파일 탐색
+    for root, dirs, files in os.walk(current_dir):
+        for file in files:
+            if file.endswith(target_extension):
+                full_path = os.path.join(root, file)
+                all_kt_files.append(full_path)
+
+    total_count = len(all_kt_files)
+    print(f"총 {total_count}개의 {target_extension} 파일을 찾았습니다.")
+
+    if total_count == 0:
+        print("파일을 찾지 못해 종료합니다.")
+        return
+
+    # 2. 파일을 3개의 묶음으로 분할 (올림 처리를 통해 마지막 파일까지 포함)
+    chunk_size = math.ceil(total_count / 3)
+    chunks = [all_kt_files[i:i + chunk_size] for i in range(0, total_count, chunk_size)]
+
+    # 파일이 3개 미만인 경우 빈 리스트를 추가하여 항상 3개의 결과 파일이 생성되거나 루프가 돌도록 처리
+    while len(chunks) < 3:
+        chunks.append([])
+
+    # 3. 각 묶음을 txt 파일로 저장
+    global_counter = 1  # 전체 파일에 대한 고유 번호
+
+    for i in range(3):
+        out_filename = output_files[i]
+        file_list = chunks[i]
+        
+        # 파일 쓰기 모드
+        try:
+            with open(out_filename, 'w', encoding='utf-8') as out_f:
+                # 해당 묶음에 파일이 없는 경우 (파일 개수가 3개 미만일 때)
+                if not file_list:
+                    out_f.write("이 파일에는 저장된 코드가 없습니다.\n")
+                    print(f"{out_filename} 생성 완료 (비어 있음).")
+                    continue
+
+                for file_path in file_list:
+                    try:
+                        # 소스 코드 파일 읽기
+                        with open(file_path, 'r', encoding='utf-8') as source_f:
+                            content = source_f.read()
+                        
+                        filename = os.path.basename(file_path)
+                        abs_path = os.path.abspath(file_path)
+
+                        # 요청하신 포맷에 맞춰 작성
+                        # # n번 코드
+                        # 코드_파일명.kt
+                        # 코드파일의 절대 경로
+                        # 코드 내용
+                        out_f.write(f"# {global_counter}번 코드\n")
+                        out_f.write(f"{filename}\n")
+                        out_f.write(f"{abs_path}\n")
+                        out_f.write(f"{content}\n")
+                        
+                        # 파일 간 구분을 위해 개행 추가 (AI가 읽기 편하도록)
+                        out_f.write("\n" + ("-" * 30) + "\n\n")
+                        
+                        global_counter += 1
+                        
+                    except Exception as e:
+                        print(f"파일 읽기 오류 ({file_path}): {e}")
+                        out_f.write(f"# {global_counter}번 코드 (읽기 오류)\n")
+                        out_f.write(f"{os.path.basename(file_path)}\n")
+                        out_f.write(f"{file_path}\n")
+                        out_f.write(f"Error reading file: {e}\n\n")
+                        global_counter += 1
+
+            print(f"{out_filename} 생성 완료.")
+
+        except Exception as e:
+            print(f"{out_filename} 생성 중 치명적 오류 발생: {e}")
+
+if __name__ == "__main__":
+    collect_and_split_kt_files()
