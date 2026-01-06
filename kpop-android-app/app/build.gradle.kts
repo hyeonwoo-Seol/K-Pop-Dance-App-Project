@@ -76,4 +76,10 @@ dependencies {
 
     // AWS Mobile Client (Cognito 인증용)
     implementation("com.amazonaws:aws-android-sdk-mobile-client:2.77.0")
+
+    // API 통신용
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0") // 디버깅용
 }
