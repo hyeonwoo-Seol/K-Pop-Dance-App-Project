@@ -324,7 +324,7 @@ def pose_estimation_task(video_path, song_id, user_id):
             visibility_ratio = score_data.get("visibility_ratio", 1.0)
             final_data["summary"]["accuracy_grade"] = _calculate_grade(score_data["total_score"], visibility_ratio)
             
-            final_data["timeline_feedback"] = score_data["timeline"]
+            # final_data["timeline_feedback"] = score_data["timeline"]  <-- 제거됨
             
             frame_scores = score_data["frame_scores"]
             frame_errors = score_data["frame_errors"]

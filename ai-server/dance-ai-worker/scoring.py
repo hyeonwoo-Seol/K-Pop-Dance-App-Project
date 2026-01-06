@@ -124,8 +124,8 @@ class Scoring:
         
         aligned_user_frames = user_frames_raw[user_start_idx_in_raw:]
         
-        # [수정] frame_errors 반환 추가
-        worst_indices, part_accuracies, timeline, frame_scores, frame_errors = self._analyze_details(
+        # [수정] frame_errors 반환 추가 (timeline 제거)
+        worst_indices, part_accuracies, frame_scores, frame_errors = self._analyze_details(
             path, 
             synced_user_feat, synced_expert_feat, 
             synced_user_norm, synced_expert_norm,
@@ -148,7 +148,7 @@ class Scoring:
             "total_score": int(final_score),
             "part_accuracies": part_accuracies, # 부위별 정확도 추가
             "worst_points": worst_indices,      # 상위 3개 안 좋은 Index 추가
-            "timeline": timeline,
+            # "timeline": timeline,             # 제거됨
             "frame_scores": full_frame_scores,
             "frame_errors": full_frame_errors,  # [수정] 프레임별 에러 리스트 추가
             "visibility_ratio": visibility_ratio 
@@ -288,7 +288,7 @@ class Scoring:
         kp_error_accum = np.zeros(18)
         
         angle_names = list(self.ANGLES_DEF.keys()) + ["torso_angle"] # 순서 중요 (9개)
-        timeline = []
+        # timeline = [] # 제거됨
         frame_scores = [] 
         frame_errors_list = [] # [수정] 프레임별 에러 리스트 (0 or 1)
         
@@ -349,17 +349,7 @@ class Scoring:
                 pass
 
                 frame_info = aligned_user_frames[u_idx]
-                # 1초(약 30프레임) 단위로 피드백 생성
-                if frame_info['frame_index'] % 30 == 0:
-                    start = frame_info['timestamp']
-                    timeline.append({
-                        "start_sec": float(f"{start:.2f}"),
-                        "end_sec": float(f"{start + 1.0:.2f}"),
-                        "score": int(frame_score),
-                        "comment": "자세 정확도가 떨어집니다.",
-                        # 해당 시점에서 오차가 20도 이상인 각도 인덱스들
-                        "error_part_index": [i for i, d in enumerate(feat_diffs[:8]) if d > 20.0] 
-                    })
+                # 1초(약 30프레임) 단위로 피드백 생성 로직 삭제됨
         
         # [수정] DTW Path 순회 후, 각 프레임별 Max Error를 에러 리스트로 확정
         # u_idx가 여러 번 등장할 수 있으므로, 등장할 때마다 에러를 OR 연산하거나 Max 값 사용
@@ -399,4 +389,4 @@ class Scoring:
             kp_name = self.KEYPOINT_NAMES.get(idx, f"Unknown({idx})")
             worst_indices.append(kp_name)
         
-        return worst_indices, part_accuracies, timeline, frame_scores, final_frame_errors
+        return worst_indices, part_accuracies, frame_scores, final_frame_errors
