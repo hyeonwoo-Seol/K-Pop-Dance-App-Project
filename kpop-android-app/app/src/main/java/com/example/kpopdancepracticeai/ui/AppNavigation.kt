@@ -302,8 +302,11 @@ fun AppNavHost(
         // 홈 화면 (Scaffold 패딩 적용)
         composable(Screen.Home.route) {
             HomeScreen(
-                onSearchClick = {
-                    navController.navigate(Screen.Search.route)
+                // [수정] 검색어 입력 시 결과 화면으로 이동
+                onSearch = { query ->
+                    if (query.isNotBlank()) {
+                        navController.navigate("searchResults/$query")
+                    }
                 },
                 // onSongClick 구현: SongDetail로 이동
                 onSongClick = { songId ->
