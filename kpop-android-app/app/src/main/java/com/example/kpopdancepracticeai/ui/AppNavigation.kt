@@ -160,11 +160,12 @@ fun KpopDancePracticeApp() {
             containerColor = Color.Transparent, // Scaffold 배경을 투명하게
             topBar = {
                 AnimatedVisibility(
-                    // [수정됨] 홈, 프로필, 검색 화면일 때는 상단 바를 숨깁니다 (스크롤 가능한 타이틀 사용을 위해)
+                    // [수정됨] 홈, 프로필, 검색, 그리고 검색 결과 화면일 때는 상단 바를 숨깁니다
                     visible = showMainBars &&
                             currentRoute != Screen.Home.route &&
                             currentRoute != Screen.Profile.route &&
-                            currentRoute != Screen.Search.route,
+                            currentRoute != Screen.Search.route &&
+                            currentRoute != Screen.SearchResults.route, // 검색 결과 화면에서도 상단 바 숨김
                     enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
                 ) {
@@ -302,8 +303,11 @@ fun AppNavHost(
         // 홈 화면 (Scaffold 패딩 적용)
         composable(Screen.Home.route) {
             HomeScreen(
-                onSearchClick = {
-                    navController.navigate(Screen.Search.route)
+                // [수정] 검색어 입력 시 결과 화면으로 이동
+                onSearch = { query ->
+                    if (query.isNotBlank()) {
+                        navController.navigate("searchResults/$query")
+                    }
                 },
                 // onSongClick 구현: SongDetail로 이동
                 onSongClick = { songId ->

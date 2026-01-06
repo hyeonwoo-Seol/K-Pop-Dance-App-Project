@@ -76,8 +76,7 @@ fun SearchResultsScreen(
     navController: NavHostController,
     paddingValues: PaddingValues
 ) {
-    // 검색창의 텍스트 상태는 전달받은 query로 초기화
-    var searchText by remember { mutableStateOf(query) }
+    // 검색창의 텍스트 상태는 제거되었습니다. (요청사항 반영)
 
     // TODO: 이 query를 ViewModel에 전달하여 실제 검색 결과 (songResult, recommendedSongs)를 가져옵니다.
     // 여기서는 더미 데이터를 즉시 사용합니다.
@@ -107,36 +106,8 @@ fun SearchResultsScreen(
             )
         }
 
-        // --- 2. 검색창 (스니펫 스타일 적용) ---
-        item {
-            OutlinedTextField(
-                value = searchText,
-                onValueChange = { searchText = it },
-                placeholder = {
-                    Text(
-                        text = "whiplash", // 스니펫 기본 텍스트
-                        color = Color(0xff717182),
-                        style = TextStyle(
-                            fontWeight = FontWeight(400),
-                            fontSize = 16.sp,
-                        )
-                    )
-                },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = "Search Icon") },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(50.dp),
-                shape = RoundedCornerShape(27417100.dp), // 스니펫의 큰 값 (사실상 CircleShape)
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedContainerColor = Color(0xffffffff),
-                    unfocusedContainerColor = Color(0xffffffff),
-                    disabledContainerColor = Color(0xffffffff),
-                    focusedBorderColor = Color(0xffe5e7eb), // 스니펫 테두리 색
-                    unfocusedBorderColor = Color(0xffe5e7eb),
-                ),
-                singleLine = true,
-            )
-        }
+        // --- 2. 검색창 제거됨 (요청사항 반영) ---
+        // 원래 위치하던 OutlinedTextField 블록이 삭제되었습니다.
 
         // --- 3. 필터 칩 (스니펫 스타일 적용) ---
         item {
@@ -146,7 +117,7 @@ fun SearchResultsScreen(
                 items(filters) { filterName ->
                     StyledFilterChip(
                         text = filterName,
-                        onClick = { /* TODO: 필터 로J- */ }
+                        onClick = { /* TODO: 필터 로직 */ }
                     )
                 }
             }
