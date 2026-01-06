@@ -43,10 +43,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -57,9 +59,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.kpopdancepracticeai.KpopApplication
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.viewmodel.MainViewModelFactory
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
-import java.net.URLDecoder
 
 // --- 1. 내비게이션 경로(Route) 정의 ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
@@ -124,6 +129,17 @@ fun KpopDancePracticeApp() {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
 
+    // [오류 해결] 1. MainViewModelFactory를 사용하여 ViewModel 생성
+    val context = LocalContext.current
+    // AndroidManifest.xml에 android:name=".KpopApplication"이 등록되어 있어야 함
+    val app = context.applicationContext as KpopApplication
+    val repository = app.repository
+
+    // 앱 전체에서 공유할 뷰모델 인스턴스 생성
+    val mainViewModel: MainViewModel = viewModel(
+        factory = MainViewModelFactory(repository)
+    )
+
     // 상/하단 바 숨길 화면 목록
     val screensToHideBars = listOf(
         Screen.Login.route,
@@ -186,7 +202,8 @@ fun KpopDancePracticeApp() {
             // --- 3. 내비게이션 호스트 ---
             AppNavHost(
                 navController = navController,
-                innerPadding = innerPadding
+                innerPadding = innerPadding,
+                viewModel = mainViewModel // [오류 해결] 2. 생성한 ViewModel을 하위로 전달
             )
         }
     }
@@ -281,7 +298,8 @@ fun AppBottomNavigationBar(navController: NavController) {
 fun AppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
-    innerPadding: PaddingValues
+    innerPadding: PaddingValues,
+    viewModel: MainViewModel // [오류 해결] 3. 전달받은 ViewModel
 ) {
     NavHost(
         navController = navController,
@@ -361,7 +379,9 @@ fun AppNavHost(
                 },
                 onNavigateToAnalysis = {
                     navController.navigate(Screen.Analysis.route)
-                }
+                },
+                // [오류 해결] 4. ProfileScreen에 준비된 viewModel 전달
+                viewModel = viewModel
             )
         }
 

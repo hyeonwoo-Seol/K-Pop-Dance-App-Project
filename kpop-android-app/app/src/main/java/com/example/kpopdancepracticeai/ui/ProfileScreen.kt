@@ -1,5 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,6 +13,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,6 +25,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -29,8 +33,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-// import com.example.kpopdancepracticeai.viewmodel.MainViewModel // 추후 주석 해제
-
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -44,11 +47,23 @@ fun ProfileScreen(
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
-    // viewModel: MainViewModel = viewModel() // 추후 활성화: 뷰모델 주입
+    viewModel: MainViewModel = viewModel()
 ) {
-    // 전략 문서 반영: ViewModel에서 UserStats 데이터를 관찰(Observe)해야 함
-    // val userStats by viewModel.userStats.collectAsState(initial = null)
-    // val achievements by viewModel.achievements.collectAsState(initial = emptyList())
+    // ViewModel 상태 구독
+    val userStats by viewModel.userStats.collectAsState()
+    val achievements by viewModel.achievements.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
+    val syncMessage by viewModel.syncMessage.collectAsState()
+
+    val context = LocalContext.current
+
+    // 동기화 결과 메시지(Toast) 처리
+    LaunchedEffect(syncMessage) {
+        syncMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearSyncMessage()
+        }
+    }
 
     var selectedTab by rememberSaveable { mutableStateOf("통계") }
 
@@ -57,12 +72,14 @@ fun ProfileScreen(
         contentPadding = paddingValues,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        item { ProfileHeaderCard(onDetailClick = onNavigateToAnalysis) }
+        // 프로필 헤더
+        item { ProfileHeaderCard(userStats = userStats, onDetailClick = onNavigateToAnalysis) }
+        // 탭 메뉴
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
 
         when (selectedTab) {
             "통계" -> {
-                item { StatisticsRow() } // 추후 userStats 데이터 전달 필요
+                item { StatisticsRow(userStats = userStats) }
                 item { AchievementsSummaryCard() }
                 item { AcquiredBadgesCard() }
             }
@@ -70,7 +87,7 @@ fun ProfileScreen(
                 item {
                     Text(text = "업적 및 성과", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
                 }
-                // DB 연동 시 achievements 리스트 사용
+                // TODO: 실제 achievements 데이터를 연동할 수 있음
                 val achievementsList = listOf(
                     Triple("완벽주의자", "95% 이상의 정확도 5회 달성", 0.8f),
                     Triple("연습 벌레", "총 연습 시간 100시간 달성", 0.41f),
@@ -84,7 +101,17 @@ fun ProfileScreen(
             }
             "설정" -> {
                 item {
-                    SettingsContent(onNavigateToProfileEdit, onNavigateToPracticeSettings, onNavigateToNotificationSettings, onNavigateToPrivacySettings, onNavigateToAppInfo, onNavigateToWithdrawal)
+                    SettingsContent(
+                        onNavigateToProfileEdit,
+                        onNavigateToPracticeSettings,
+                        onNavigateToNotificationSettings,
+                        onNavigateToPrivacySettings,
+                        onNavigateToAppInfo,
+                        onNavigateToWithdrawal,
+                        // [수정됨] 동기화 클릭 시 ViewModel 호출
+                        onSyncClick = { viewModel.refreshData() },
+                        isSyncing = isSyncing
+                    )
                 }
             }
         }
@@ -93,7 +120,10 @@ fun ProfileScreen(
 }
 
 @Composable
-fun ProfileHeaderCard(onDetailClick: () -> Unit) {
+fun ProfileHeaderCard(
+    userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
+    onDetailClick: () -> Unit
+) {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 4.dp) {
         Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.AccountCircle, "프로필 이미지", modifier = Modifier.size(64.dp).clip(CircleShape), tint = Color.LightGray)
@@ -104,12 +134,26 @@ fun ProfileHeaderCard(onDetailClick: () -> Unit) {
                     CustomShadowButton("상세 통계 보기", onDetailClick, 92.dp, 35.dp, 11.sp)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                // DB 데이터 연동 시 실제 값 표시
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) { StatColumn("경험치", "1250 XP"); StatColumn("Level", "Lv. 5") }
+
+                val currentXp = userStats?.currentXp ?: 0
+                val currentLevel = userStats?.currentLevel ?: 1
+                val avgAccuracy = userStats?.averageAccuracy ?: 0f
+
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    StatColumn("경험치", "$currentXp XP")
+                    StatColumn("Level", "Lv. $currentLevel")
+                }
                 Spacer(modifier = Modifier.height(12.dp))
                 Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("평균 정확도", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium); Text("87/100", style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-                    Spacer(modifier = Modifier.height(4.dp)); LinearProgressIndicator(progress = { 0.87f }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("평균 정확도", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        Text("${avgAccuracy.toInt()}/100", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { avgAccuracy / 100f },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                    )
                 }
             }
         }
@@ -141,10 +185,19 @@ fun CustomShadowButton(text: String, onClick: () -> Unit, width: androidx.compos
 }
 
 @Composable
-fun StatisticsRow() {
-    // DB 데이터 연동 시 실제 값 사용
+fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserStats?) {
+    // [확인] DB에서 불러온 데이터를 UI에 매핑
+    val totalTimeMin = (userStats?.totalPracticeTimeSeconds ?: 0) / 60
+    val totalTimeText = if (totalTimeMin > 60) "${totalTimeMin/60}H" else "${totalTimeMin}M"
+
+    // [수정] completedSongCount 사용 (동기화 테스트 시 이 값이 변경됨)
+    val completedSongs = "${userStats?.completedSongCount ?: 0}개"
+    val avgAccuracy = "${userStats?.averageAccuracy?.toInt() ?: 0}%"
+
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        StatCard(Modifier.weight(1f), "41H", "총 연습시간"); StatCard(Modifier.weight(1f), "5개", "완료한 곡 개수"); StatCard(Modifier.weight(1f), "89%", "평균 정확도")
+        StatCard(Modifier.weight(1f), totalTimeText, "총 연습시간")
+        StatCard(Modifier.weight(1f), completedSongs, "완료한 곡 개수")
+        StatCard(Modifier.weight(1f), avgAccuracy, "평균 정확도")
     }
 }
 
@@ -161,7 +214,6 @@ fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
 fun AchievementsSummaryCard() {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // 이모티콘 제거
             Text("진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             listOf("완벽주의자" to 0.8f, "연습 벌레" to 0.3f, "BTS 마스터" to 0.5f, "챌린지 헌터" to 0.1f).forEach { (l, p) -> AchievementProgressItem(l, p, "${(p * 100).toInt()}%") }
         }
@@ -186,7 +238,6 @@ fun AcquiredBadgesCard() {
     val badges = mapOf("BTS 마스터" to Color(0xFFEBEBFF), "NewJeans 팬" to Color(0xFFD6F5FF), "BLACKPINK 전문가" to Color(0xFFFFD6EB), "초급자 졸업" to Color(0xFFD9FFE5), "중급자" to Color(0xFFFFFAD6))
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            // 이모티콘 제거
             Text("획득한 뱃지", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 badges.forEach { (text, color) -> BadgeChip(text = text, color = color) }
@@ -195,10 +246,17 @@ fun AcquiredBadgesCard() {
     }
 }
 
-// BadgeChip 컴포넌트는 Components.kt 또는 다른 파일에 정의되어 있다고 가정
-
 @Composable
-fun SettingsContent(onNavigateToProfileEdit: () -> Unit, onNavigateToPracticeSettings: () -> Unit, onNavigateToNotificationSettings: () -> Unit, onNavigateToPrivacySettings: () -> Unit, onNavigateToAppInfo: () -> Unit, onNavigateToWithdrawal: () -> Unit) {
+fun SettingsContent(
+    onNavigateToProfileEdit: () -> Unit,
+    onNavigateToPracticeSettings: () -> Unit,
+    onNavigateToNotificationSettings: () -> Unit,
+    onNavigateToPrivacySettings: () -> Unit,
+    onNavigateToAppInfo: () -> Unit,
+    onNavigateToWithdrawal: () -> Unit,
+    onSyncClick: () -> Unit,
+    isSyncing: Boolean
+) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("설정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
         Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 4.dp) {
@@ -208,6 +266,16 @@ fun SettingsContent(onNavigateToProfileEdit: () -> Unit, onNavigateToPracticeSet
                 SettingsMenuItem("알림 설정", Icons.Outlined.Notifications, Color(0xFFFFF9E6), onClick = onNavigateToNotificationSettings); SettingsMenuDivider()
                 SettingsMenuItem("개인정보 보호 및 권한", Icons.Outlined.Shield, Color(0xFFE6F7EB), onClick = onNavigateToPrivacySettings); SettingsMenuDivider()
                 SettingsMenuItem("앱 정보", Icons.Outlined.Info, Color(0xFFF3F4F6), onClick = onNavigateToAppInfo); SettingsMenuDivider()
+
+                // [수정됨] 최신 데이터 동기화 버튼 (상태에 따라 UI 변경)
+                SettingsMenuItem(
+                    text = if (isSyncing) "데이터 받아오는 중..." else "최신 데이터 동기화",
+                    icon = if (isSyncing) Icons.Default.HourglassEmpty else Icons.Default.Sync,
+                    iconBgColor = Color(0xFFE3F2FD),
+                    textColor = if (isSyncing) Color.Gray else Color.Black,
+                    onClick = onSyncClick
+                ); SettingsMenuDivider()
+
                 SettingsMenuItem("회원 탈퇴", Icons.Outlined.ExitToApp, Color(0xFFFFF0F0), textColor = Color.Red, onClick = onNavigateToWithdrawal)
             }
         }

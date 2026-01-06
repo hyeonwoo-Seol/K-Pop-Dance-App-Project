@@ -18,6 +18,10 @@ interface UserDao {
     @Query("SELECT * FROM user_stats WHERE userId = :userId")
     fun getUserStats(userId: String): Flow<UserStats?>
 
+    // 1회성 조회 동기화 버튼 전용
+    @Query("SELECT * FROM user_stats WHERE userId = :userId")
+    suspend fun getUserStatsOneShot(userId: String): UserStats?
+
     // 사용자 통계 저장 또는 업데이트 (충돌 시 덮어쓰기)
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdate(userStats: UserStats)
