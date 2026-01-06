@@ -143,24 +143,24 @@ fun PracticeResultScreen(
                     .border(1.25.dp, Color(0xffe9d4ff), RectangleShape) // RectangleShape or Rounded? Figma said Rectangle in code snippet but had corners in others. Using RectangleShape as per code.
                     .background(Color.White, RoundedCornerShape(14.dp))
                     .border(1.25.dp, Color(0xffe9d4ff), RoundedCornerShape(14.dp)) // Override with corners
-                    .padding(24.dp),
+                    .padding(20.dp),
             ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(1.dp),
                     horizontalAlignment = Alignment.Start,
                 ) {
                     // Total Accuracy
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(7.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Text(
                             text = "${result.accuracy}%",
                             style = TextStyle(
                                 fontWeight = FontWeight(700),
-                                fontSize = 48.sp,
+                                fontSize = 52.sp,
                                 lineHeight = 48.sp,
                             ),
                             color = Color(0xff9810fa),
@@ -170,7 +170,7 @@ fun PracticeResultScreen(
                             text = "전체 정확도",
                             style = TextStyle(
                                 fontWeight = FontWeight(400),
-                                fontSize = 14.sp,
+                                fontSize = 18.sp,
                                 lineHeight = 20.sp,
                             ),
                             color = Color(0xff717182),
@@ -181,13 +181,13 @@ fun PracticeResultScreen(
                     // Song Info
                     Box(
                         modifier = Modifier
-                            .height(45.dp)
+                            .height(80.dp)
                             .fillMaxWidth(),
                         contentAlignment = Alignment.Center
                     ) {
                         Box(
                             modifier = Modifier
-                                .height(10.dp)
+                                .height(16.dp)
                                 .fillMaxWidth()
                                 .background(Color(0x33030213), RoundedCornerShape(50.dp))
                         ) {
@@ -195,17 +195,17 @@ fun PracticeResultScreen(
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth(result.accuracy / 100f) // Dynamic progress
-                                    .height(12.dp)
+                                    .height(16.dp)
                                     .background(Color(0xff030213), RoundedCornerShape(50.dp))
                             )
                         }
                         // Song Title Overlay (Visual tweak to match Figma layout logic)
                         Text(
-                            modifier = Modifier.padding(top=32.dp),
+                            modifier = Modifier.padding(top=50.dp),
                             text = "${result.title} - 3:00",
                             style = TextStyle(
                                 fontWeight = FontWeight(400),
-                                fontSize = 12.sp,
+                                fontSize = 20.sp,
                                 lineHeight = 16.sp,
                             ),
                             color = Color(0xff717182),
@@ -558,20 +558,20 @@ fun ScoreDetailItem(label: String, score: Int) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(8.dp)
-                .background(Color(0xff9810fa), RoundedCornerShape(50.dp))
-        )
-        Text(
-            text = "$label: ${score}점",
-            style = TextStyle(
-                fontWeight = FontWeight(400),
-                fontSize = 12.sp,
-                lineHeight = 16.sp,
-            ),
-            color = Color(0xff717182),
-        )
+//        Box(
+//            modifier = Modifier
+//                .size(8.dp)
+//                .background(Color(0xff9810fa), RoundedCornerShape(50.dp))
+//        )
+//        Text(
+//            text = "$label: ${score}점",
+//            style = TextStyle(
+//                fontWeight = FontWeight(400),
+//                fontSize = 12.sp,
+//                lineHeight = 16.sp,
+//            ),
+//            color = Color(0xff717182),
+//        )
     }
 }
 
