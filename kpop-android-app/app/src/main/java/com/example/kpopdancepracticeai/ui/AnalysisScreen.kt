@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.CheckCircle
@@ -27,6 +28,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kpopdancepracticeai.ui.theme.*
@@ -40,7 +42,8 @@ private val HeatmapLevel4 = Color(0xff006045)
 
 @Composable
 fun AnalysisScreen(
-    paddingValues: PaddingValues
+    paddingValues: PaddingValues,
+    onBackClick: () -> Unit
 ) {
     val appGradient = Brush.verticalGradient(
         colors = listOf(
@@ -53,27 +56,52 @@ fun AnalysisScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(appGradient)
-            .padding(paddingValues)
+            //  시스템 상태 표시줄과 겹치지 않게 패딩 추가
+            .statusBarsPadding()
+            // 하단 네비게이션 바 높이만큼 패딩 처리
+            .padding(bottom = paddingValues.calculateBottomPadding())
     ) {
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
+            //  뒤로가기 버튼과 타이틀을 Box로 묶어서 배치 (타이틀 중앙 정렬, 버튼 좌측 정렬)
             item {
-                Text(
-                    text = "상세 통계",
-                    style = TextStyle(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 24.sp,
-                        lineHeight = 36.sp
-                    ),
-                    color = TextDark,
-                    modifier = Modifier.padding(top = 16.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 16.dp, bottom = 8.dp) // 상단 여백
+                ) {
+                    // 뒤로가기 버튼 (좌측 정렬)
+                    IconButton(
+                        onClick = onBackClick,
+                        modifier = Modifier
+                            .size(24.dp) // 버튼 크기 조절 (필요 시)
+                            .align(Alignment.CenterStart)
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "뒤로가기",
+                            tint = TextDark // 아이콘 색상
+                        )
+                    }
+
+                    // 타이틀 텍스트 (중앙 정렬)
+                    Text(
+                        text = "상세 통계",
+                        style = TextStyle(
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 24.sp,
+                            lineHeight = 36.sp
+                        ),
+                        color = TextDark,
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
             }
+
             item { StatisticsOverviewSection() }
             item { GrowthGraphSection() }
         }
@@ -291,5 +319,17 @@ fun SimpleLineChart(dataPoints: List<Float>, labels: List<String>, lineColor: Co
         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
             labels.forEach { Text(it, fontSize = 10.sp, color = TextLightGray) }
         }
+    }
+}
+
+
+@Preview(showBackground = true)
+@Composable
+fun AnalysisScreenPreview(){
+    KpopDancePracticeAITheme {
+        AnalysisScreen(
+            PaddingValues(),
+            onBackClick = {}
+        )
     }
 }
