@@ -46,19 +46,7 @@ fun SearchScreen(
         contentPadding = paddingValues,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // [추가됨] 1. 타이틀을 스크롤 가능한 영역의 첫 번째 아이템으로 추가
-        item {
-            Text(
-                text = "KPOP 댄스 연습 앱",
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 16.dp, bottom = 8.dp),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                style = MaterialTheme.typography.headlineSmall, // 기존 앱 바와 유사한 크기
-                fontWeight = FontWeight.Bold,
-                color = Color.Black
-            )
-        }
+        // [삭제됨] 타이틀("KPOP 댄스 연습 앱") 제거 (요청사항 반영)
 
         // --- 화면 타이틀 ---
         item {

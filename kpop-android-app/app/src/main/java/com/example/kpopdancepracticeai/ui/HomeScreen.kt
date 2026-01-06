@@ -7,6 +7,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions // [추가] 키보드 액션
+import androidx.compose.foundation.text.KeyboardOptions // [추가] 키보드 옵션
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
@@ -17,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction // [추가] 키보드 액션 타입
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
@@ -47,7 +50,7 @@ val challengeSongs = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    onSearchClick: () -> Unit,
+    onSearch: (String) -> Unit, // [수정] 검색어 입력을 처리하기 위해 String 매개변수 추가 및 이름 변경
     onSongClick: (String) -> Unit,
     paddingValues: PaddingValues
 ) {
@@ -80,9 +83,15 @@ fun HomeScreen(
                 leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .clickable { onSearchClick() },
-                readOnly = true,
+                    .padding(horizontal = 16.dp),
+                // [수정] clickable 및 readOnly 제거하여 입력 가능하게 변경
+                singleLine = true, // [추가] 한 줄 입력
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search), // [추가] 키보드 엔터 키를 검색 아이콘으로 변경
+                keyboardActions = KeyboardActions( // [추가] 검색 버튼 클릭 시 동작 정의
+                    onSearch = {
+                        onSearch(searchText)
+                    }
+                )
             )
         }
 
@@ -219,6 +228,6 @@ fun SongCard(
 @Composable
 fun HomeScreenPreview() {
     KpopDancePracticeAITheme {
-        HomeScreen(onSearchClick = {}, onSongClick = {}, paddingValues = PaddingValues())
+        HomeScreen(onSearch = {}, onSongClick = {}, paddingValues = PaddingValues())
     }
 }
