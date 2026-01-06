@@ -15,7 +15,7 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable // 이 문제를 해결하기 위해 추가된 import입니다.
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,6 +28,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+// import com.example.kpopdancepracticeai.viewmodel.MainViewModel // 추후 주석 해제
+
 import com.example.kpopdancepracticeai.ui.theme.*
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
@@ -40,10 +43,13 @@ fun ProfileScreen(
     onNavigateToPrivacySettings: () -> Unit,
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
-    onNavigateToAnalysis: () -> Unit
+    onNavigateToAnalysis: () -> Unit,
+    // viewModel: MainViewModel = viewModel() // 추후 활성화: 뷰모델 주입
 ) {
-    // remember 대신 rememberSaveable을 사용하여 화면 재진입 시에도 탭 상태를 유지합니다.
-    // 이것은 네비게이션 이동 등으로 화면이 일시적으로 사라져도 그 상태를 번들(Bundle)에 저장해 두었다가 복구해줍니다.
+    // 전략 문서 반영: ViewModel에서 UserStats 데이터를 관찰(Observe)해야 함
+    // val userStats by viewModel.userStats.collectAsState(initial = null)
+    // val achievements by viewModel.achievements.collectAsState(initial = emptyList())
+
     var selectedTab by rememberSaveable { mutableStateOf("통계") }
 
     LazyColumn(
@@ -51,14 +57,12 @@ fun ProfileScreen(
         contentPadding = paddingValues,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // [삭제됨] 타이틀("KPOP 댄스 연습 앱") 제거 (요청사항 반영)
-
         item { ProfileHeaderCard(onDetailClick = onNavigateToAnalysis) }
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
 
         when (selectedTab) {
             "통계" -> {
-                item { StatisticsRow() }
+                item { StatisticsRow() } // 추후 userStats 데이터 전달 필요
                 item { AchievementsSummaryCard() }
                 item { AcquiredBadgesCard() }
             }
@@ -66,6 +70,7 @@ fun ProfileScreen(
                 item {
                     Text(text = "업적 및 성과", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
                 }
+                // DB 연동 시 achievements 리스트 사용
                 val achievementsList = listOf(
                     Triple("완벽주의자", "95% 이상의 정확도 5회 달성", 0.8f),
                     Triple("연습 벌레", "총 연습 시간 100시간 달성", 0.41f),
@@ -99,11 +104,12 @@ fun ProfileHeaderCard(onDetailClick: () -> Unit) {
                     CustomShadowButton("상세 통계 보기", onDetailClick, 92.dp, 35.dp, 11.sp)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) { StatColumn("경험치", "N/A"); StatColumn("Level", "N/A") }
+                // DB 데이터 연동 시 실제 값 표시
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) { StatColumn("경험치", "1250 XP"); StatColumn("Level", "Lv. 5") }
                 Spacer(modifier = Modifier.height(12.dp))
                 Column {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("평균 정확도", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium); Text("0/100", style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
-                    Spacer(modifier = Modifier.height(4.dp)); LinearProgressIndicator(progress = { 0.0f }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)))
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) { Text("평균 정확도", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium); Text("87/100", style = MaterialTheme.typography.bodySmall, color = Color.Gray) }
+                    Spacer(modifier = Modifier.height(4.dp)); LinearProgressIndicator(progress = { 0.87f }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)))
                 }
             }
         }
@@ -136,6 +142,7 @@ fun CustomShadowButton(text: String, onClick: () -> Unit, width: androidx.compos
 
 @Composable
 fun StatisticsRow() {
+    // DB 데이터 연동 시 실제 값 사용
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         StatCard(Modifier.weight(1f), "41H", "총 연습시간"); StatCard(Modifier.weight(1f), "5개", "완료한 곡 개수"); StatCard(Modifier.weight(1f), "89%", "평균 정확도")
     }
@@ -154,7 +161,8 @@ fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
 fun AchievementsSummaryCard() {
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("🏆 진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            // 이모티콘 제거
+            Text("진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             listOf("완벽주의자" to 0.8f, "연습 벌레" to 0.3f, "BTS 마스터" to 0.5f, "챌린지 헌터" to 0.1f).forEach { (l, p) -> AchievementProgressItem(l, p, "${(p * 100).toInt()}%") }
         }
     }
@@ -178,15 +186,16 @@ fun AcquiredBadgesCard() {
     val badges = mapOf("BTS 마스터" to Color(0xFFEBEBFF), "NewJeans 팬" to Color(0xFFD6F5FF), "BLACKPINK 전문가" to Color(0xFFFFD6EB), "초급자 졸업" to Color(0xFFD9FFE5), "중급자" to Color(0xFFFFFAD6))
     Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("✨ 획득한 뱃지", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            // 이모티콘 제거
+            Text("획득한 뱃지", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                badges.forEach { (text, color) -> BadgeChip(text = text, color = color) } // 공통 컴포넌트 사용
+                badges.forEach { (text, color) -> BadgeChip(text = text, color = color) }
             }
         }
     }
 }
 
-// ⭐️ BadgeChip 정의 삭제됨
+// BadgeChip 컴포넌트는 Components.kt 또는 다른 파일에 정의되어 있다고 가정
 
 @Composable
 fun SettingsContent(onNavigateToProfileEdit: () -> Unit, onNavigateToPracticeSettings: () -> Unit, onNavigateToNotificationSettings: () -> Unit, onNavigateToPrivacySettings: () -> Unit, onNavigateToAppInfo: () -> Unit, onNavigateToWithdrawal: () -> Unit) {
