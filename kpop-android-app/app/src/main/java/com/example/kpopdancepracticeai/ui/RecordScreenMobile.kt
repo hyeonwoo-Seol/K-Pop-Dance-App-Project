@@ -33,7 +33,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import com.example.kpopdancepracticeai.data.PresignedUrlUploader
 import com.example.kpopdancepracticeai.data.S3Uploader // [추가됨] S3Uploader 임포트
+import kotlinx.coroutines.launch
 
 @Composable
 fun RecordScreen(
@@ -46,9 +48,10 @@ fun RecordScreen(
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val scope = rememberCoroutineScope() // Coroutine Scope 생성
 
     // [추가됨] S3 업로더 인스턴스
-    val s3Uploader = remember { S3Uploader(context) }
+    val uploader = remember { PresignedUrlUploader(context) }
 
     // [추가됨] 권한 상태 관리
     var hasPermissions by remember {
@@ -265,20 +268,37 @@ fun RecordScreen(
                                                 // [추가됨] S3 업로드 트리거 (Task T3-1 핵심)
                                                 // TODO: 실제 userId를 로그인 정보에서 가져와야 함
                                                 val userId = "user_test_01"
-                                                val s3Key = "$userId/${System.currentTimeMillis()}/raw.mp4"
+                                                val safeSongTitle = songTitle.replace(" ", "_")
+                                                val safePart = part.replace(" ", "_").replace(":", "")
 
-                                                s3Uploader.uploadVideo(
-                                                    fileUri = uri,
-                                                    s3Key = s3Key,
-                                                    onComplete = {
-                                                        // 메인 스레드 UI 처리 필요 시 Handler 사용 권장
-                                                        Log.d("RecordScreen", "Upload Complete: $s3Key")
-                                                        onRecordingComplete(s3Key)
-                                                    },
-                                                    onError = { e ->
-                                                        Log.e("RecordScreen", "Upload Failed", e)
-                                                    }
-                                                )
+                                                val filename = "${userId}_${safeSongTitle}_${safePart}.mp4"
+
+                                                scope.launch {
+                                                    uploader.uploadVideo(
+                                                        fileUri = uri,
+                                                        filename = filename,
+                                                        onComplete = { s3Key ->
+                                                            // 메인 스레드 UI 업데이트 (Toast 등)
+                                                            Toast.makeText(
+                                                                context,
+                                                                "업로드 성공!",
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                            Log.d(
+                                                                "RecordScreen",
+                                                                "Upload Complete Key: $s3Key"
+                                                            )
+                                                            onRecordingComplete(s3Key)
+                                                        },
+                                                        onError = { e ->
+                                                            Toast.makeText(
+                                                                context,
+                                                                "업로드 실패: ${e.message}",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
+                                                        }
+                                                    )
+                                                }
                                             } else {
                                                 recordingState.value?.close()
                                                 isRecording = false
