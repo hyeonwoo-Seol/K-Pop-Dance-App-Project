@@ -319,7 +319,8 @@ fun AppNavHost(
 
         // 분석 화면
         composable(Screen.Analysis.route) {
-            AnalysisScreen(paddingValues = innerPadding)
+            AnalysisScreen(paddingValues = innerPadding
+                    ,onBackClick = {})
         }
 
         // 프로필 화면 (Scaffold 패딩 적용)
