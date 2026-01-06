@@ -23,5 +23,8 @@ data class UserStats(
 
     val currentLevel: Int = 1, // 현재 레벨
     val currentXp: Int = 0, // 현재 경험치
-    val averageAccuracy: Float = 0f // 전체 평균 정확도
+    val averageAccuracy: Float = 0f, // 전체 평균 정확도
+
+    //마지막 연습 날짜
+    val lastPracticeDate: Long = 0L
 )

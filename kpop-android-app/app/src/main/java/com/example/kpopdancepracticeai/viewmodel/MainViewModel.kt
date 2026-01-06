@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.entity.UserStats
 import com.example.kpopdancepracticeai.data.repository.AppRepository
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -17,7 +19,7 @@ import kotlinx.coroutines.launch
  */
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
-    // 현재 로그인한 사용자 ID (실제 앱에서는 로그인 정보에서 가져와야 함)
+    // 현재 로그인한 사용자 ID (실제 앱에서는 Auth 시스템에서 가져와야 함)
     private val currentUserId = "user_test_01"
 
     // --- 1. UI 상태 (StateFlow) ---
@@ -38,11 +40,23 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             initialValue = emptyList()
         )
 
+    // [3단계 추가] 동기화 로딩 상태 (true = 로딩 중)
+    private val _isSyncing = MutableStateFlow(false)
+    val isSyncing = _isSyncing.asStateFlow()
+
+    // [3단계 추가] 동기화 결과 메시지 (Toast용)
+    private val _syncMessage = MutableStateFlow<String?>(null)
+    val syncMessage = _syncMessage.asStateFlow()
+
+    // 메시지 초기화 (Toast 표시 후 호출)
+    fun clearSyncMessage() {
+        _syncMessage.value = null
+    }
+
     // --- 2. 사용자 액션 처리 ---
 
     /**
      * 연습 결과 저장 요청
-     * PracticeResultScreen에서 호출됨
      */
     fun savePracticeResult(
         title: String,
@@ -55,8 +69,8 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 userId = currentUserId,
                 songId = songId,
                 songTitle = title,
-                artistName = "Unknown", // 필요 시 파라미터로 받기
-                partName = "Part 1",    // 필요 시 파라미터로 받기
+                artistName = "Unknown",
+                partName = "Part 1",
                 practiceDate = System.currentTimeMillis(),
                 score = score,
                 accuracy = accuracy,
@@ -67,19 +81,33 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     /**
-     * 앱 시작 시 초기 데이터 동기화
+     * [3단계 구현] 데이터 동기화 요청 (새로고침)
+     * ProfileScreen의 '동기화' 버튼 클릭 시 호출
      */
     fun refreshData() {
+        // 이미 동기화 중이라면 중복 실행 방지
+        if (_isSyncing.value) return
+
         viewModelScope.launch {
-            repository.fetchInitialData(currentUserId)
+            _isSyncing.value = true
+            _syncMessage.value = "서버에서 최신 데이터를 가져오는 중..."
+
+            try {
+                // Repository 호출 -> 서버 데이터 Fetch -> 로컬 DB Update
+                repository.fetchInitialData(currentUserId)
+                _syncMessage.value = "최신 데이터 동기화 완료!"
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _syncMessage.value = "동기화 실패: 네트워크 상태를 확인해주세요."
+            } finally {
+                _isSyncing.value = false
+            }
         }
     }
 }
 
 /**
  * ViewModel Factory
- * 역할: Repository를 주입받아 MainViewModel을 생성하는 공장 클래스
- * (Hilt 같은 DI 라이브러리를 안 쓸 때 필요)
  */
 class MainViewModelFactory(private val repository: AppRepository) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
