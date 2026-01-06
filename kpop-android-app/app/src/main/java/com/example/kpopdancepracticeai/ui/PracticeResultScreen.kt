@@ -26,6 +26,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+// import com.example.kpopdancepracticeai.viewmodel.MainViewModel // 추후 주석 해제
+
 import com.example.kpopdancepracticeai.ui.theme.*
 
 // 결과 데이터 모델
@@ -67,16 +70,22 @@ fun PracticeResultScreen(
     onBackClick: () -> Unit = {},
     onCompareClick: () -> Unit = {},
     onRetryClick: (songId: String) -> Unit = { },
-    onNextPartClick: (songId: String) -> Unit = { }
+    onNextPartClick: (songId: String) -> Unit = { },
+    // viewModel: MainViewModel = viewModel() // 추후 활성화
 ) {
     val result = dummyResultData
     val scrollState = rememberScrollState()
+
+    // 전략 문서 반영: 화면 진입 시 로컬 DB에 결과 저장 요청 (isSynced = false)
+    LaunchedEffect(Unit) {
+        // viewModel.savePracticeResult(result)
+    }
 
     // Root Container
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFFAFAFA)) // 배경색 추가
+            .background(Color(0xFFFAFAFA))
     ) {
         // Scrollable Content
         Column(
@@ -99,7 +108,7 @@ fun PracticeResultScreen(
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally, // Center contents
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(
                         modifier = Modifier
@@ -108,7 +117,7 @@ fun PracticeResultScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "B", // Logic based on result.accuracy can be added here
+                            text = "B",
                             style = TextStyle(
                                 fontWeight = FontWeight(700),
                                 fontSize = 60.sp,
@@ -140,9 +149,9 @@ fun PracticeResultScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.25.dp, Color(0xffe9d4ff), RectangleShape) // RectangleShape or Rounded? Figma said Rectangle in code snippet but had corners in others. Using RectangleShape as per code.
+                    .border(1.25.dp, Color(0xffe9d4ff), RectangleShape)
                     .background(Color.White, RoundedCornerShape(14.dp))
-                    .border(1.25.dp, Color(0xffe9d4ff), RoundedCornerShape(14.dp)) // Override with corners
+                    .border(1.25.dp, Color(0xffe9d4ff), RoundedCornerShape(14.dp))
                     .padding(24.dp),
             ) {
                 Column(
@@ -194,12 +203,12 @@ fun PracticeResultScreen(
                             // Progress Bar Background
                             Box(
                                 modifier = Modifier
-                                    .fillMaxWidth(result.accuracy / 100f) // Dynamic progress
+                                    .fillMaxWidth(result.accuracy / 100f)
                                     .height(12.dp)
                                     .background(Color(0xff030213), RoundedCornerShape(50.dp))
                             )
                         }
-                        // Song Title Overlay (Visual tweak to match Figma layout logic)
+                        // Song Title Overlay
                         Text(
                             modifier = Modifier.padding(top=32.dp),
                             text = "${result.title} - 3:00",
@@ -213,8 +222,7 @@ fun PracticeResultScreen(
                         )
                     }
 
-                    // Detailed Scores (Rhythm, Accuracy, Power) - Mocked based on Figma
-                    // In a real app, these would come from 'result'
+                    // Detailed Scores
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
@@ -372,10 +380,10 @@ fun PracticeResultScreen(
                     )
                 }
 
-                // Achievements List
-                AchievementItem("🏃‍♀️", "첫 완주", "100%", true)
-                AchievementItem("🎯", "정확도 마스터", "75%", false)
-                AchievementItem("💪", "연습벌레", "60%", false)
+                // Achievements List - 이모티콘 텍스트로 대체
+                AchievementItem("Run", "첫 완주", "100%", true)
+                AchievementItem("Target", "정확도 마스터", "75%", false)
+                AchievementItem("Power", "연습벌레", "60%", false)
             }
 
             // 6. Best Record
@@ -508,8 +516,8 @@ fun PracticeResultScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(80.dp) // Fixed height for header area
-                .background(Color(0x00ffffff)) // Transparent
+                .height(80.dp)
+                .background(Color(0x00ffffff))
                 .padding(horizontal = 16.dp)
                 .align(Alignment.TopCenter),
         ) {
