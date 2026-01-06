@@ -1,7 +1,9 @@
+// build.gradle.kts(Module :app)
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    id("com.google.devtools.ksp") // KSP 플러그인 적용
 }
 
 android {
@@ -76,4 +78,13 @@ dependencies {
 
     // AWS Mobile Client (Cognito 인증용)
     implementation("com.amazonaws:aws-android-sdk-mobile-client:2.77.0")
+
+    // Room Database
+    val roomVersion = "2.6.1"
+    implementation("androidx.room:room-runtime:$roomVersion")
+    implementation("androidx.room:room-ktx:$roomVersion")
+    ksp("androidx.room:room-compiler:$roomVersion")
+
+    // Gson (JSON Parsing)
+    implementation("com.google.code.gson:gson:2.10.1")
 }
