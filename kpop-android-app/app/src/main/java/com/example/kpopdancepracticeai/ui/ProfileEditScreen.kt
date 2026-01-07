@@ -1,6 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
-import androidx.compose.foundation.BorderStroke // ⭐️ [오류 수정] 추가
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,7 +10,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AccountCircle // ⭐️ [오류 수정] 추가
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
@@ -63,22 +63,7 @@ fun ProfileEditScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("프로필 설정", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "뒤로가기"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
-                )
-            },
+            // topBar 제거: 스크롤 영역 내부로 이동
             bottomBar = {
                 // 하단 '취소' / '저장' 버튼
                 Surface(
@@ -113,32 +98,60 @@ fun ProfileEditScreen(
             LazyColumn(
                 contentPadding = innerPadding,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize(),
+                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 여기 패딩 제거
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
+                item {
+                    TopAppBar(
+                        title = { Text("프로필 설정", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로가기"
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
+                        ),
+                        // Scaffold의 innerPadding이 이미 상단 여백을 제공하므로, TopAppBar 자체의 시스템 창 인셋은 제거
+                        windowInsets = WindowInsets(0.dp)
+                    )
+                }
+
                 // --- 1. 프로필 사진 변경 ---
                 item {
-                    ProfileImageCard(onClick = { /* TODO: 이미지 선택 로직 */ })
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        ProfileImageCard(onClick = { /* TODO: 이미지 선택 로직 */ })
+                    }
                 }
                 // --- 2. 기본 정보 ---
                 item {
-                    BasicInfoCard(
-                        name = name, onNameChange = { name = it },
-                        email = email, onEmailChange = { email = it },
-                        phone = phone, onPhoneChange = { phone = it },
-                        birthdate = birthdate, onBirthdateChange = { birthdate = it }
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        BasicInfoCard(
+                            name = name, onNameChange = { name = it },
+                            email = email, onEmailChange = { email = it },
+                            phone = phone, onPhoneChange = { phone = it },
+                            birthdate = birthdate, onBirthdateChange = { birthdate = it }
+                        )
+                    }
                 }
                 // --- 3. 댄스 정보 ---
                 item {
-                    DanceInfoCard(
-                        bio = bio, onBioChange = { bio = it }
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        DanceInfoCard(
+                            bio = bio, onBioChange = { bio = it }
+                        )
+                    }
                 }
                 // --- 4. 활동 통계 ---
                 item {
-                    ActivityStatsCard()
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        ActivityStatsCard()
+                    }
                 }
                 // --- 하단 버튼 영역 확보용 Spacer ---
                 item {
@@ -170,7 +183,7 @@ fun ProfileImageCard(onClick: () -> Unit) {
         ) {
             Box {
                 Icon(
-                    imageVector = Icons.Default.AccountCircle, // ⭐️ 오류 나던 부분
+                    imageVector = Icons.Default.AccountCircle,
                     contentDescription = "프로필 이미지",
                     modifier = Modifier
                         .size(128.dp)
@@ -213,13 +226,13 @@ fun BasicInfoCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xffd6deff)) // ⭐️ 오류 나던 부분
+        border = BorderStroke(1.dp, Color(0xffd6deff))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("👤 기본 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("기본 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
             SettingsTextField(
                 label = "이름",
@@ -268,13 +281,13 @@ fun DanceInfoCard(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xffd6deff)) // ⭐️ 오류 나던 부분
+        border = BorderStroke(1.dp, Color(0xffd6deff))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("🎵 댄스 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("댄스 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
             // 댄스 레벨 (Dropdown)
             ExposedDropdownMenuBox(
@@ -357,13 +370,13 @@ fun ActivityStatsCard() {
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = Color.White,
-        border = BorderStroke(1.dp, Color(0xffd6deff)) // ⭐️ 오류 나던 부분
+        border = BorderStroke(1.dp, Color(0xffd6deff))
     ) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text("📊 활동 통계", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text("활동 통계", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceAround

@@ -54,83 +54,86 @@ fun NotificationSettingsScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("알림 설정", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "뒤로가기"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
-                )
-            }
+            // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
                 contentPadding = innerPadding,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize(),
+                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 패딩 제거 -> 내부 아이템에 적용
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
+                item {
+                    TopAppBar(
+                        title = { Text("알림 설정", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로가기"
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
+                        ),
+                        // Scaffold 내부 List에 있으므로 별도의 윈도우 인셋 처리 불필요 혹은 0으로 설정
+                        windowInsets = WindowInsets(0.dp)
+                    )
+                }
+
                 // --- 1. 마스터 푸쉬 설정 카드 ---
                 item {
-                    // ⭐️ [오류 수정] 이름 변경
-                    NotificationSettingsCard(title = null) { // 타이틀 없는 카드
-                        // ⭐️ [오류 수정] 이름 변경
-                        NotificationSettingsToggleItem(
-                            title = "푸쉬 알림",
-                            description = "모든 알림 켜기",
-                            icon = Icons.Outlined.Notifications,
-                            checked = allNotificationsOn,
-                            onCheckedChange = { allNotificationsOn = it }
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        NotificationSettingsCard(title = null) {
+                            NotificationSettingsToggleItem(
+                                title = "푸쉬 알림",
+                                description = "모든 알림 켜기",
+                                icon = Icons.Outlined.Notifications,
+                                checked = allNotificationsOn,
+                                onCheckedChange = { allNotificationsOn = it }
+                            )
+                        }
                     }
                 }
 
                 // --- 2. 알림 항목 카드 ---
                 item {
-                    // ⭐️ [오류 수정] 이름 변경
-                    NotificationSettingsCard(title = "알림 항목") {
-                        // ⭐️ [오류 수정] 이름 변경
-                        NotificationSettingsToggleItem(
-                            title = "분석 완료 알림",
-                            description = "연습 영상 분석이 완료되었을 때",
-                            icon = Icons.Outlined.CheckCircle,
-                            checked = analysisNotifOn,
-                            onCheckedChange = { analysisNotifOn = it }
-                        )
-                        // ⭐️ [오류 수정] 이름 변경
-                        NotificationSettingsDivider()
-                        // ⭐️ [오류 수정] 이름 변경
-                        NotificationSettingsToggleItem(
-                            title = "이벤트 알림",
-                            description = "새로운 이벤트 및 프로모션 소식",
-                            icon = Icons.Outlined.AutoFixHigh,
-                            checked = eventNotifOn,
-                            onCheckedChange = { eventNotifOn = it }
-                        )
-                        // ⭐️ [오류 수정] 이름 변경
-                        NotificationSettingsDivider()
-                        // ⭐️ [오류 수정] 이름 변경
-                        NotificationSettingsToggleItem(
-                            title = "수집 요소 알림",
-                            description = "새로운 배지 및 업적 획득 시",
-                            icon = Icons.Outlined.CardGiftcard,
-                            checked = collectionNotifOn,
-                            onCheckedChange = { collectionNotifOn = it }
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        NotificationSettingsCard(title = "알림 항목") {
+                            NotificationSettingsToggleItem(
+                                title = "분석 완료 알림",
+                                description = "연습 영상 분석이 완료되었을 때",
+                                icon = Icons.Outlined.CheckCircle,
+                                checked = analysisNotifOn,
+                                onCheckedChange = { analysisNotifOn = it }
+                            )
+                            NotificationSettingsDivider()
+                            NotificationSettingsToggleItem(
+                                title = "이벤트 알림",
+                                description = "새로운 이벤트 및 프로모션 소식",
+                                icon = Icons.Outlined.AutoFixHigh,
+                                checked = eventNotifOn,
+                                onCheckedChange = { eventNotifOn = it }
+                            )
+                            NotificationSettingsDivider()
+                            NotificationSettingsToggleItem(
+                                title = "수집 요소 알림",
+                                description = "새로운 배지 및 업적 획득 시",
+                                icon = Icons.Outlined.CardGiftcard,
+                                checked = collectionNotifOn,
+                                onCheckedChange = { collectionNotifOn = it }
+                            )
+                        }
                     }
                 }
 
                 // --- 3. 알림 권한 안내 ---
                 item {
-                    NotificationInfoBox()
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        NotificationInfoBox()
+                    }
                 }
 
                 // 하단 여백
@@ -144,11 +147,10 @@ fun NotificationSettingsScreen(
 
 /**
  * 설정 항목을 감싸는 카드 (재사용)
- * ⭐️ [오류 수정] 이 파일에서만 사용하도록 이름 변경
  */
 @Composable
 fun NotificationSettingsCard(
-    title: String?, // Nullable로 변경
+    title: String?,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Surface(
@@ -160,7 +162,6 @@ fun NotificationSettingsCard(
         Column(
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 20.dp)
         ) {
-            // title이 null이 아닐 때만 Text 표시
             title?.let {
                 Text(
                     text = it,
@@ -180,7 +181,6 @@ fun NotificationSettingsCard(
 
 /**
  * 토글 스위치가 있는 설정 항목 (재사용)
- * ⭐️ [오류 수정] 이 파일에서만 사용하도록 이름 변경
  */
 @Composable
 fun NotificationSettingsToggleItem(
@@ -210,14 +210,13 @@ fun NotificationSettingsToggleItem(
 
 /**
  * 설정 카드 내부 구분선
- * ⭐️ [오류 수정] 이 파일에서만 사용하도록 이름 변경 + HorizontalDivider로 수정
  */
 @Composable
 fun NotificationSettingsDivider() {
-    HorizontalDivider( // ⭐️ [오류 수정] Divider -> HorizontalDivider
+    HorizontalDivider(
         color = Color.Gray.copy(alpha = 0.15f),
         thickness = 1.dp,
-        modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp) // 아이콘 영역만큼 패딩
+        modifier = Modifier.padding(start = 40.dp, top = 4.dp, bottom = 4.dp)
     )
 }
 

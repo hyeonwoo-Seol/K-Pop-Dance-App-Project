@@ -60,85 +60,96 @@ fun PracticeSettingsScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("연습 화면 설정", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "뒤로가기"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
-                )
-            }
+            // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
                 contentPadding = innerPadding,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize(),
+                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 패딩 제거 -> 내부 아이템에 적용
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
+                item {
+                    TopAppBar(
+                        title = { Text("연습 화면 설정", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로가기"
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
+                        ),
+                        // Scaffold 내부 List에 있으므로 별도의 윈도우 인셋 처리 불필요 혹은 0으로 설정
+                        windowInsets = WindowInsets(0.dp)
+                    )
+                }
+
                 // --- 1. 카메라 설정 카드 ---
                 item {
-                    SettingsCard(title = "카메라") {
-                        SettingsToggleItem(
-                            title = "카메라 좌우 반전",
-                            icon = Icons.Outlined.FlipCameraAndroid,
-                            checked = isMirrorMode,
-                            onCheckedChange = { isMirrorMode = it }
-                        )
-                        SettingsDivider()
-                        SettingsToggleItem(
-                            title = "기본 카메라",
-                            description = if (isFrontCamera) "전면 카메라" else "후면 카메라",
-                            icon = Icons.Outlined.Videocam,
-                            checked = isFrontCamera,
-                            onCheckedChange = { isFrontCamera = it }
-                        )
-                        SettingsDivider()
-                        SettingsClickableItem(
-                            title = "카운트다운 타이머",
-                            description = countdownTime,
-                            icon = Icons.Outlined.Timer,
-                            onClick = { /* TODO: 타이머 선택 다이얼로그 표시 */ }
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SettingsCard(title = "카메라") {
+                            SettingsToggleItem(
+                                title = "카메라 좌우 반전",
+                                icon = Icons.Outlined.FlipCameraAndroid,
+                                checked = isMirrorMode,
+                                onCheckedChange = { isMirrorMode = it }
+                            )
+                            SettingsDivider()
+                            SettingsToggleItem(
+                                title = "기본 카메라",
+                                description = if (isFrontCamera) "전면 카메라" else "후면 카메라",
+                                icon = Icons.Outlined.Videocam,
+                                checked = isFrontCamera,
+                                onCheckedChange = { isFrontCamera = it }
+                            )
+                            SettingsDivider()
+                            SettingsClickableItem(
+                                title = "카운트다운 타이머",
+                                description = countdownTime,
+                                icon = Icons.Outlined.Timer,
+                                onClick = { /* TODO: 타이머 선택 다이얼로그 표시 */ }
+                            )
+                        }
                     }
                 }
 
                 // --- 2. 업로드 설정 카드 ---
                 item {
-                    SettingsCard(title = "업로드") {
-                        SettingsToggleItem(
-                            title = "연습 영상 자동 전송",
-                            icon = Icons.Outlined.UploadFile,
-                            checked = isAutoUpload,
-                            onCheckedChange = { isAutoUpload = it }
-                        )
-                        SettingsDivider()
-                        SettingsToggleItem(
-                            title = "WIFI에만 업로드",
-                            icon = Icons.Outlined.Wifi,
-                            checked = isWifiOnly,
-                            onCheckedChange = { isWifiOnly = it }
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SettingsCard(title = "업로드") {
+                            SettingsToggleItem(
+                                title = "연습 영상 자동 전송",
+                                icon = Icons.Outlined.UploadFile,
+                                checked = isAutoUpload,
+                                onCheckedChange = { isAutoUpload = it }
+                            )
+                            SettingsDivider()
+                            SettingsToggleItem(
+                                title = "WIFI에만 업로드",
+                                icon = Icons.Outlined.Wifi,
+                                checked = isWifiOnly,
+                                onCheckedChange = { isWifiOnly = it }
+                            )
+                        }
                     }
                 }
 
                 // --- 3. 저장 공간 카드 ---
                 item {
-                    SettingsCard(title = "저장 공간") {
-                        SettingsStorageItem(
-                            title = "캐시 데이터 삭제",
-                            description = cacheSize,
-                            icon = Icons.Outlined.Storage,
-                            onClearClick = { /* TODO: 캐시 삭제 로직 */ }
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SettingsCard(title = "저장 공간") {
+                            SettingsStorageItem(
+                                title = "캐시 데이터 삭제",
+                                description = cacheSize,
+                                icon = Icons.Outlined.Storage,
+                                onClearClick = { /* TODO: 캐시 삭제 로직 */ }
+                            )
+                        }
                     }
                 }
 
@@ -286,7 +297,7 @@ fun SettingsStorageItem(
  */
 @Composable
 fun SettingsDivider() {
-    HorizontalDivider( // ⭐️ [오류 수정] Divider -> HorizontalDivider
+    HorizontalDivider(
         color = Color.Gray.copy(alpha = 0.15f),
         thickness = 1.dp,
         modifier = Modifier.padding(vertical = 4.dp)
