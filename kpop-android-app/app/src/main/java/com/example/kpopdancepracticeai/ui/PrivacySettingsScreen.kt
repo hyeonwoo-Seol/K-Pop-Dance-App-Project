@@ -55,85 +55,96 @@ fun PrivacySettingsScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("개인정보 보호 및 권한", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "뒤로가기"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
-                )
-            }
+            // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
                 contentPadding = innerPadding,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize(),
+                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 패딩 제거 후 내부 아이템에 적용
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
+                item {
+                    TopAppBar(
+                        title = { Text("개인정보 보호 및 권한", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로가기"
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
+                        ),
+                        // Scaffold의 innerPadding이 상단 여백을 처리하므로, TopAppBar 자체의 인셋 제거
+                        windowInsets = WindowInsets(0.dp)
+                    )
+                }
+
                 // --- 1. 데이터 처리 및 수집 카드 ---
                 item {
-                    SettingsCard(title = "데이터 처리 및 수집") {
-                        SettingsToggleItem(
-                            title = "서버 영상 전송 동의",
-                            description = "댄스 영상을 GPU로 처리하기 위해 서버로 전송하는 것에 동의합니다. 전송된 영상은 분석 완료 후 자동으로 삭제됩니다.",
-                            icon = Icons.Outlined.CloudUpload,
-                            checked = isServerUploadEnabled,
-                            onCheckedChange = { isServerUploadEnabled = it }
-                        )
-                        SettingsDivider()
-                        SettingsToggleItem(
-                            title = "댄스 성향 수집 동의",
-                            description = "맞춤형 추천 영상 제공을 위해 사용자의 댄스 성향 및 연습 패턴을 수집하는 것에 동의합니다.",
-                            icon = Icons.Outlined.TrendingUp,
-                            checked = isAnalyticsEnabled,
-                            onCheckedChange = { isAnalyticsEnabled = it }
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SettingsCard(title = "데이터 처리 및 수집") {
+                            SettingsToggleItem(
+                                title = "서버 영상 전송 동의",
+                                description = "댄스 영상을 GPU로 처리하기 위해 서버로 전송하는 것에 동의합니다. 전송된 영상은 분석 완료 후 자동으로 삭제됩니다.",
+                                icon = Icons.Outlined.CloudUpload,
+                                checked = isServerUploadEnabled,
+                                onCheckedChange = { isServerUploadEnabled = it }
+                            )
+                            SettingsDivider()
+                            SettingsToggleItem(
+                                title = "댄스 성향 수집 동의",
+                                description = "맞춤형 추천 영상 제공을 위해 사용자의 댄스 성향 및 연습 패턴을 수집하는 것에 동의합니다.",
+                                icon = Icons.Outlined.TrendingUp,
+                                checked = isAnalyticsEnabled,
+                                onCheckedChange = { isAnalyticsEnabled = it }
+                            )
+                        }
                     }
                 }
 
                 // --- 2. 기기 권한 카드 ---
                 item {
-                    SettingsCard(title = "기기 권한") {
-                        SettingsClickableItem(
-                            title = "권한 설정",
-                            description = "카메라, 저장장치, 위치",
-                            icon = Icons.Outlined.Shield,
-                            onClick = { /* TODO: 기기 설정 화면으로 이동 (Intent) */ }
-                        )
-                        SettingsDivider()
-                        PermissionStatusItem(
-                            label = "카메라",
-                            icon = Icons.Outlined.CameraAlt,
-                            status = "허용됨",
-                            statusColor = Color(0xFF00A63E) // Green
-                        )
-                        PermissionStatusItem(
-                            label = "저장장치",
-                            icon = Icons.Outlined.Storage,
-                            status = "허용됨",
-                            statusColor = Color(0xFF00A63E) // Green
-                        )
-                        PermissionStatusItem(
-                            label = "위치",
-                            icon = Icons.Outlined.LocationOn,
-                            status = "거부됨",
-                            statusColor = Color.Red
-                        )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        SettingsCard(title = "기기 권한") {
+                            SettingsClickableItem(
+                                title = "권한 설정",
+                                description = "카메라, 저장장치, 위치",
+                                icon = Icons.Outlined.Shield,
+                                onClick = { /* TODO: 기기 설정 화면으로 이동 (Intent) */ }
+                            )
+                            SettingsDivider()
+                            PermissionStatusItem(
+                                label = "카메라",
+                                icon = Icons.Outlined.CameraAlt,
+                                status = "허용됨",
+                                statusColor = Color(0xFF00A63E) // Green
+                            )
+                            PermissionStatusItem(
+                                label = "저장장치",
+                                icon = Icons.Outlined.Storage,
+                                status = "허용됨",
+                                statusColor = Color(0xFF00A63E) // Green
+                            )
+                            PermissionStatusItem(
+                                label = "위치",
+                                icon = Icons.Outlined.LocationOn,
+                                status = "거부됨",
+                                statusColor = Color.Red
+                            )
+                        }
                     }
                 }
 
                 // --- 3. 알림 사항 카드 ---
                 item {
-                    InfoCard()
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        InfoCard()
+                    }
                 }
 
                 // 하단 여백
@@ -193,12 +204,12 @@ fun InfoCard() {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = "🔒 수집된 데이터는 암호화되어 안전하게 보관됩니다.",
+                text = "수집된 데이터는 암호화되어 안전하게 보관됩니다.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF016630) // 진한 초록색
             )
             Text(
-                text = "📋 자세한 내용은 개인정보 처리방침을 확인해주세요.",
+                text = "자세한 내용은 개인정보 처리방침을 확인해주세요.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color(0xFF016630) // 진한 초록색
             )

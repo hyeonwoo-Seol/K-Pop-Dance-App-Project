@@ -53,55 +53,68 @@ fun WithdrawalScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            topBar = {
-                TopAppBar(
-                    title = { Text("회원 탈퇴", fontWeight = FontWeight.Bold) },
-                    navigationIcon = {
-                        IconButton(onClick = onBackClick) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "뒤로가기"
-                            )
-                        }
-                    },
-                    colors = TopAppBarDefaults.topAppBarColors(
-                        containerColor = Color.Transparent
-                    )
-                )
-            }
+            // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
                 contentPadding = innerPadding,
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp),
+                    .fillMaxSize(),
+                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 패딩 제거 -> 내부 아이템에 적용
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
+                item {
+                    TopAppBar(
+                        title = { Text("회원 탈퇴", fontWeight = FontWeight.Bold) },
+                        navigationIcon = {
+                            IconButton(onClick = onBackClick) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                    contentDescription = "뒤로가기"
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = Color.Transparent
+                        ),
+                        // Scaffold 내부 List에 있으므로 별도의 윈도우 인셋 처리 불필요 혹은 0으로 설정
+                        windowInsets = WindowInsets(0.dp)
+                    )
+                }
+
                 // --- 1. 상단 경고 카드 ---
                 item {
-                    WithdrawalWarningCard()
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        WithdrawalWarningCard()
+                    }
                 }
 
                 // --- 2. 삭제될 데이터 카드 ---
                 item {
-                    DeletedDataCard()
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        DeletedDataCard()
+                    }
                 }
 
                 // --- 3. 약관 동의 ---
                 item {
-                    AgreementCard(
-                        isAgreed = isAgreed,
-                        onAgreedChange = { isAgreed = it }
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        AgreementCard(
+                            isAgreed = isAgreed,
+                            onAgreedChange = { isAgreed = it }
+                        )
+                    }
                 }
 
                 // --- 4. 하단 버튼 ---
                 item {
-                    ActionButtons(
-                        isAgreed = isAgreed,
-                        onCancelClick = onBackClick,
-                        onWithdrawClick = onWithdrawConfirm
-                    )
+                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                        ActionButtons(
+                            isAgreed = isAgreed,
+                            onCancelClick = onBackClick,
+                            onWithdrawClick = onWithdrawConfirm
+                        )
+                    }
                 }
 
                 // 하단 여백
