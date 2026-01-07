@@ -19,6 +19,8 @@ local.properties
 *:RVContext
 code_to_python.py
 code_to_kotlin.py
+code_to_txt.py
+code_to_kotlin_kts.py
 *.py~
 *.txt~
 compiled_python_1.txt
