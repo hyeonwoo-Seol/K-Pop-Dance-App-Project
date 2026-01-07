@@ -100,7 +100,7 @@ class PoseEstimator:
                 "part_accuracies": {},     # 부위별 정확도 딕셔너리
                 "worst_points": []         # 가장 많이 틀린 관절 이름 리스트
             },
-            "timeline_feedback": [],
+            # "timeline_feedback": [],  <-- 제거됨
             "frames": []
         }
 
