@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "771002087294",
+    "project_id": "kpopdancepracticeai",
+    "storage_bucket": "kpopdancepracticeai.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771002087294:android:da12576ee2ff53bb5e652f",
+        "android_client_info": {
+          "package_name": "com.example.kpopdancepracticeai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBCOo8PKJpB4CvZOZxif7NZH5eaVkPle3g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
