@@ -161,6 +161,13 @@ fun KpopDancePracticeApp() {
         Screen.Login.route,
         // [추가] 회원가입 화면들에서도 바 숨김
         Screen.SignUp.route,
+        // Screen.SignUpSecond.route는 아래에서 인자가 포함된 경로로 매칭되므로
+        // 정확한 경로 매칭을 위해 startsWith 등으로 처리하거나,
+        // 네비게이션 구조상 바텀바가 필요없는 화면임을 인지해야 함.
+        // 여기서는 단순 문자열 비교이므로, signUpSecond가 포함된 경로 처리가 필요할 수 있으나,
+        // 현재 로직(currentRoute !in screensToHideBars)에서는 정확히 일치해야 숨겨짐.
+        // 따라서 SignUpSecond 화면 진입 시 바가 보일 수 있는 잠재적 이슈가 있으나,
+        // 우선 기존 코드 구조를 유지하며 SignUpSecond 기본 경로를 추가함.
         Screen.SignUpSecond.route,
 
         Screen.ProfileEdit.route,
@@ -177,7 +184,17 @@ fun KpopDancePracticeApp() {
         Screen.Record.route, // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
         Screen.Analysis.route // [수정됨] 분석 화면에서도 상단 바 숨김
     )
-    val showMainBars = currentRoute !in screensToHideBars
+
+    // 동적 경로(인자가 있는 경로)에 대한 바 숨김 처리 보완
+    // currentRoute가 null이 아니고, screensToHideBars에 있는 경로로 시작하거나 포함되면 숨김 처리
+    val showMainBars = if (currentRoute != null) {
+        screensToHideBars.none { route ->
+            // 단순 일치 또는 인자가 붙는 경로(/) 앞부분 일치 확인
+            currentRoute == route || currentRoute.startsWith("$route/")
+        }
+    } else {
+        false
+    }
 
     // 피그마 디자인의 그라데이션 배경
     val appGradient = Brush.verticalGradient(
@@ -203,7 +220,10 @@ fun KpopDancePracticeApp() {
                             currentRoute != Screen.Home.route &&
                             currentRoute != Screen.Profile.route &&
                             currentRoute != Screen.Search.route &&
-                            currentRoute != Screen.SearchResults.route, // 검색 결과 화면에서도 상단 바 숨김
+                            // 검색 결과 화면 경로는 인자가 있어 정확히 일치하지 않을 수 있음.
+                            // startsWith로 체크하거나, 위 showMainBars 로직에 의존.
+                            // 여기서는 기존 로직을 유지하되 안전하게 처리.
+                            (currentRoute?.startsWith(Screen.SearchResults.route.substringBefore("/{")) == false),
                     enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
                     exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
                 ) {
@@ -353,17 +373,32 @@ fun AppNavHost(
                 onNavigateToLogin = {
                     navController.popBackStack()
                 },
-                onSignUpSubmit = { _, _ ->
-                    // 이메일, 비밀번호 정보를 뷰모델에 저장하거나 인자로 전달 가능
-                    // 다음 화면(SignUpSecond)으로 이동
-                    navController.navigate(Screen.SignUpSecond.route)
+                onSignUpSubmit = { email, password ->
+                    // 이메일, 비밀번호 정보를 인코딩
+                    val encodedEmail = Screen.encodeArg(email)
+                    val encodedPassword = Screen.encodeArg(password)
+
+                    // 다음 화면(SignUpSecond)으로 이동하면서 인자 전달
+                    navController.navigate("${Screen.SignUpSecond.route}/$encodedEmail/$encodedPassword")
                 }
             )
         }
 
-        // [추가] 회원가입 두 번째 화면
-        composable(Screen.SignUpSecond.route) {
+        // [추가] 회원가입 두 번째 화면 (인자 받도록 수정)
+        composable(
+            route = "${Screen.SignUpSecond.route}/{email}/{password}",
+            arguments = listOf(
+                navArgument("email") { type = NavType.StringType },
+                navArgument("password") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            // 전달받은 인자 추출 및 디코딩
+            val email = backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
+            val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
+
             SignUpSecondScreen(
+                email = email,
+                password = password,
                 onSignUpComplete = { _, _ ->
                     // 회원가입 완료 로직 처리 후 홈 화면으로 이동
                     // 백스택에서 로그인/회원가입 관련 화면 모두 제거

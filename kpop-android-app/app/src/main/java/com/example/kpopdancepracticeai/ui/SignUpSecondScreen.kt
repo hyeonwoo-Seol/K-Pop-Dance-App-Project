@@ -1,5 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -11,20 +12,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
+import kotlinx.coroutines.launch
 
 @Composable
 fun SignUpSecondScreen(
+    email: String, // 이전 화면에서 전달받은 이메일
+    password: String, // 이전 화면에서 전달받은 비밀번호
     onSignUpComplete: (String, String) -> Unit = { _, _ -> } // 닉네임, 생년월일 전달 콜백
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // AuthRepository 초기화
+    val authRepository = remember { AuthRepository(context) }
+
     // 입력 상태 관리
     var nickname by remember { mutableStateOf("") }
     var birthdate by remember { mutableStateOf("") }
+    var isSigningUp by remember { mutableStateOf(false) } // 로딩 상태 관리
 
     // 배경 (이미지의 그라데이션 느낌을 위한 연한 배경색 혹은 테마 배경색)
     Box(
@@ -80,24 +92,55 @@ fun SignUpSecondScreen(
 
             // 가입 완료 버튼
             Button(
-                onClick = { onSignUpComplete(nickname, birthdate) },
+                onClick = {
+                    // 입력값 유효성 확인
+                    if (nickname.isNotBlank() && birthdate.isNotBlank()) {
+                        if (!isSigningUp) {
+                            isSigningUp = true
+                            scope.launch {
+                                // Firebase Authentication에 등록
+                                val result = authRepository.signUpWithEmail(email, password)
+                                if (result.isSuccess) {
+                                    Toast.makeText(context, "회원가입 성공", Toast.LENGTH_SHORT).show()
+                                    // 가입 성공 시 콜백 호출 (닉네임, 생년월일 전달)
+                                    onSignUpComplete(nickname, birthdate)
+                                } else {
+                                    val errorMsg = result.exceptionOrNull()?.message ?: "알 수 없는 오류"
+                                    Toast.makeText(context, "회원가입 실패: $errorMsg", Toast.LENGTH_SHORT).show()
+                                }
+                                isSigningUp = false
+                            }
+                        }
+                    } else {
+                        Toast.makeText(context, "닉네임과 생년월일을 입력해주세요.", Toast.LENGTH_SHORT).show()
+                    }
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(48.dp), // 터치 영역 확보를 위해 높이 약간 조정
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF030213)
-                )
+                ),
+                enabled = !isSigningUp // 로딩 중 버튼 비활성화
             ) {
-                Text(
-                    text = "가입 완료",
-                    style = TextStyle(
-                        fontWeight = FontWeight(400),
-                        fontSize = 14.sp,
-                        lineHeight = 20.sp,
-                        color = Color.White
+                if (isSigningUp) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(24.dp),
+                        color = Color.White,
+                        strokeWidth = 2.dp
                     )
-                )
+                } else {
+                    Text(
+                        text = "가입 완료",
+                        style = TextStyle(
+                            fontWeight = FontWeight(400),
+                            fontSize = 14.sp,
+                            lineHeight = 20.sp,
+                            color = Color.White
+                        )
+                    )
+                }
             }
         }
     }
@@ -167,5 +210,6 @@ fun InputField(
 @Preview(showBackground = true)
 @Composable
 fun SignUpSecondScreenPreview() {
-    SignUpSecondScreen()
+    // 미리보기용 더미 데이터
+    SignUpSecondScreen(email = "test@example.com", password = "password123")
 }
