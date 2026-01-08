@@ -40,7 +40,8 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit,
-    onNavigateToSignUp: () -> Unit // [추가] 회원가입 화면 이동 콜백
+    onNavigateToSignUp: () -> Unit, // [추가] 회원가입 화면 이동 콜백
+    onGoogleLoginSuccess: () -> Unit // [추가] 구글 로그인 성공 시 추가 정보 입력을 위한 콜백
 ) {
     // 1. 상태 관리: 사용자의 입력을 기억하기 위한 변수
     val context = LocalContext.current
@@ -68,7 +69,8 @@ fun LoginScreen(
                         val authResult = authRepository.firebaseAuthWithGoogle(idToken)
                         if (authResult.isSuccess) {
                             Toast.makeText(context, "구글 로그인 성공", Toast.LENGTH_SHORT).show()
-                            onLoginSuccess() // 화면 이동
+                            // 기존 onLoginSuccess() 대신 구글 로그인 전용 콜백 호출
+                            onGoogleLoginSuccess()
                         } else {
                             errorMessage = "구글 로그인 실패: ${authResult.exceptionOrNull()?.message}"
                         }
@@ -115,7 +117,7 @@ fun LoginScreen(
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(30.dp), // 둥근 모서리
                 color = Color.White,
-                // ⭐️ [오류 1 수정] elevation -> shadowElevation
+                // [오류 1 수정] elevation -> shadowElevation
                 shadowElevation = 8.dp
             ) {
                 // 5. 카드 내부 로그인 폼
@@ -218,7 +220,7 @@ fun LoginScreen(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = Color.Black
                         ),
-                        // ⭐️ [오류 3 수정] ButtonDefaults.outlinedBorder -> BorderStroke(MaterialTheme)
+                        // [오류 3 수정] ButtonDefaults.outlinedBorder -> BorderStroke(MaterialTheme)
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
                         // TODO: 구글 아이콘 추가 (필요시 Icon 컴포넌트 추가)
@@ -305,7 +307,8 @@ fun LoginScreenPreview() {
         Surface {
             LoginScreen(
                 onLoginSuccess = {},
-                onNavigateToSignUp = {} // 미리보기용 빈 람다
+                onNavigateToSignUp = {}, // 미리보기용 빈 람다
+                onGoogleLoginSuccess = {} // 미리보기용 빈 람다
             )
         }
     }

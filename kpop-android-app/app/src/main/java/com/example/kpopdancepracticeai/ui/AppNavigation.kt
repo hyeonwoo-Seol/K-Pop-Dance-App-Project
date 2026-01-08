@@ -149,11 +149,16 @@ fun KpopDancePracticeApp() {
 
     // [수정] 앱 시작 시 로그인 상태 확인 로직 추가
     val authRepository = remember { AuthRepository(context) }
-    // 현재 로그인된 사용자가 있으면 홈 화면으로, 없으면 로그인 화면으로 시작
-    val startDestination = if (authRepository.getCurrentUser() != null) {
-        Screen.Home.route
-    } else {
-        Screen.Login.route
+
+    // [중요 수정] remember를 사용하여 초기 계산된 startDestination 값을 유지하도록 변경
+    // 이렇게 해야 로그인 성공 후 화면이 재구성될 때 startDestination이 Home으로 바뀌어
+    // SignUpSecondScreen으로의 이동을 방해하는 문제를 해결할 수 있습니다.
+    val startDestination = remember {
+        if (authRepository.getCurrentUser() != null) {
+            Screen.Home.route
+        } else {
+            Screen.Login.route
+        }
     }
 
     // 상/하단 바 숨길 화면 목록
@@ -363,6 +368,12 @@ fun AppNavHost(
                 // [추가] 회원가입 버튼 클릭 시 회원가입 화면으로 이동
                 onNavigateToSignUp = {
                     navController.navigate(Screen.SignUp.route)
+                },
+                // [추가] 구글 로그인 성공 시 추가 정보 입력(SignUpSecond) 화면으로 이동
+                onGoogleLoginSuccess = {
+                    // 구글 로그인은 비밀번호가 없으므로 식별 가능한 더미 값 전달
+                    val dummyArg = Screen.encodeArg("GOOGLE_LOGIN")
+                    navController.navigate("${Screen.SignUpSecond.route}/$dummyArg/$dummyArg")
                 }
             )
         }

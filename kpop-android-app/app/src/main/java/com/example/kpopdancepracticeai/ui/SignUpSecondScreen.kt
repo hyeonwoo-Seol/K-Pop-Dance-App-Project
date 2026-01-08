@@ -96,19 +96,27 @@ fun SignUpSecondScreen(
                     // 입력값 유효성 확인
                     if (nickname.isNotBlank() && birthdate.isNotBlank()) {
                         if (!isSigningUp) {
-                            isSigningUp = true
-                            scope.launch {
-                                // Firebase Authentication에 등록
-                                val result = authRepository.signUpWithEmail(email, password)
-                                if (result.isSuccess) {
-                                    Toast.makeText(context, "회원가입 성공", Toast.LENGTH_SHORT).show()
-                                    // 가입 성공 시 콜백 호출 (닉네임, 생년월일 전달)
-                                    onSignUpComplete(nickname, birthdate)
-                                } else {
-                                    val errorMsg = result.exceptionOrNull()?.message ?: "알 수 없는 오류"
-                                    Toast.makeText(context, "회원가입 실패: $errorMsg", Toast.LENGTH_SHORT).show()
+                            // [수정] 구글 로그인(password가 'GOOGLE_LOGIN' 등 식별자)인 경우 Firebase 회원가입 건너뛰기
+                            if (password == "GOOGLE_LOGIN") {
+                                // 구글 로그인 시에는 이미 인증이 완료되었으므로, 추가 정보 입력만 완료 처리
+                                Toast.makeText(context, "회원가입 완료", Toast.LENGTH_SHORT).show()
+                                onSignUpComplete(nickname, birthdate)
+                            } else {
+                                // 일반 이메일 가입 시에는 Firebase Auth 생성 진행
+                                isSigningUp = true
+                                scope.launch {
+                                    // Firebase Authentication에 등록
+                                    val result = authRepository.signUpWithEmail(email, password)
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, "회원가입 성공", Toast.LENGTH_SHORT).show()
+                                        // 가입 성공 시 콜백 호출 (닉네임, 생년월일 전달)
+                                        onSignUpComplete(nickname, birthdate)
+                                    } else {
+                                        val errorMsg = result.exceptionOrNull()?.message ?: "알 수 없는 오류"
+                                        Toast.makeText(context, "회원가입 실패: $errorMsg", Toast.LENGTH_SHORT).show()
+                                    }
+                                    isSigningUp = false
                                 }
-                                isSigningUp = false
                             }
                         }
                     } else {
