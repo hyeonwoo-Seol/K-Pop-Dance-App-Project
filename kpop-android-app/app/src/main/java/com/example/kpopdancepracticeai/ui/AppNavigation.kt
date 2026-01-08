@@ -72,6 +72,10 @@ import java.nio.charset.StandardCharsets
 // --- 1. 내비게이션 경로(Route) 정의 ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Login : Screen("login", "로그인", Icons.Default.Home)
+    // [추가] 회원가입 관련 화면 경로 정의
+    object SignUp : Screen("signUp", "회원가입", Icons.Default.Person)
+    object SignUpSecond : Screen("signUpSecond", "회원가입2", Icons.Default.Person)
+
     object Home : Screen("home", "홈", Icons.Default.Home)
     object Search : Screen("search", "검색", Icons.Default.Search)
     object Analysis : Screen("analysis", "분석", Icons.Default.Analytics)
@@ -155,6 +159,10 @@ fun KpopDancePracticeApp() {
     // 상/하단 바 숨길 화면 목록
     val screensToHideBars = listOf(
         Screen.Login.route,
+        // [추가] 회원가입 화면들에서도 바 숨김
+        Screen.SignUp.route,
+        Screen.SignUpSecond.route,
+
         Screen.ProfileEdit.route,
         Screen.PracticeSettings.route,
         Screen.NotificationSettings.route,
@@ -326,6 +334,39 @@ fun AppNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.Login.route) {
+                            inclusive = true
+                        }
+                    }
+                },
+                // [추가] 회원가입 버튼 클릭 시 회원가입 화면으로 이동
+                onNavigateToSignUp = {
+                    navController.navigate(Screen.SignUp.route)
+                }
+            )
+        }
+
+        // [추가] 회원가입 첫 번째 화면
+        composable(Screen.SignUp.route) {
+            SignUpScreen(
+                onNavigateToLogin = {
+                    navController.popBackStack()
+                },
+                onSignUpSubmit = { _, _ ->
+                    // 이메일, 비밀번호 정보를 뷰모델에 저장하거나 인자로 전달 가능
+                    // 다음 화면(SignUpSecond)으로 이동
+                    navController.navigate(Screen.SignUpSecond.route)
+                }
+            )
+        }
+
+        // [추가] 회원가입 두 번째 화면
+        composable(Screen.SignUpSecond.route) {
+            SignUpSecondScreen(
+                onSignUpComplete = { _, _ ->
+                    // 회원가입 완료 로직 처리 후 홈 화면으로 이동
+                    // 백스택에서 로그인/회원가입 관련 화면 모두 제거
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) {
                             inclusive = true

@@ -39,7 +39,8 @@ import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onNavigateToSignUp: () -> Unit // [추가] 회원가입 화면 이동 콜백
 ) {
     // 1. 상태 관리: 사용자의 입력을 기억하기 위한 변수
     val context = LocalContext.current
@@ -224,20 +225,20 @@ fun LoginScreen(
                         Text("Google 계정으로 로그인", fontSize = 16.sp)
                     }
 
-                    // 카카오 로그인 버튼 (이미지 리소스 사용)
-                    Image(
-                        painter = painterResource(id = R.drawable.kakao_login_large_wide),
-                        contentDescription = "카카오로 시작하기",
+                    // [수정됨] 카카오 로그인 버튼을 회원가입 버튼으로 교체
+                    Button(
+                        onClick = { onNavigateToSignUp() },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable {
-                                // TODO: Kakao 로그인 로직 (추후 구현 시 여기에 추가)
-                                Toast.makeText(context, "카카오 로그인 준비 중입니다.", Toast.LENGTH_SHORT).show()
-                            },
-                        contentScale = ContentScale.FillBounds
-                    )
+                            .height(50.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF4F39F6), // 디자인 시안의 보라색 포인트 컬러 사용
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text("회원 가입하기", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
 
                     // 약관 안내
                     Text(
@@ -302,7 +303,10 @@ private fun LoginTextField(
 fun LoginScreenPreview() {
     KpopDancePracticeAITheme {
         Surface {
-            LoginScreen(onLoginSuccess = {})
+            LoginScreen(
+                onLoginSuccess = {},
+                onNavigateToSignUp = {} // 미리보기용 빈 람다
+            )
         }
     }
 }
