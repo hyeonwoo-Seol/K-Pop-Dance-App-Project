@@ -267,35 +267,53 @@ fun RecordScreen(
 
                                                 // [추가됨] S3 업로드 트리거 (Task T3-1 핵심)
                                                 // TODO: 실제 userId를 로그인 정보에서 가져와야 함
-                                                val userId = "user_test_01"
+                                                val userId = "xooyong"
                                                 val safeSongTitle = songTitle.replace(" ", "_")
+                                                val timestamp = System.currentTimeMillis() // Timestamp 추가
                                                 val safePart = part.replace(" ", "_").replace(":", "")
 
-                                                val filename = "${userId}_${safeSongTitle}_${safePart}.mp4"
+                                                val filename = "user_${userId}_${safeSongTitle}_${safePart}_${timestamp}.mp4"
 
                                                 scope.launch {
                                                     uploader.uploadVideo(
                                                         fileUri = uri,
                                                         filename = filename,
                                                         onComplete = { s3Key ->
-                                                            // 메인 스레드 UI 업데이트 (Toast 등)
-                                                            Toast.makeText(
-                                                                context,
-                                                                "업로드 성공!",
-                                                                Toast.LENGTH_SHORT
-                                                            ).show()
-                                                            Log.d(
-                                                                "RecordScreen",
-                                                                "Upload Complete Key: $s3Key"
-                                                            )
-                                                            onRecordingComplete(s3Key)
+                                                            Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
+                                                            Log.d("RecordScreen", "Upload Complete Key: $s3Key")
+
+                                                            scope.launch {
+                                                                uploader.pollAnalysisResult(
+                                                                    userId = userId,
+                                                                    timestamp = timestamp,
+                                                                    onProgress = { message ->
+                                                                        //  분석 중 상태 표시
+                                                                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+                                                                    },
+                                                                    onComplete = { resultS3Key ->
+                                                                        //  분석 완료
+                                                                        Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
+                                                                        Log.d("RecordScreen", "Result Ready: $resultS3Key")
+
+                                                                        // JSON 다운로드
+                                                                        scope.launch {
+                                                                            try {
+                                                                                val jsonResult = uploader.downloadResultJson(resultS3Key)
+                                                                                Log.d("RecordScreen", "Result JSON: $jsonResult")
+                                                                                onRecordingComplete(resultS3Key)
+                                                                            } catch (e: Exception) {
+                                                                                Log.e("RecordScreen", "JSON 다운로드 실패", e)
+                                                                            }
+                                                                        }
+                                                                    },
+                                                                    onError = { e ->
+                                                                        Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                                                                    }
+                                                                )
+                                                            }
                                                         },
                                                         onError = { e ->
-                                                            Toast.makeText(
-                                                                context,
-                                                                "업로드 실패: ${e.message}",
-                                                                Toast.LENGTH_LONG
-                                                            ).show()
+                                                            Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
                                                         }
                                                     )
                                                 }

@@ -5,6 +5,8 @@ import android.net.Uri
 import android.util.Log
 import com.example.kpopdancepracticeai.data.api.UploadApiService
 import com.example.kpopdancepracticeai.data.dto.PresignedUrlRequest
+import com.example.kpopdancepracticeai.data.dto.AnalysisStatusRequest
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
@@ -15,7 +17,8 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
 import java.io.FileOutputStream
-
+import java.net.HttpURLConnection
+import java.net.URL
 class PresignedUrlUploader(private val context: Context) {
 
     private val apiService: UploadApiService
@@ -23,7 +26,7 @@ class PresignedUrlUploader(private val context: Context) {
     init {
         // 1. Retrofit 초기화 (API Gateway 주소 설정)
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://YOUR_API_ID.execute-api.ap-northeast-2.amazonaws.com/prod/") // ⚠️ API Gateway 주소 입력
+            .baseUrl("https://7v1ery3x1g.execute-api.ap-northeast-1.amazonaws.com/") // ⚠️ API Gateway 주소 입력
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
@@ -109,4 +112,76 @@ class PresignedUrlUploader(private val context: Context) {
         }
         return tempFile
     }
+    suspend fun pollAnalysisResult(
+        userId: String,
+        timestamp: Long,
+        onProgress: (String) -> Unit,  // ✅ 진행 상태 콜백 추가
+        onComplete: (String) -> Unit,
+        onError: (Exception) -> Unit
+    ) {
+        withContext(Dispatchers.IO) {
+            try {
+                var attempts = 0
+                val maxAttempts = 60
+
+                while (attempts < maxAttempts) {
+                    val response = apiService.checkAnalysisStatus(
+                        AnalysisStatusRequest(userId, timestamp)
+                    )
+
+                    if (!response.isSuccessful || response.body() == null) {
+                        throw Exception("상태 확인 실패: ${response.code()}")
+                    }
+
+                    val status = response.body()!!
+
+                    when (status.status) {
+                        "completed" -> {
+                            Log.d("Polling", "분석 완료!")
+                            withContext(Dispatchers.Main) {
+                                onComplete(status.resultS3Key ?: "")
+                            }
+                            return@withContext
+                        }
+                        "failed" -> {
+                            throw Exception("분석 실패: ${status.errorMessage}")
+                        }
+                        "processing", "uploaded" -> {
+                            val elapsed = attempts * 5
+                            Log.d("Polling", "분석 중... ($attempts/$maxAttempts)")
+
+                            // ✅ 진행 상태 콜백 호출
+                            withContext(Dispatchers.Main) {
+                                onProgress("분석 중... (${elapsed}초 경과)")
+                            }
+
+                            delay(5000)
+                            attempts++
+                        }
+                    }
+                }
+
+                throw Exception("타임아웃: 분석이 너무 오래 걸립니다")
+
+            } catch (e: Exception) {
+                Log.e("Polling", "폴링 실패", e)
+                withContext(Dispatchers.Main) {
+                    onError(e)
+                }
+            }
+        }
+    }
+
+    suspend fun downloadResultJson(resultS3Key: String): String {
+        return withContext(Dispatchers.IO) {
+            val url = "https://kpop-dance-app-data.s3.ap-northeast-1.amazonaws.com/${resultS3Key}"
+            val connection = URL(url).openConnection() as HttpURLConnection
+            try {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } finally {
+                connection.disconnect()
+            }
+        }
+    }
+
 }
