@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
@@ -175,6 +176,7 @@ fun KpopDancePracticeApp() {
             .background(appGradient)
     ) {
         Scaffold(
+            modifier = Modifier.systemBarsPadding(), // [수정] 시스템 바와 겹치지 않도록 패딩 추가
             containerColor = Color.Transparent, // Scaffold 배경을 투명하게
             topBar = {
                 AnimatedVisibility(
@@ -238,7 +240,7 @@ fun AppBottomNavigationBar(navController: NavController) {
         color = Color.White.copy(alpha = 0.8f), // 반투명 흰색
         modifier = Modifier
             .fillMaxWidth()
-            .navigationBarsPadding() // [수정] 시스템 내비게이션 바 높이만큼 패딩 추가
+            // .navigationBarsPadding() // [수정] 부모 Scaffold에서 패딩을 처리하므로 제거하여 중복 패딩 방지
             .padding(horizontal = 16.dp, vertical = 12.dp) // 플로팅 여백
             .height(64.dp) //  [높이 고정] 64dp로 얇게 설정
             .clip(RoundedCornerShape(50.dp)), // 둥근 모서리
