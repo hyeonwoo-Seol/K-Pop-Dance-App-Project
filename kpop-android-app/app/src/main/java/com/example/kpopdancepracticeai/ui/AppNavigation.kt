@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -237,6 +238,7 @@ fun AppBottomNavigationBar(navController: NavController) {
         color = Color.White.copy(alpha = 0.8f), // 반투명 흰색
         modifier = Modifier
             .fillMaxWidth()
+            .navigationBarsPadding() // [수정] 시스템 내비게이션 바 높이만큼 패딩 추가
             .padding(horizontal = 16.dp, vertical = 12.dp) // 플로팅 여백
             .height(64.dp) //  [높이 고정] 64dp로 얇게 설정
             .clip(RoundedCornerShape(50.dp)), // 둥근 모서리
