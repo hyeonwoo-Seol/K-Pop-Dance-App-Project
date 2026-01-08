@@ -1,6 +1,10 @@
 package com.example.kpopdancepracticeai.ui
 
-import androidx.compose.foundation.BorderStroke 
+import android.app.Activity
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -17,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
@@ -26,16 +31,53 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kpopdancepracticeai.R
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.common.api.ApiException
+import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
     onLoginSuccess: () -> Unit
 ) {
     // 1. 상태 관리: 사용자의 입력을 기억하기 위한 변수
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    // AuthRepository 초기화 (이전 단계에서 생성한 클래스 사용)
+    val authRepository = remember { AuthRepository(context) }
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) } // 에러 메시지용 상태
+
+    // --- 구글 로그인 런처 설정 ---
+    val googleSignInLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+            try {
+                val account = task.getResult(ApiException::class.java)
+                val idToken = account?.idToken
+                if (idToken != null) {
+                    // 구글 토큰을 받아서 파이어베이스 로그인 시도
+                    scope.launch {
+                        val authResult = authRepository.firebaseAuthWithGoogle(idToken)
+                        if (authResult.isSuccess) {
+                            Toast.makeText(context, "구글 로그인 성공", Toast.LENGTH_SHORT).show()
+                            onLoginSuccess() // 화면 이동
+                        } else {
+                            errorMessage = "구글 로그인 실패: ${authResult.exceptionOrNull()?.message}"
+                        }
+                    }
+                }
+            } catch (e: ApiException) {
+                errorMessage = "구글 로그인 오류: ${e.message}"
+            }
+        }
+    }
 
     // 2. 피그마 디자인의 그라데이션 배경 적용
     Box(
@@ -112,7 +154,21 @@ fun LoginScreen(
 
                     // 로그인 버튼 (검은색)
                     Button(
-                        onClick = { onLoginSuccess() },
+                        onClick = {
+                            if (email.isNotBlank() && password.isNotBlank()) {
+                                scope.launch {
+                                    val result = authRepository.signInWithEmail(email, password)
+                                    if (result.isSuccess) {
+                                        Toast.makeText(context, "로그인 성공", Toast.LENGTH_SHORT).show()
+                                        onLoginSuccess()
+                                    } else {
+                                        errorMessage = "로그인 실패. 아이디/비번을 확인하세요."
+                                    }
+                                }
+                            } else {
+                                errorMessage = "이메일과 비밀번호를 입력해주세요."
+                            }
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -123,6 +179,16 @@ fun LoginScreen(
                         shape = RoundedCornerShape(8.dp)
                     ) {
                         Text("로그인", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    // 에러 메시지 표시
+                    if (errorMessage != null) {
+                        Text(
+                            text = errorMessage!!,
+                            color = Color.Red,
+                            fontSize = 12.sp,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
 
                     // "또는" 구분선
@@ -138,7 +204,12 @@ fun LoginScreen(
 
                     // Google 로그인 버튼 (흰색)
                     OutlinedButton(
-                        onClick = { /* TODO: Google 로그인 로직 */ },
+                        onClick = {
+                            // 구글 로그인 클라이언트 실행
+                            val gso = authRepository.getGoogleSignInOptions()
+                            val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                            googleSignInLauncher.launch(googleSignInClient.signInIntent)
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
@@ -149,7 +220,7 @@ fun LoginScreen(
                         // ⭐️ [오류 3 수정] ButtonDefaults.outlinedBorder -> BorderStroke(MaterialTheme)
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
-                        // TODO: 구글 아이콘 추가
+                        // TODO: 구글 아이콘 추가 (필요시 Icon 컴포넌트 추가)
                         Text("Google 계정으로 로그인", fontSize = 16.sp)
                     }
 
@@ -161,7 +232,10 @@ fun LoginScreen(
                             .fillMaxWidth()
                             .height(50.dp)
                             .clip(RoundedCornerShape(8.dp))
-                            .clickable { /* TODO: Kakao 로그인 로직 */ },
+                            .clickable {
+                                // TODO: Kakao 로그인 로직 (추후 구현 시 여기에 추가)
+                                Toast.makeText(context, "카카오 로그인 준비 중입니다.", Toast.LENGTH_SHORT).show()
+                            },
                         contentScale = ContentScale.FillBounds
                     )
 
