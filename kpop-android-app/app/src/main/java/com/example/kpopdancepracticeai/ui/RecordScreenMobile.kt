@@ -12,6 +12,7 @@ import androidx.camera.core.*
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.*
 import androidx.camera.view.PreviewView
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -36,6 +37,8 @@ import androidx.core.content.ContextCompat
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
 import com.example.kpopdancepracticeai.data.S3Uploader // [추가됨] S3Uploader 임포트
 import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalConfiguration // [추가] 기기 설정 확인용
+import androidx.camera.video.FallbackStrategy // [추가] 화질 지원 안될 시 대처용
 
 @Composable
 fun RecordScreen(
@@ -47,8 +50,11 @@ fun RecordScreen(
     onRecordingComplete: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
+    // [추가] 1. 기기 유형 판별 (화면 너비 600dp 이상이면 태블릿으로 간주)
+    val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope() // Coroutine Scope 생성
+
 
     // [추가됨] S3 업로더 인스턴스
     val uploader = remember { PresignedUrlUploader(context) }
@@ -142,6 +148,8 @@ fun RecordScreen(
             },
             modifier = Modifier.fillMaxSize(),
             update = { previewView ->
+                val currentLensFacing = lensFacing
+
                 val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                 cameraProviderFuture.addListener({
                     val cameraProvider = cameraProviderFuture.get()
@@ -149,15 +157,29 @@ fun RecordScreen(
                         it.setSurfaceProvider(previewView.surfaceProvider)
                     }
 
-                    // [수정됨] Recorder 설정 (HD 화질, S3 업로드 효율 고려)
+                    // 목표 화질 설정: 태블릿 -> FHD(1080p), 모바일 -> HD(720p)
+                    val targetQuality = if (isTablet) {
+                        Quality.FHD
+                    } else {
+                        Quality.HD
+                    }
+
+                    // 폴백 전략: 만약 해당 기기가 목표 화질(예: FHD)을 지원하지 않으면
+                    // 가능한 가장 높은 화질(HIGHER) 혹은 낮은 화질(LOWER)로 자동 조정
+                    val qualitySelector = QualitySelector.from(
+                        targetQuality,
+                        FallbackStrategy.lowerQualityOrHigherThan(targetQuality)
+                    )
+
                     val recorder = Recorder.Builder()
-                        .setQualitySelector(QualitySelector.from(Quality.HD))
+                        .setQualitySelector(qualitySelector)
                         .build()
+
                     val videoCapture = VideoCapture.withOutput(recorder)
                     videoCaptureState.value = videoCapture
 
                     val cameraSelector = CameraSelector.Builder()
-                        .requireLensFacing(lensFacing)
+                        .requireLensFacing(currentLensFacing)
                         .build()
 
                     try {
@@ -218,14 +240,24 @@ fun RecordScreen(
         Box(
             modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 32.dp)
         ) {
+            // [수정] 상태에 따른 모양 및 패딩 크기 정의
+            // 녹화 중이면 둥근 모서리의 네모(Stop 기호), 아니면 원형
+            val buttonShape = if (isRecording) RoundedCornerShape(12.dp) else CircleShape
+
+            // 녹화 중(네모)일 때는 정지 버튼처럼 보이게 크기를 조금 줄임 (패딩을 늘림)
+            // 원형일 때는 6.dp, 네모일 때는 20.dp로 설정하여 시각적 차이 부여
+            val buttonPadding by animateDpAsState(
+                targetValue = if (isRecording) 24.dp else 6.dp,
+                label = "buttonPadding"
+            )
             // 녹화 버튼
             Box(
                 modifier = Modifier
                     .size(80.dp)
                     .align(Alignment.Center)
                     .border(4.dp, Color.White, CircleShape)
-                    .padding(6.dp)
-                    .clip(CircleShape)
+                    .padding(buttonPadding)
+                    .clip(buttonShape)
                     .background(if (isRecording) Color.Red else Color(0xFFFB2C36))
                     .clickable {
                         if (isRecording) {
