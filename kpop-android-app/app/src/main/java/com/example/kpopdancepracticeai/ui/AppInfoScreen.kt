@@ -20,12 +20,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext // Context 획득을 위해 추가
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.util.sendSupportEmail // 확장 함수 임포트
 
 /**
  * 앱 정보 화면 (전체 화면)
@@ -35,6 +37,9 @@ import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 fun AppInfoScreen(
     onBackClick: () -> Unit
 ) {
+    // Context 획득
+    val context = LocalContext.current
+
     // 앱 전체의 그라데이션 배경
     val appGradient = Brush.verticalGradient(
         colors = listOf(
@@ -107,7 +112,10 @@ fun AppInfoScreen(
                                 title = "문의하기",
                                 description = "",
                                 icon = Icons.Outlined.ChatBubbleOutline,
-                                onClick = { /* TODO: 문의하기 화면 이동 */ }
+                                onClick = {
+                                    // 유틸리티 함수 호출로 이메일 발송 처리
+                                    context.sendSupportEmail()
+                                }
                             )
                             SettingsDivider()
                             SettingsClickableItem(
