@@ -23,7 +23,7 @@ class PresignedUrlUploader(private val context: Context) {
     init {
         // 1. Retrofit 초기화 (API Gateway 주소 설정)
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://YOUR_API_ID.execute-api.ap-northeast-2.amazonaws.com/prod/") // ⚠️ API Gateway 주소 입력
+            .baseUrl("https://7v1ery3x1g.execute-api.ap-northeast-1.amazonaws.com/") // ⚠️ API Gateway 주소 입력
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 

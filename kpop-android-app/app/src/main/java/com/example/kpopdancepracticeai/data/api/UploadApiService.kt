@@ -8,6 +8,6 @@ import retrofit2.http.POST
 
 interface UploadApiService {
     // Lambda와 연결된 API Gateway의 엔드포인트 경로를 입력하세요 (예: /upload-url)
-    @POST("YOUR_API_GATEWAY_ENDPOINT_PATH")
+    @POST("default/preSignedUrl")
     suspend fun getPresignedUrl(@Body request: PresignedUrlRequest): Response<PresignedUrlResponse>
 }
