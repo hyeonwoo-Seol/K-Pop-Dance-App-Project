@@ -62,6 +62,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kpopdancepracticeai.KpopApplication
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModelFactory
 import java.net.URLDecoder
@@ -142,6 +143,15 @@ fun KpopDancePracticeApp() {
         factory = MainViewModelFactory(repository)
     )
 
+    // [수정] 앱 시작 시 로그인 상태 확인 로직 추가
+    val authRepository = remember { AuthRepository(context) }
+    // 현재 로그인된 사용자가 있으면 홈 화면으로, 없으면 로그인 화면으로 시작
+    val startDestination = if (authRepository.getCurrentUser() != null) {
+        Screen.Home.route
+    } else {
+        Screen.Login.route
+    }
+
     // 상/하단 바 숨길 화면 목록
     val screensToHideBars = listOf(
         Screen.Login.route,
@@ -206,7 +216,8 @@ fun KpopDancePracticeApp() {
             AppNavHost(
                 navController = navController,
                 innerPadding = innerPadding,
-                viewModel = mainViewModel // [오류 해결] 2. 생성한 ViewModel을 하위로 전달
+                viewModel = mainViewModel, // [오류 해결] 2. 생성한 ViewModel을 하위로 전달
+                startDestination = startDestination // [수정] 동적으로 결정된 시작 화면 전달
             )
         }
     }
@@ -303,11 +314,12 @@ fun AppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
     innerPadding: PaddingValues,
-    viewModel: MainViewModel // [오류 해결] 3. 전달받은 ViewModel
+    viewModel: MainViewModel, // [오류 해결] 3. 전달받은 ViewModel
+    startDestination: String // [수정] 시작 화면을 매개변수로 받음
 ) {
     NavHost(
         navController = navController,
-        startDestination = Screen.Login.route,
+        startDestination = startDestination, // [수정] 전달받은 시작 화면 사용
         modifier = modifier
     ) {
         // 로그인 화면 (패딩 적용 X)
