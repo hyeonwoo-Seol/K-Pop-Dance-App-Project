@@ -92,10 +92,55 @@ fun PracticeResultScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(scrollState)
-                .padding(start = 16.dp, top = 81.dp, end = 16.dp, bottom = 32.dp),
+                // ⭐️ 수정됨: Top padding 제거 (헤더가 안에 포함되므로)
+                .padding(start = 16.dp, top = 0.dp, end = 16.dp, bottom = 32.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
             horizontalAlignment = Alignment.Start,
         ) {
+            // 0. Header (이제 스크롤 영역 안에 포함됨)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(80.dp)
+                // 패딩은 Column에서 처리하므로 여기서는 제거
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(top = 16.dp),
+                    contentAlignment = Alignment.CenterStart
+                ) {
+                    // Back Button (Icon)
+                    Box(
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clickable { onBackClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Back",
+                            modifier = Modifier.size(24.dp),
+                            tint = Color.Black
+                        )
+                    }
+
+                    // Title
+                    Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                        Text(
+                            text = "연습 결과",
+                            style = TextStyle(
+                                fontWeight = FontWeight(700),
+                                fontSize = 24.sp,
+                                lineHeight = 24.sp,
+                            ),
+                            color = Color(0xff0a0a0a),
+                            textAlign = TextAlign.Center,
+                        )
+                    }
+                }
+            }
+
             // 1. Grade Card
             Box(
                 modifier = Modifier
@@ -154,7 +199,7 @@ fun PracticeResultScreen(
                     .border(1.25.dp, Color(0xffe9d4ff), RoundedCornerShape(14.dp))
                     .padding(24.dp),
 
-            ) {
+                ) {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(1.dp),
@@ -509,52 +554,6 @@ fun PracticeResultScreen(
                             color = Color(0xff000000),
                         )
                     }
-                }
-            }
-        }
-
-        // Header (Overlay)
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(80.dp)
-                .background(Color(0x00ffffff))
-                .padding(horizontal = 16.dp)
-                .align(Alignment.TopCenter),
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(top = 16.dp),
-                contentAlignment = Alignment.CenterStart
-            ) {
-                // Back Button (Icon)
-                Box(
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clickable { onBackClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = "Back",
-                        modifier = Modifier.size(24.dp),
-                        tint = Color.Black
-                    )
-                }
-
-                // Title
-                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = "연습 결과",
-                        style = TextStyle(
-                            fontWeight = FontWeight(700),
-                            fontSize = 24.sp,
-                            lineHeight = 24.sp,
-                        ),
-                        color = Color(0xff0a0a0a),
-                        textAlign = TextAlign.Center,
-                    )
                 }
             }
         }
