@@ -1,9 +1,15 @@
 package com.example.kpopdancepracticeai.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,11 +67,19 @@ fun PracticeScreenMobile(
     var isPlaying by remember { mutableStateOf(false) }
     var selectedSpeed by remember { mutableStateOf(1.0f) } // ⚠️ [경고] 그대로 유지
 
+    // 컨트롤 패널 가시성 상태 관리
+    var areControlsVisible by remember { mutableStateOf(true) }
     // 비디오 영역 전체를 차지하는 Box
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black) // 비디오가 없는 기본 배경색
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null // 터치 시 물결 효과 제거
+            ) {
+                areControlsVisible = !areControlsVisible
+            }
     ) {
 
         // 중앙 비디오 영역 (임시: 보라색 그라데이션)
@@ -79,100 +93,120 @@ fun PracticeScreenMobile(
                 ),
             contentAlignment = Alignment.Center
         ) {
-            // 중앙의 재생 아이콘 및 안내 텍스트 (UI 스니펫의 '댄스 튜토리얼 영상' 영역)
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                // 중앙 재생 버튼 (흰색 원형)
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(Color.White.copy(alpha = 0.8f))
-                        .clickable(onClick = { isPlaying = !isPlaying }),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.MusicNote else Icons.Default.PlayArrow,
-                        contentDescription = "재생/일시정지",
-                        modifier = Modifier.size(40.dp),
-                        tint = Color.Black.copy(alpha = 0.8f)
+            AnimatedVisibility(
+                visible = areControlsVisible,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
+                // 중앙의 재생 아이콘 및 안내 텍스트 (UI 스니펫의 '댄스 튜토리얼 영상' 영역)
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // 중앙 재생 버튼 (흰색 원형)
+                    Box(
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .background(Color.White.copy(alpha = 0.8f))
+                            .clickable(onClick = { isPlaying = !isPlaying }),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isPlaying) Icons.Default.MusicNote else Icons.Default.PlayArrow,
+                            contentDescription = "재생/일시정지",
+                            modifier = Modifier.size(40.dp),
+                            tint = Color.Black.copy(alpha = 0.8f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "댄스 튜토리얼 영상",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = "세로 화면",
+                        color = Color.White.copy(alpha = 0.5f),
+                        fontSize = 14.sp
                     )
                 }
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "댄스 튜토리얼 영상",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 16.sp
-                )
-                Text(
-                    text = "세로 화면",
-                    color = Color.White.copy(alpha = 0.5f),
-                    fontSize = 14.sp
-                )
             }
         }
 
         // --- 상단 컨트롤 바 ---
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            // 뒤로가기 버튼
-            IconButton(onClick = onBackClick) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기", tint = Color.White)
-            }
+        AnimatedVisibility(
+            visible = areControlsVisible,
+            modifier = Modifier.align(Alignment.TopCenter),
+            enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { -it }) + fadeOut()
+        ){
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // 뒤로가기 버튼
+                IconButton(onClick = onBackClick) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로가기", tint = Color.White)
+                }
 
-            // 우측 아이콘 그룹 (미러링, 볼륨, 설정)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // 미러링 버튼 (아이콘 임시 대체)
-                RoundIconButton(icon = Icons.Default.CameraAlt, onClick = { /* TODO */ })
-                // 볼륨 버튼 (경고 사항은 수정하지 않음)
-                RoundIconButton(icon = Icons.Default.VolumeUp, onClick = { /* TODO */ })
-                // 설정 버튼
-                RoundIconButton(icon = Icons.Default.Settings, onClick = onSettingsClick)
+                // 우측 아이콘 그룹 (미러링, 볼륨, 설정)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // 미러링 버튼 (아이콘 임시 대체)
+                    RoundIconButton(icon = Icons.Default.CameraAlt, onClick = { /* TODO */ })
+                    // 볼륨 버튼 (경고 사항은 수정하지 않음)
+                    RoundIconButton(icon = Icons.Default.VolumeUp, onClick = { /* TODO */ })
+                    // 설정 버튼
+                    RoundIconButton(icon = Icons.Default.Settings, onClick = onSettingsClick)
+                }
             }
         }
 
         // --- 하단 제어판 영역 ---
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.BottomCenter)
-                .background(ColorVideoOverlay) // 하단 제어판 영역의 투명한 검정 오버레이
-                .navigationBarsPadding() // 하단 네비게이션 바 영역 확보
-                .padding(horizontal = 16.dp, vertical = 24.dp), // 내부 패딩
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+        AnimatedVisibility(
+            visible = areControlsVisible,
+            modifier = Modifier.align(Alignment.BottomCenter),
+            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
         ) {
-            // 1. 곡 정보
-            SongInfoBar(
-                title = songTitle, // ⭐️ [수정] 인자 사용
-                artistPart = artistPart, // ⭐️ [수정] 인자 사용
-                difficulty = difficulty // ⭐️ [수정] 인자 사용
-            )
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .align(Alignment.BottomCenter)
+                    .background(ColorVideoOverlay) // 하단 제어판 영역의 투명한 검정 오버레이
+                    .navigationBarsPadding() // 하단 네비게이션 바 영역 확보
+                    .padding(horizontal = 16.dp, vertical = 24.dp), // 내부 패딩
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // 1. 곡 정보
+                SongInfoBar(
+                    title = songTitle, // ⭐️ [수정] 인자 사용
+                    artistPart = artistPart, // ⭐️ [수정] 인자 사용
+                    difficulty = difficulty // ⭐️ [수정] 인자 사용
+                )
 
-            // 2. 재생 슬라이더 및 시간
-            PlaybackSlider(
-                currentPosition = currentPosition,
-                totalTime = length, // ⭐️ [수정] 인자 사용
-                onPositionChange = { newPosition -> currentPosition = newPosition }
-            )
+                // 2. 재생 슬라이더 및 시간
+                PlaybackSlider(
+                    currentPosition = currentPosition,
+                    totalTime = length, // ⭐️ [수정] 인자 사용
+                    onPositionChange = { newPosition -> currentPosition = newPosition }
+                )
 
-            // 3. 속도 조절 버튼 (0.5x, 0.75x, 1x, 1.25x, 1.5x)
-            SpeedControlRow(
-                selectedSpeed = selectedSpeed,
-                onSpeedSelected = { selectedSpeed = it }
-            )
+                // 3. 속도 조절 버튼 (0.5x, 0.75x, 1x, 1.25x, 1.5x)
+                SpeedControlRow(
+                    selectedSpeed = selectedSpeed,
+                    onSpeedSelected = { selectedSpeed = it }
+                )
 
-            // 4. 액션 버튼 (처음부터, 재생/일시정지, 따라하기)
-            ActionButtons(
-                isPlaying = isPlaying,
-                onRefreshClick = { currentPosition = 0.0f },
-                onPlayPauseClick = { isPlaying = !isPlaying },
-                onFollowClick = onRecordClick
-            )
+                // 4. 액션 버튼 (처음부터, 재생/일시정지, 따라하기)
+                ActionButtons(
+                    isPlaying = isPlaying,
+                    onRefreshClick = { currentPosition = 0.0f },
+                    onPlayPauseClick = { isPlaying = !isPlaying },
+                    onFollowClick = onRecordClick
+                )
+            }
         }
     }
 }
