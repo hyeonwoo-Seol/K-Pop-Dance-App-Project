@@ -19,35 +19,30 @@ import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+
 class PresignedUrlUploader(private val context: Context) {
 
     private val apiService: UploadApiService
 
     init {
-        // 1. Retrofit 초기화 (API Gateway 주소 설정)
         val retrofit = Retrofit.Builder()
-            .baseUrl("https://7v1ery3x1g.execute-api.ap-northeast-1.amazonaws.com/") // ⚠️ API Gateway 주소 입력
+            .baseUrl("https://aujfpfdg6e.execute-api.ap-northeast-1.amazonaws.com/")  // ✅ 유지
             .addConverterFactory(GsonConverterFactory.create())
             .build()
 
         apiService = retrofit.create(UploadApiService::class.java)
     }
 
-    /**
-     * 메인 업로드 함수
-     */
     suspend fun uploadVideo(
         fileUri: Uri,
-        filename: String, // 예: user01_song01_BTS_Part2.mp4
-        onComplete: (String) -> Unit, // s3Key 반환
+        filename: String,
+        onComplete: (String) -> Unit,
         onError: (Exception) -> Unit
     ) {
         withContext(Dispatchers.IO) {
             try {
-                // 1. 임시 파일 생성 (Android 13+ 호환)
                 val file = createTempFileFromUri(fileUri)
 
-                // 2. Lambda에게 Pre-signed URL 요청
                 Log.d("Upload", "URL 요청 시작: $filename")
                 val requestPayload = PresignedUrlRequest(filename = filename)
                 val response = apiService.getPresignedUrl(requestPayload)
@@ -56,25 +51,34 @@ class PresignedUrlUploader(private val context: Context) {
                     throw Exception("URL 발급 실패: ${response.code()} ${response.errorBody()?.string()}")
                 }
 
-                val uploadUrl = response.body()!!.uploadUrl
-                val s3Key = response.body()!!.s3Key
-                Log.d("Upload", "URL 발급 완료. S3 업로드 시작...")
+                // ✅ 수정: 한 번만 읽기
+                val responseBody = response.body()!!
+                // ⭐ 여기서 서버가 보낸 '진짜 데이터'를 확인합니다.
+                val body = response.body()
+                val rawJson = response.errorBody()?.string() ?: response.body().toString()
+                Log.d("CHECK_DEBUG", "서버가 보낸 진짜 데이터: $rawJson")
 
-                // 3. 발급받은 URL로 파일 PUT 업로드 (OkHttp 사용)
+                val uploadUrl = responseBody.uploadUrl
+                val s3Key = responseBody.s3Key
+                // [추가할 로그 2] 변수에 값이 제대로 담겼는지 확인합니다.
+                Log.d("Upload", "추출된 uploadUrl: $uploadUrl")
+                Log.d("Upload", "추출된 s3Key: $s3Key")
+
+                Log.d("Upload", "URL 발급 완료. S3 업로드 시작...")
+                Log.d("Upload", "uploadUrl: $uploadUrl")
+                Log.d("Upload", "s3Key: $s3Key")
+
                 uploadFileToS3(uploadUrl, file)
 
-                // 4. 완료 처리
                 Log.d("Upload", "S3 업로드 성공!")
-                file.delete() // 임시 파일 삭제
+                file.delete()
 
-                // UI 업데이트(콜백)는 반드시 Main 스레드에서 실행
                 withContext(Dispatchers.Main) {
                     onComplete(s3Key)
                 }
 
             } catch (e: Exception) {
                 Log.e("Upload", "업로드 실패", e)
-                // 에러 콜백도 Main 스레드에서 실행
                 withContext(Dispatchers.Main) {
                     onError(e)
                 }
@@ -82,18 +86,16 @@ class PresignedUrlUploader(private val context: Context) {
         }
     }
 
-    // OkHttp를 사용하여 S3로 직접 파일 전송
     private fun uploadFileToS3(url: String, file: File) {
         val client = OkHttpClient()
 
-        // Lambda에서 설정한 Content-Type과 반드시 일치해야 함 (video/mp4)
         val mediaType = "video/mp4".toMediaTypeOrNull()
         val requestBody = file.asRequestBody(mediaType)
 
         val request = Request.Builder()
             .url(url)
-            .put(requestBody) // PUT 메서드 중요
-            .addHeader("Content-Type", "video/mp4") // 헤더 추가
+            .put(requestBody)
+            .addHeader("Content-Type", "video/mp4")
             .build()
 
         val response = client.newCall(request).execute()
@@ -102,7 +104,6 @@ class PresignedUrlUploader(private val context: Context) {
         }
     }
 
-    // Uri -> File 변환 유틸리티 (기존 로직 재사용)
     private fun createTempFileFromUri(uri: Uri): File {
         val inputStream = context.contentResolver.openInputStream(uri)
             ?: throw IllegalArgumentException("URI 열기 실패")
@@ -112,10 +113,11 @@ class PresignedUrlUploader(private val context: Context) {
         }
         return tempFile
     }
+
     suspend fun pollAnalysisResult(
         userId: String,
         timestamp: Long,
-        onProgress: (String) -> Unit,  // ✅ 진행 상태 콜백 추가
+        onProgress: (String) -> Unit,
         onComplete: (String) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -124,41 +126,51 @@ class PresignedUrlUploader(private val context: Context) {
                 var attempts = 0
                 val maxAttempts = 60
 
+                /// 서버가 아직 DB에 데이터를 쓰기 전이라 404를 보내면,
+                // 여기서 바로 Exception을 던지고(throw) catch 블록으로 가서 폴링이 종료됩니다.
+                delay(5000)
+
                 while (attempts < maxAttempts) {
                     val response = apiService.checkAnalysisStatus(
                         AnalysisStatusRequest(userId, timestamp)
                     )
 
-                    if (!response.isSuccessful || response.body() == null) {
-                        throw Exception("상태 확인 실패: ${response.code()}")
-                    }
-
-                    val status = response.body()!!
-
-                    when (status.status) {
-                        "completed" -> {
-                            Log.d("Polling", "분석 완료!")
-                            withContext(Dispatchers.Main) {
-                                onComplete(status.resultS3Key ?: "")
-                            }
-                            return@withContext
-                        }
-                        "failed" -> {
-                            throw Exception("분석 실패: ${status.errorMessage}")
-                        }
-                        "processing", "uploaded" -> {
-                            val elapsed = attempts * 5
-                            Log.d("Polling", "분석 중... ($attempts/$maxAttempts)")
-
-                            // ✅ 진행 상태 콜백 호출
-                            withContext(Dispatchers.Main) {
-                                onProgress("분석 중... (${elapsed}초 경과)")
-                            }
-
-                            delay(5000)
-                            attempts++
+                    // ✅ 수정된 로직: 404는 실패가 아니라 '대기'로 처리합니다.
+                    if (response.code() == 404) {
+                        Log.d("Polling", "아직 데이터 생성 전입니다... ($attempts/$maxAttempts)")
+                        withContext(Dispatchers.Main) {
+                            onProgress("서버 응답 대기 중...")
                         }
                     }
+                    else if (response.isSuccessful && response.body() != null) {
+                        val status = response.body()!!
+                        when (status.status) {
+                            "completed" -> {
+                                Log.d("Polling", "분석 완료!")
+                                withContext(Dispatchers.Main) {
+                                    onComplete(status.resultS3Key ?: "")
+                                }
+                                return@withContext
+                            }
+                            "failed" -> {
+                                throw Exception("분석 실패: ${status.errorMessage}")
+                            }
+                            "processing", "uploaded" -> {
+                                val elapsed = attempts * 5
+                                withContext(Dispatchers.Main) {
+                                    onProgress("분석 중... (${elapsed}초 경과)")
+                                }
+                            }
+                        }
+                    }
+                    else {
+                        // 404가 아닌 다른 에러(500 등)인 경우에만 중단
+                        throw Exception("서버 에러 발생: ${response.code()}")
+                    }
+
+                    // 다음 시도까지 대기
+                    delay(5000)
+                    attempts++
                 }
 
                 throw Exception("타임아웃: 분석이 너무 오래 걸립니다")
@@ -171,7 +183,6 @@ class PresignedUrlUploader(private val context: Context) {
             }
         }
     }
-
     suspend fun downloadResultJson(resultS3Key: String): String {
         return withContext(Dispatchers.IO) {
             val url = "https://kpop-dance-app-data.s3.ap-northeast-1.amazonaws.com/${resultS3Key}"
@@ -183,5 +194,4 @@ class PresignedUrlUploader(private val context: Context) {
             }
         }
     }
-
 }

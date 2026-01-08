@@ -267,12 +267,23 @@ fun RecordScreen(
 
                                                 // [추가됨] S3 업로드 트리거 (Task T3-1 핵심)
                                                 // TODO: 실제 userId를 로그인 정보에서 가져와야 함
+// ✅ [수정됨] 파일명 생성 로직: 조각을 정확히 5개로 맞춤
                                                 val userId = "xooyong"
-                                                val safeSongTitle = songTitle.replace(" ", "_")
-                                                val timestamp = System.currentTimeMillis() // Timestamp 추가
-                                                val safePart = part.replace(" ", "_").replace(":", "")
 
-                                                val filename = "user_${userId}_${safeSongTitle}_${safePart}_${timestamp}.mp4"
+                                                // 1. songTitle에서 공백과 언더바를 제거하여 한 단어로 만듦
+                                                val songId = songTitle.replace(" ", "").replace("_", "")
+
+                                                // 2. part 문자열에서 숫자만 추출하여 partNum 생성 (예: "Part 2" -> "2")
+                                                val partNum = part.filter { it.isDigit() }.ifEmpty { "0" }
+
+                                                // 3. ":" 뒤의 이름에서 공백과 언더바 제거하여 partName 생성 (예: "메인 파트" -> "메인파트")
+                                                val partName = part.split(":").lastOrNull()?.replace(" ", "")?.replace("_", "") ?: "None"
+
+                                                // 4. Polling과 공유할 정확한 타임스탬프
+                                                val timestamp = System.currentTimeMillis()
+
+                                                // ✅ 최종 파일명: xooyong_Dynamite_2_메인파트_1767882222994.mp4 (조각 5개 확인!)
+                                                val filename = "${userId}_${songId}_${partNum}_${partName}_${timestamp}.mp4"
 
                                                 scope.launch {
                                                     uploader.uploadVideo(
@@ -281,7 +292,7 @@ fun RecordScreen(
                                                         onComplete = { s3Key ->
                                                             Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
                                                             Log.d("RecordScreen", "Upload Complete Key: $s3Key")
-
+                                                            Log.d("RecordScreen", "폴링 시작 요청값 확인 -> ID: $userId, TIME: $timestamp")
                                                             scope.launch {
                                                                 uploader.pollAnalysisResult(
                                                                     userId = userId,
