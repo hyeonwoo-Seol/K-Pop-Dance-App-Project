@@ -54,7 +54,9 @@ fun RecordScreen(
     val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope() // Coroutine Scope 생성
-
+    val isTablet = remember(configuration) {
+        configuration.screenWidthDp >= 600
+    }
 
     // [추가됨] S3 업로더 인스턴스
     val uploader = remember { PresignedUrlUploader(context) }
