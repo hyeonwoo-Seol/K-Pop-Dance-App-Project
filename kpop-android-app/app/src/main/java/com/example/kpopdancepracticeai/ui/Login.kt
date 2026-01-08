@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.rememberAsyncImagePainter
 import com.example.kpopdancepracticeai.R
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 
@@ -138,32 +139,75 @@ fun LoginScreen(
 
                     // Google 로그인 버튼 (흰색)
                     OutlinedButton(
+
                         onClick = { /* TODO: Google 로그인 로직 */ },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(50.dp),
                         shape = RoundedCornerShape(8.dp),
                         colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color.White,
                             contentColor = Color.Black
                         ),
                         // ⭐️ [오류 3 수정] ButtonDefaults.outlinedBorder -> BorderStroke(MaterialTheme)
-                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline),
+                        contentPadding = PaddingValues(0.dp) // 기본 패딩 제거하여 아이콘 위치 제어
                     ) {
-                        // TODO: 구글 아이콘 추가
-                        Text("Google 계정으로 로그인", fontSize = 16.sp)
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.googleicon),
+                                contentDescription = "Google Logo",
+                                modifier = Modifier
+                                    .align(Alignment.CenterStart) // 왼쪽 정렬
+                                    .padding(start = 7.dp) // 아이콘 자체의 시작 패딩은 0 (버튼 패딩 고려)
+                                    .size(20.dp),
+                                tint = Color.Unspecified // 원본 색상 유지
+                            )
+                            // 텍스트는 중앙 정렬
+                            Text(
+                                text = "Google 계정으로 로그인",
+                                fontSize = 16.sp,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
                     }
 
-                    // 카카오 로그인 버튼 (이미지 리소스 사용)
-                    Image(
-                        painter = painterResource(id = R.drawable.kakao_login_large_wide),
-                        contentDescription = "카카오로 시작하기",
+                    // 카카오 로그인 버튼 (흰색)
+                    OutlinedButton(
+
+                        onClick = { /* TODO: kakao 로그인 로직 */ },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(50.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .clickable { /* TODO: Kakao 로그인 로직 */ },
-                        contentScale = ContentScale.FillBounds
-                    )
+                            .height(50.dp),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            containerColor = Color(0xFFFCE400),
+                            contentColor = Color.Black,
+
+                        ),
+                        // ⭐️ [오류 3 수정] ButtonDefaults.outlinedBorder -> BorderStroke(MaterialTheme)
+                        border = BorderStroke(1.dp, Color(0xFFFCE400)),
+                        contentPadding = PaddingValues(0.dp)
+                    ) {
+                        Box(modifier = Modifier.fillMaxWidth()) {
+                            Icon(
+                                painter = painterResource(id = R.drawable.kakaologo),
+                                contentDescription = "Kakao Logo",
+                                modifier = Modifier
+
+                                    .align(Alignment.CenterStart) // 왼쪽 정렬
+                                    .padding(start = 7.dp)
+                                    .size(20.dp),
+                                tint = Color.Unspecified, // 원본 색상 유지
+                            )
+                            // 텍스트는 중앙 정렬
+                            Text(
+                                text = "kakao 계정으로 로그인",
+                                fontSize = 16.sp,
+                                modifier = Modifier.align(Alignment.Center)
+                            )
+                        }
+                    }
 
                     // 약관 안내
                     Text(
