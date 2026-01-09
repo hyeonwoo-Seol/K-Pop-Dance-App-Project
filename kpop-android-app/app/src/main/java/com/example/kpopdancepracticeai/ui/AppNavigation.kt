@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
@@ -62,6 +63,7 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kpopdancepracticeai.KpopApplication
+import com.example.kpopdancepracticeai.ui.test.IntegrationTestScreen
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModelFactory
 import java.net.URLDecoder
@@ -89,6 +91,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     // 곡 파트 선택 화면 경로
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
 
+
+    object Test : Screen("test", "시스템 테스트", Icons.Default.Build)
     // 댄스 연습 화면 경로
     object DancePractice : Screen(
         "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}",
@@ -157,7 +161,9 @@ fun KpopDancePracticeApp() {
         Screen.PracticeResult.route,
         Screen.AnalysisLoading.route, // 로딩 화면에서도 바 숨김
         Screen.Record.route, // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
-        Screen.Analysis.route // [수정됨] 분석 화면에서도 상단 바 숨김
+        Screen.Analysis.route, // [수정됨] 분석 화면에서도 상단 바 숨김
+        Screen.Test.route
+
     )
     val showMainBars = currentRoute !in screensToHideBars
 
@@ -384,11 +390,14 @@ fun AppNavHost(
                 onNavigateToAnalysis = {
                     navController.navigate(Screen.Analysis.route)
                 },
+                onNavigateToTest = { navController.navigate(Screen.Test.route) },
                 // [오류 해결] 4. ProfileScreen에 준비된 viewModel 전달
                 viewModel = viewModel
             )
         }
-
+        composable(Screen.Test.route) {
+            IntegrationTestScreen()
+        }
         // 프로필 설정 화면 (전체 화면, innerPadding 적용 X)
         composable(Screen.ProfileEdit.route) {
             ProfileEditScreen(

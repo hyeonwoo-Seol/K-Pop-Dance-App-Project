@@ -12,6 +12,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Sync
@@ -47,6 +48,7 @@ fun ProfileScreen(
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
+    onNavigateToTest: () -> Unit,
     viewModel: MainViewModel = viewModel()
 ) {
     // ViewModel 상태 구독
@@ -108,6 +110,7 @@ fun ProfileScreen(
                         onNavigateToPrivacySettings,
                         onNavigateToAppInfo,
                         onNavigateToWithdrawal,
+                        onNavigateToTest = onNavigateToTest,
                         // [수정됨] 동기화 클릭 시 ViewModel 호출
                         onSyncClick = { viewModel.refreshData() },
                         isSyncing = isSyncing
@@ -255,6 +258,7 @@ fun SettingsContent(
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
     onSyncClick: () -> Unit,
+    onNavigateToTest: () -> Unit,
     isSyncing: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -275,7 +279,12 @@ fun SettingsContent(
                     textColor = if (isSyncing) Color.Gray else Color.Black,
                     onClick = onSyncClick
                 ); SettingsMenuDivider()
-
+                SettingsMenuItem(
+                    text = "시스템 기능 테스트",
+                    icon = Icons.Default.Build, // 렌치(도구) 아이콘
+                    iconBgColor = Color(0xFFEEEEEE), // 회색 배경
+                    onClick = onNavigateToTest
+                ); SettingsMenuDivider()
                 SettingsMenuItem("회원 탈퇴", Icons.Outlined.ExitToApp, Color(0xFFFFF0F0), textColor = Color.Red, onClick = onNavigateToWithdrawal)
             }
         }
@@ -313,5 +322,5 @@ fun AchievementCard(title: String, description: String, progress: Float, progres
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    KpopDancePracticeAITheme { ProfileScreen(PaddingValues(), {}, {}, {}, {}, {}, {}, {}) }
+    KpopDancePracticeAITheme { ProfileScreen(PaddingValues(), {}, {}, {}, {}, {}, {}, {}, onNavigateToTest = {}) }
 }
