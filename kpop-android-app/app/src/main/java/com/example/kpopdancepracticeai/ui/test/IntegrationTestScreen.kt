@@ -29,7 +29,12 @@ import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
 
-
+/**
+ * [통합 테스트 화면]
+ * 위치: ui/test 패키지
+ * 역할: assets 폴더의 JSON 파일들을 읽어와서
+ * 파일명 파싱(UserId, SongId 등 추출) 및 데이터 흐름을 검증합니다.
+ */
 @Composable
 fun IntegrationTestScreen() {
     val context = LocalContext.current

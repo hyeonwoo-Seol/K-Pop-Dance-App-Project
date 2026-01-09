@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp") // KSP 플러그인 적용
+    id("com.google.gms.google-services") //firebase
 }
 
 android {
@@ -92,4 +93,11 @@ dependencies {
 
     // Gson (JSON Parsing)
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // firebase
+    implementation(platform("com.google.firebase:firebase-bom:34.7.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+
 }
