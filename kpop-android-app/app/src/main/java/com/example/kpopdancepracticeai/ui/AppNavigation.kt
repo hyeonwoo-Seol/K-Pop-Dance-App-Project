@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
@@ -63,6 +64,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kpopdancepracticeai.KpopApplication
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
+import com.example.kpopdancepracticeai.ui.test.IntegrationTestScreen
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModelFactory
 import java.net.URLDecoder
@@ -91,6 +93,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object SearchResults : Screen("searchResults/{query}", "검색 결과", Icons.Default.Search)
     object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
 
+    object Test : Screen("test", "시스템 테스트", Icons.Default.Build)
     // 곡 파트 선택 화면 경로
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
 
@@ -187,7 +190,8 @@ fun KpopDancePracticeApp() {
         Screen.PracticeResult.route,
         Screen.AnalysisLoading.route, // 로딩 화면에서도 바 숨김
         Screen.Record.route, // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
-        Screen.Analysis.route // [수정됨] 분석 화면에서도 상단 바 숨김
+        Screen.Analysis.route, // [수정됨] 분석 화면에서도 상단 바 숨김
+        Screen.Test.route
     )
 
     // 동적 경로(인자가 있는 경로)에 대한 바 숨김 처리 보완
@@ -404,8 +408,10 @@ fun AppNavHost(
             )
         ) { backStackEntry ->
             // 전달받은 인자 추출 및 디코딩
-            val email = backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
-            val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
+            val email =
+                backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
+            val password =
+                backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
 
             SignUpSecondScreen(
                 email = email,
@@ -483,219 +489,241 @@ fun AppNavHost(
                 onNavigateToAnalysis = {
                     navController.navigate(Screen.Analysis.route)
                 },
+                onNavigateToTest = { navController.navigate(Screen.Test.route) },
                 // [오류 해결] 4. ProfileScreen에 준비된 viewModel 전달
                 viewModel = viewModel
             )
         }
-
-        // 프로필 설정 화면 (전체 화면, innerPadding 적용 X)
-        composable(Screen.ProfileEdit.route) {
-            ProfileEditScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+        composable(Screen.Test.route) {
+            IntegrationTestScreen()
         }
+            // 프로필 설정 화면 (전체 화면, innerPadding 적용 X)
+            composable(Screen.ProfileEdit.route) {
+                ProfileEditScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
 
-        // 연습 화면 설정 (전체 화면, innerPadding 적용 X)
-        composable(Screen.PracticeSettings.route) {
-            PracticeSettingsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
-        }
+            // 연습 화면 설정 (전체 화면, innerPadding 적용 X)
+            composable(Screen.PracticeSettings.route) {
+                PracticeSettingsScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
 
-        // 알림 설정 화면 (전체 화면, innerPadding 적용 X)
-        composable(Screen.NotificationSettings.route) {
-            NotificationSettingsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
-        }
+            // 알림 설정 화면 (전체 화면, innerPadding 적용 X)
+            composable(Screen.NotificationSettings.route) {
+                NotificationSettingsScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
 
-        // 개인정보 보호 및 권한 화면 (전체 화면, innerPadding 적용 X)
-        composable(Screen.PrivacySettings.route) {
-            PrivacySettingsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
-        }
+            // 개인정보 보호 및 권한 화면 (전체 화면, innerPadding 적용 X)
+            composable(Screen.PrivacySettings.route) {
+                PrivacySettingsScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
 
-        // 앱 정보 화면 (전체 화면, innerPadding 적용 X)
-        composable(Screen.AppInfo.route) {
-            AppInfoScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
-        }
+            // 앱 정보 화면 (전체 화면, innerPadding 적용 X)
+            composable(Screen.AppInfo.route) {
+                AppInfoScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    }
+                )
+            }
 
-        // 회원 탈퇴 화면 (전체 화면, innerPadding 적용 X)
-        composable(Screen.Withdrawal.route) {
-            WithdrawalScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                onWithdrawConfirm = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            inclusive = true
+            // 회원 탈퇴 화면 (전체 화면, innerPadding 적용 X)
+            composable(Screen.Withdrawal.route) {
+                WithdrawalScreen(
+                    onBackClick = {
+                        navController.popBackStack()
+                    },
+                    onWithdrawConfirm = {
+                        navController.navigate(Screen.Login.route) {
+                            popUpTo(navController.graph.findStartDestination().id) {
+                                inclusive = true
+                            }
                         }
                     }
-                }
-            )
-        }
+                )
+            }
 
-        // 검색 결과 화면
-        composable(
-            route = Screen.SearchResults.route,
-            arguments = listOf(navArgument("query") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val query = backStackEntry.arguments?.getString("query") ?: ""
-            SearchResultsScreen(
-                query = query,
-                navController = navController,
-                paddingValues = innerPadding
-            )
-        }
+            // 검색 결과 화면
+            composable(
+                route = Screen.SearchResults.route,
+                arguments = listOf(navArgument("query") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val query = backStackEntry.arguments?.getString("query") ?: ""
+                SearchResultsScreen(
+                    query = query,
+                    navController = navController,
+                    paddingValues = innerPadding
+                )
+            }
 
-        // 곡 상세 화면 (SongDetailScreen)
-        composable(
-            route = Screen.SongDetail.route,
-            arguments = listOf(navArgument("songId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val songId = backStackEntry.arguments?.getString("songId") ?: ""
-            SongDetailScreen(
-                songId = songId,
-                navController = navController,
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
-        }
-
-        // 곡 파트 선택 화면 (SongPartSelectScreen)
-        composable(
-            route = Screen.SongPartSelect.route,
-            arguments = listOf(navArgument("songId") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val songId = backStackEntry.arguments?.getString("songId") ?: ""
-            SongPartSelectScreen(
-                songId = songId,
-                onBackClick = {
-                    navController.popBackStack()
-                },
-                // onNavigateToPractice 람다 구현: 인코딩하여 PracticeScreenMobile로 이동
-                onNavigateToPractice = { songTitle, artistPart, difficulty, length ->
-                    // 특수 문자가 포함될 수 있는 문자열 인코딩
-                    val encodedTitle = Screen.encodeArg(songTitle)
-                    val encodedArtistPart = Screen.encodeArg(artistPart)
-                    val encodedDifficulty = Screen.encodeArg(difficulty)
-                    val encodedLength = Screen.encodeArg(length)
-
-                    navController.navigate(
-                        "dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength"
-                    )
-                }
-            )
-        }
-
-        // 댄스 연습 화면 (PracticeScreenMobile)
-        composable(
-            route = Screen.DancePractice.route,
-            arguments = listOf(
-                navArgument("songTitle") { type = NavType.StringType },
-                navArgument("artistPart") { type = NavType.StringType },
-                navArgument("difficulty") { type = NavType.StringType },
-                navArgument("length") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            // 전달받은 파라미터를 디코딩하여 사용
-            val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: "곡 정보 없음"
-            val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: "아티스트 정보 없음"
-            val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: "난이도 정보 없음"
-            val length = backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) } ?: "시간 정보 없음"
-
-            PracticeScreenMobile(
-                songTitle = songTitle,
-                artistPart = artistPart,
-                difficulty = difficulty,
-                length = length,
-                onBackClick = {
-                    // [수정] 연습이 끝나면(뒤로가기/완료 시) 분석 대기 화면으로 이동
-                    navController.navigate(Screen.AnalysisLoading.route) {
-                        popUpTo(Screen.DancePractice.route) { inclusive = true }
+            // 곡 상세 화면 (SongDetailScreen)
+            composable(
+                route = Screen.SongDetail.route,
+                arguments = listOf(navArgument("songId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val songId = backStackEntry.arguments?.getString("songId") ?: ""
+                SongDetailScreen(
+                    songId = songId,
+                    navController = navController,
+                    onBackClick = {
+                        navController.popBackStack()
                     }
-                },
-                //  [추가] '따라하기' 버튼 클릭 시 녹화 화면으로 이동하는 로직 연결
-                onRecordClick = {
-                    val encodedTitle = Screen.encodeArg(songTitle)
-                    val encodedArtistPart = Screen.encodeArg(artistPart)
-                    val encodedDifficulty = Screen.encodeArg(difficulty)
+                )
+            }
 
-                    navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty")
-                },
-                onSettingsClick = {
-                    navController.navigate(Screen.PracticeSettings.route)
-                }
-            )
-        }
+            // 곡 파트 선택 화면 (SongPartSelectScreen)
+            composable(
+                route = Screen.SongPartSelect.route,
+                arguments = listOf(navArgument("songId") { type = NavType.StringType })
+            ) { backStackEntry ->
+                val songId = backStackEntry.arguments?.getString("songId") ?: ""
+                SongPartSelectScreen(
+                    songId = songId,
+                    onBackClick = {
+                        navController.popBackStack()
+                    },
+                    // onNavigateToPractice 람다 구현: 인코딩하여 PracticeScreenMobile로 이동
+                    onNavigateToPractice = { songTitle, artistPart, difficulty, length ->
+                        // 특수 문자가 포함될 수 있는 문자열 인코딩
+                        val encodedTitle = Screen.encodeArg(songTitle)
+                        val encodedArtistPart = Screen.encodeArg(artistPart)
+                        val encodedDifficulty = Screen.encodeArg(difficulty)
+                        val encodedLength = Screen.encodeArg(length)
 
-        // 로딩 화면 (분석 대기)
-        composable(Screen.AnalysisLoading.route) {
-            // [수정] AnalysisWaitingScreen으로 교체 및 연결
-            AnalysisWaitingScreen(
-                onAnalysisComplete = {
-                    // 분석 완료 시 결과 화면으로 이동
-                    navController.navigate(Screen.PracticeResult.route) {
-                        popUpTo(Screen.AnalysisLoading.route) { inclusive = true }
+                        navController.navigate(
+                            "dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength"
+                        )
                     }
-                }
-            )
-        }
-        // 연습 결과 화면
-        composable(Screen.PracticeResult.route) {
-            PracticeResultScreen(
-                onBackClick = { navController.popBackStack(Screen.Home.route, inclusive = false) }, // 홈으로 돌아가기
-                onCompareClick = { /* TODO: 시각적 비교 화면으로 이동 */ },
-                onRetryClick = { songId -> navController.navigate("songPartSelect/$songId") }, // 파트 선택 화면으로 돌아가기
-                onNextPartClick = { songId -> navController.navigate("songPartSelect/$songId") } // 다음 파트 선택 화면으로 돌아가기
-            )
-        }
+                )
+            }
 
-        //  [추가] 녹화 화면 (RecordScreen) 연결
-        composable(
-            route = Screen.Record.route,
-            arguments = listOf(
-                navArgument("songTitle") { type = NavType.StringType },
-                navArgument("artistPart") { type = NavType.StringType },
-                navArgument("difficulty") { type = NavType.StringType }
-            )
-        ) { backStackEntry ->
-            val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: "제목 없음"
-            val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: "정보 없음"
-            val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: "보통"
+            // 댄스 연습 화면 (PracticeScreenMobile)
+            composable(
+                route = Screen.DancePractice.route,
+                arguments = listOf(
+                    navArgument("songTitle") { type = NavType.StringType },
+                    navArgument("artistPart") { type = NavType.StringType },
+                    navArgument("difficulty") { type = NavType.StringType },
+                    navArgument("length") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                // 전달받은 파라미터를 디코딩하여 사용
+                val songTitle =
+                    backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) }
+                        ?: "곡 정보 없음"
+                val artistPart =
+                    backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) }
+                        ?: "아티스트 정보 없음"
+                val difficulty =
+                    backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) }
+                        ?: "난이도 정보 없음"
+                val length =
+                    backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) }
+                        ?: "시간 정보 없음"
 
-            // artistPart 문자열(예: "BTS · Part 2")을 분리해서 전달 (임시 로직)
-            val parts = artistPart.split("·").map { it.trim() }
-            val artistName = parts.getOrNull(0) ?: "Unknown"
-            val partName = parts.getOrNull(1) ?: artistPart
+                PracticeScreenMobile(
+                    songTitle = songTitle,
+                    artistPart = artistPart,
+                    difficulty = difficulty,
+                    length = length,
+                    onBackClick = {
+                        // [수정] 연습이 끝나면(뒤로가기/완료 시) 분석 대기 화면으로 이동
+                        navController.navigate(Screen.AnalysisLoading.route) {
+                            popUpTo(Screen.DancePractice.route) { inclusive = true }
+                        }
+                    },
+                    //  [추가] '따라하기' 버튼 클릭 시 녹화 화면으로 이동하는 로직 연결
+                    onRecordClick = {
+                        val encodedTitle = Screen.encodeArg(songTitle)
+                        val encodedArtistPart = Screen.encodeArg(artistPart)
+                        val encodedDifficulty = Screen.encodeArg(difficulty)
 
-            RecordScreen(
-                songTitle = songTitle,
-                difficulty = difficulty,
-                artist = artistName,
-                part = partName,
-                onBack = { navController.popBackStack() },
-                onRecordingComplete = { s3Key ->
-                    // 녹화 완료 후 처리 (예: 결과 화면으로 이동하거나 토스트 메시지)
-                    // 현재는 간단히 뒤로 가기
-                    navController.popBackStack()
-                }
-            )
+                        navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty")
+                    },
+                    onSettingsClick = {
+                        navController.navigate(Screen.PracticeSettings.route)
+                    }
+                )
+            }
+
+            // 로딩 화면 (분석 대기)
+            composable(Screen.AnalysisLoading.route) {
+                // [수정] AnalysisWaitingScreen으로 교체 및 연결
+                AnalysisWaitingScreen(
+                    onAnalysisComplete = {
+                        // 분석 완료 시 결과 화면으로 이동
+                        navController.navigate(Screen.PracticeResult.route) {
+                            popUpTo(Screen.AnalysisLoading.route) { inclusive = true }
+                        }
+                    }
+                )
+            }
+            // 연습 결과 화면
+            composable(Screen.PracticeResult.route) {
+                PracticeResultScreen(
+                    onBackClick = {
+                        navController.popBackStack(
+                            Screen.Home.route,
+                            inclusive = false
+                        )
+                    }, // 홈으로 돌아가기
+                    onCompareClick = { /* TODO: 시각적 비교 화면으로 이동 */ },
+                    onRetryClick = { songId -> navController.navigate("songPartSelect/$songId") }, // 파트 선택 화면으로 돌아가기
+                    onNextPartClick = { songId -> navController.navigate("songPartSelect/$songId") } // 다음 파트 선택 화면으로 돌아가기
+                )
+            }
+
+            //  [추가] 녹화 화면 (RecordScreen) 연결
+            composable(
+                route = Screen.Record.route,
+                arguments = listOf(
+                    navArgument("songTitle") { type = NavType.StringType },
+                    navArgument("artistPart") { type = NavType.StringType },
+                    navArgument("difficulty") { type = NavType.StringType }
+                )
+            ) { backStackEntry ->
+                val songTitle =
+                    backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) }
+                        ?: "제목 없음"
+                val artistPart =
+                    backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) }
+                        ?: "정보 없음"
+                val difficulty =
+                    backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) }
+                        ?: "보통"
+
+                // artistPart 문자열(예: "BTS · Part 2")을 분리해서 전달 (임시 로직)
+                val parts = artistPart.split("·").map { it.trim() }
+                val artistName = parts.getOrNull(0) ?: "Unknown"
+                val partName = parts.getOrNull(1) ?: artistPart
+
+                RecordScreen(
+                    songTitle = songTitle,
+                    difficulty = difficulty,
+                    artist = artistName,
+                    part = partName,
+                    onBack = { navController.popBackStack() },
+                    onRecordingComplete = { s3Key ->
+                        // 녹화 완료 후 처리 (예: 결과 화면으로 이동하거나 토스트 메시지)
+                        // 현재는 간단히 뒤로 가기
+                        navController.popBackStack()
+                    }
+                )
+            }
         }
     }
-}

@@ -117,7 +117,7 @@ fun LoginScreen(
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(30.dp), // 둥근 모서리
                 color = Color.White,
-                // [오류 1 수정] elevation -> shadowElevation
+                // ⭐️ [오류 1 수정] elevation -> shadowElevation
                 shadowElevation = 8.dp
             ) {
                 // 5. 카드 내부 로그인 폼

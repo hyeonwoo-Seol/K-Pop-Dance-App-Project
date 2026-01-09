@@ -24,6 +24,7 @@ class AppRepository(
     private val achievementDao: AchievementDao
 ) {
 
+
     // --- 1. 사용자 통계 관련 ---
 
     fun getUserStatsStream(userId: String): Flow<UserStats?> {
