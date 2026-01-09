@@ -267,7 +267,6 @@ fun RecordScreen(
 
                                                 // [추가됨] S3 업로드 트리거 (Task T3-1 핵심)
                                                 // TODO: 실제 userId를 로그인 정보에서 가져와야 함
-// ✅ [수정됨] 파일명 생성 로직: 조각을 정확히 5개로 맞춤
                                                 val userId = "xooyong"
 
                                                 // 1. songTitle에서 공백과 언더바를 제거하여 한 단어로 만듦
@@ -282,7 +281,7 @@ fun RecordScreen(
                                                 // 4. Polling과 공유할 정확한 타임스탬프
                                                 val timestamp = System.currentTimeMillis()
 
-                                                // ✅ 최종 파일명: xooyong_Dynamite_2_메인파트_1767882222994.mp4 (조각 5개 확인!)
+                                                // 최종 파일명: xooyong_Dynamite_2_메인파트_1767882222994.mp4
                                                 val filename = "${userId}_${songId}_${partNum}_${partName}_${timestamp}.mp4"
 
                                                 scope.launch {
