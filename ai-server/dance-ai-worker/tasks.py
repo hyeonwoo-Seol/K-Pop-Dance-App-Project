@@ -186,6 +186,56 @@ class CallbackNotifier:
             logger.error(f"[API] 에러 통보 실패: {e}")
 
 # -----------------------------------------------------------------------------
+# [Helper Class 4] DynamoDB 상태 관리 (추가됨)
+# -----------------------------------------------------------------------------
+class DynamoDBManager:
+    def __init__(self):
+        self.enabled = Config.USE_AWS
+        self.table = None
+        if self.enabled:
+            try:
+                # boto3.resource를 사용하여 DynamoDB 연결
+                dynamodb = boto3.resource(
+                    'dynamodb',
+                    region_name=Config.AWS_REGION,
+                    aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
+                    aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY
+                )
+                self.table = dynamodb.Table(Config.DYNAMODB_TABLE)
+            except Exception as e:
+                logger.error(f"[DynamoDB] 클라이언트 초기화 실패: {e}")
+
+    def update_status(self, user_id, timestamp, status, result_s3_key=None, error_msg=None):
+        if not self.enabled or self.table is None:
+            logger.info("[DynamoDB] AWS 비활성화 또는 연결 실패로 상태 업데이트 건너뜀")
+            return
+
+        try:
+            update_expression = 'SET #status = :status'
+            expression_values = {':status': status}
+            expression_names = {'#status': 'status'}
+
+            if result_s3_key:
+                update_expression += ', result_s3_key = :key'
+                expression_values[':key'] = result_s3_key
+            
+            if error_msg:
+                update_expression += ', error_message = :msg'
+                expression_values[':msg'] = error_msg
+
+            self.table.update_item(
+                Key={'user_id': str(user_id), 'timestamp': int(timestamp)},
+                UpdateExpression=update_expression,
+                ExpressionAttributeNames=expression_names,
+                ExpressionAttributeValues=expression_values
+            )
+            logger.info(f"[DynamoDB] 상태 업데이트 성공 ({status}): User={user_id}")
+        
+        except Exception as e:
+            logger.error(f"[DynamoDB] 상태 업데이트 실패: {e}")
+
+
+# -----------------------------------------------------------------------------
 # Celery Tasks
 # -----------------------------------------------------------------------------
 
@@ -244,16 +294,21 @@ def download_video_task(self, bucket_name, video_key):
 
 
 # >> Task 2: AI 분석 및 채점 (YOLO v11 + DTW)
+# >> [수정] timestamp 인자 추가 (DynamoDB 키)
 @app.task(
     name='tasks.pose_estimation_task',
     queue='gpu_queue'
 )
-def pose_estimation_task(video_path, song_id, user_id):
+def pose_estimation_task(video_path, song_id, user_id, timestamp):
     global pose_estimator, scoring_engine
     
     logger.info(f"[Task 2] AI 분석 및 채점 시작 (GPU Queue): {video_path}")
-    logger.info(f"요청 정보 | Song: {song_id} | User: {user_id}")
+    logger.info(f"요청 정보 | Song: {song_id} | User: {user_id} | TS: {timestamp}")
     
+    # [추가] DynamoDB 매니저 초기화 및 시작 상태 업데이트
+    db_manager = DynamoDBManager()
+    db_manager.update_status(user_id, timestamp, 'processing')
+
     # 1. 파일명 파싱 (Helper Class 사용)
     full_song_identifier, expert_json_filename = VideoMetadataParser.parse(video_path, song_id, user_id)
     logger.info(f"[Info] 타겟 전문가 데이터 파일: {expert_json_filename}")
@@ -268,6 +323,8 @@ def pose_estimation_task(video_path, song_id, user_id):
             err_msg = f"Model load failed: {str(e)}"
             logger.error(err_msg)
             CallbackNotifier.send_error(user_id, full_song_identifier, err_msg)
+            # [추가] 실패 상태 DB 업데이트
+            db_manager.update_status(user_id, timestamp, 'failed', error_msg=err_msg)
             return {"status": "error", "message": str(e)}
 
     # >> [변경] 결과 파일명 규칙: userID_songID_Artist_PartNumber_result.json
@@ -352,6 +409,9 @@ def pose_estimation_task(video_path, song_id, user_id):
         # 7. 성공 콜백 전송 (Callback Notifier 사용)
         CallbackNotifier.send_success(user_id, full_song_identifier, final_data, s3_url)
         
+        # [추가] 완료 상태 DB 업데이트
+        db_manager.update_status(user_id, timestamp, 'completed', result_s3_key=s3_url)
+
         # 임시 파일 정리
         if temp_json_path and os.path.exists(temp_json_path) and temp_json_path != result_json_path:
             try:
@@ -369,6 +429,8 @@ def pose_estimation_task(video_path, song_id, user_id):
     except Exception as e:
         logger.critical(f"분석 중 치명적 오류: {e}", exc_info=True)
         CallbackNotifier.send_error(user_id, full_song_identifier, str(e))
+        # [추가] 실패 상태 DB 업데이트
+        db_manager.update_status(user_id, timestamp, 'failed', error_msg=str(e))
         return {"status": "error", "error_message": str(e)}
 
 
