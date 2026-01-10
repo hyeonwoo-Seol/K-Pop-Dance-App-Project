@@ -1,16 +1,21 @@
 package com.example.kpopdancepracticeai.ui.test
 
+import android.net.Uri
+import androidx.annotation.OptIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,34 +25,185 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
+import com.example.kpopdancepracticeai.data.dto.FrameData
 import com.example.kpopdancepracticeai.data.mapper.AnalysisMapper
 import com.example.kpopdancepracticeai.ui.SkeletonOverlay
 import com.example.kpopdancepracticeai.util.FilenameParser
 import com.google.gson.Gson
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import kotlin.math.abs
 
 /**
- * [통합 테스트 화면]
- * 위치: ui/test 패키지
- * 역할: assets 폴더의 JSON 파일들을 읽어와서
- * 파일명 파싱(UserId, SongId 등 추출) 및 데이터 흐름을 검증합니다.
+ * [영상 오버레이 통합 테스트 화면 - 정밀 보정 기능 추가]
+ * 기능:
+ * 1. 파일명 파싱 및 데이터 로드
+ * 2. 영상 재생 및 싱크 맞춤
+ * 3. [정밀 보정] Scale/Offset 슬라이더를 통해 오버레이 위치 미세 조정 가능
  */
+@OptIn(UnstableApi::class)
 @Composable
 fun IntegrationTestScreen() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
-    var logText by remember { mutableStateOf("테스트 준비 완료.\n[Step 1]을 눌러 assets 폴더의 JSON 파일을 로드하세요.") }
-    var isParsingSuccess by remember { mutableStateOf(false) }
+    // --- 상태 변수 ---
+    var selectedPartNumber by remember { mutableStateOf(1) }
 
-    // 오버레이 데이터 상태
-    var testKeyPoints by remember { mutableStateOf<List<com.example.kpopdancepracticeai.ui.KeyPoint>>(emptyList()) }
-    var testErrors by remember { mutableStateOf<List<Int>>(emptyList()) }
-    var showOverlay by remember { mutableStateOf(false) }
+    // 로그 및 진행 상태
+    var logText by remember { mutableStateOf("상단의 파트 번호를 선택하고 [Step 1]을 눌러주세요.") }
+    var isDataReady by remember { mutableStateOf(false) }
 
+    // 영상 플레이어 상태
+    var isVideoReady by remember { mutableStateOf(false) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var currentVideoTime by remember { mutableStateOf(0L) }
+
+    // 데이터
+    var allFrames by remember { mutableStateOf<List<FrameData>>(emptyList()) }
+    var currentKeyPoints by remember { mutableStateOf<List<com.example.kpopdancepracticeai.ui.KeyPoint>>(emptyList()) }
+    var currentErrors by remember { mutableStateOf<List<Int>>(emptyList()) }
+
+    // 영상 비율 정보
+    var videoWidth by remember { mutableStateOf(1080) }
+    var videoHeight by remember { mutableStateOf(1920) }
+
+    // ⭐️ [보정 변수] 슬라이더로 조절할 값들
+    var scaleX by remember { mutableStateOf(1f) }
+    var scaleY by remember { mutableStateOf(1f) }
+    var offsetX by remember { mutableStateOf(0f) }
+    var offsetY by remember { mutableStateOf(0f) }
+    var showCalibration by remember { mutableStateOf(true) } // 보정 패널 표시 여부
+
+    // ExoPlayer 초기화
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Player.REPEAT_MODE_OFF
+            addListener(object : Player.Listener {
+                override fun onIsPlayingChanged(isPlayingState: Boolean) {
+                    isPlaying = isPlayingState
+                }
+                override fun onPlaybackStateChanged(playbackState: Int) {
+                    if (playbackState == Player.STATE_READY) {
+                        isVideoReady = true
+                    }
+                }
+            })
+        }
+    }
+
+    // --- Step 1: 데이터 로드 ---
+    fun loadAndParseData() {
+        scope.launch {
+            try {
+                isDataReady = false
+                isVideoReady = false
+                isPlaying = false
+                exoPlayer.stop()
+                exoPlayer.clearMediaItems()
+
+                logText = "▶ [Step 1] Part $selectedPartNumber 데이터 로드 시작...\n"
+
+                val assetManager = context.assets
+                val allFiles = assetManager.list("") ?: emptyArray()
+
+                // 파일 찾기
+                val targetJson = allFiles.find { it.endsWith(".json") && it.contains("_$selectedPartNumber") }
+                val targetVideo = allFiles.find { it.endsWith(".mp4") && it.contains("_$selectedPartNumber") }
+                    ?: allFiles.find { it.endsWith(".mp4") && it.contains("$selectedPartNumber") }
+
+                if (targetJson == null || targetVideo == null) {
+                    logText += "❌ 파일 매칭 실패. (JSON: $targetJson, Video: $targetVideo)\n"
+                    return@launch
+                }
+
+                // JSON 파싱
+                val jsonString = assetManager.open(targetJson).use {
+                    InputStreamReader(it).use { reader -> BufferedReader(reader).readText() }
+                }
+                val response = Gson().fromJson(jsonString, AnalysisResultResponse::class.java)
+
+                // 해상도 정보 업데이트 및 초기 스케일 계산
+                if (response.metadata.videoWidth > 0 && response.metadata.videoHeight > 0) {
+                    videoWidth = response.metadata.videoWidth
+                    videoHeight = response.metadata.videoHeight
+
+                    // ⭐️ 자동 보정: 세로 영상(9:16)일 경우 X축 스케일을 1.77배(1920/1080)로 자동 설정
+                    if (videoWidth < videoHeight) {
+                        scaleX = videoHeight.toFloat() / videoWidth.toFloat()
+                        logText += "ℹ️ 세로 영상 감지: X축 스케일 자동 보정 (${String.format("%.2f", scaleX)})\n"
+                    } else {
+                        scaleX = 1f
+                    }
+                    scaleY = 1f
+                    offsetX = 0f
+                    offsetY = 0f
+                }
+
+                allFrames = response.frames.sortedBy { it.timestamp }
+                logText += "✅ 데이터 로드 완료 (${allFrames.size} 프레임)\n"
+
+                // 영상 로드
+                val videoUri = Uri.parse("file:///android_asset/$targetVideo")
+                val mediaItem = MediaItem.fromUri(videoUri)
+                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.prepare()
+
+                isDataReady = true
+                logText += "\n🎉 준비 완료! 재생 버튼을 누르고 아래 슬라이더로 위치를 미세 조정하세요."
+
+            } catch (e: Exception) {
+                e.printStackTrace()
+                logText += "❌ 에러 발생: ${e.message}\n"
+            }
+        }
+    }
+
+    // --- 실시간 오버레이 업데이트 ---
+    LaunchedEffect(isPlaying, isVideoReady, scaleX, scaleY, offsetX, offsetY) {
+        if (isVideoReady && isPlaying) {
+            while (isActive) {
+                val currentMs = exoPlayer.currentPosition
+                currentVideoTime = currentMs
+                val currentSec = currentMs / 1000.0
+
+                val targetFrame = allFrames.minByOrNull { abs(it.timestamp - currentSec) }
+
+                if (targetFrame != null && abs(targetFrame.timestamp - currentSec) < 0.1) {
+                    if (targetFrame.keypoints.isNotEmpty()) {
+                        val rawPoints = DataConverter.convertToKeyPoints(targetFrame)
+
+                        // ⭐️ [실시간 보정 적용 - 중심 기준 스케일링]
+                        // (좌표 - 0.5) * Scale + 0.5 + Offset
+                        // 이렇게 하면 0.5(중앙)를 기준으로 커졌다 작아졌다 합니다.
+                        currentKeyPoints = rawPoints.map {
+                            it.copy(
+                                x = ((it.x - 0.5f) * scaleX) + 0.5f + offsetX,
+                                y = ((it.y - 0.5f) * scaleY) + 0.5f + offsetY
+                            )
+                        }
+
+                        currentErrors = targetFrame.errors
+                    } else {
+                        currentKeyPoints = emptyList()
+                    }
+                }
+                delay(16) // 60fps
+            }
+        }
+    }
+
+    // --- UI ---
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -55,219 +211,157 @@ fun IntegrationTestScreen() {
             .padding(16.dp)
             .verticalScroll(rememberScrollState())
     ) {
-        Text(
-            text = "통합 테스트 (파일명 파싱)",
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 16.dp)
-        )
-
-        // --- Step 1: 파일 로드 및 파싱 ---
-        Button(
-            onClick = {
-                scope.launch {
-                    try {
-                        logText = "> [Step 1] assets 폴더 검색 중...\n"
-                        isParsingSuccess = false
-                        showOverlay = false
-
-                        // 1. Assets에서 .json 파일 목록 찾기
-                        val assetManager = context.assets
-                        val jsonFiles = assetManager.list("")?.filter { it.endsWith(".json") } ?: emptyList()
-
-                        if (jsonFiles.isEmpty()) {
-                            logText += "[실패] assets 폴더에 .json 파일이 없습니다.\n"
-                            return@launch
-                        }
-
-                        // 랜덤으로 하나 선택
-                        val targetFilename = jsonFiles.random()
-                        logText += "[정보] 파일 선택됨: $targetFilename\n"
-
-                        // 2. 파일 내용 읽기
-                        val jsonString = try {
-                            assetManager.open(targetFilename).use { inputStream ->
-                                InputStreamReader(inputStream).use { reader ->
-                                    BufferedReader(reader).readText()
-                                }
-                            }
-                        } catch (e: Exception) {
-                            logText += "[실패] 파일 읽기 실패: ${e.message}\n"
-                            return@launch
-                        }
-
-                        logText += "[성공] 파일 로드 성공 (${jsonString.length} bytes)\n"
-
-                        // 3. 파일명 파싱 (UserId, SongId, Artist, Part 추출)
-                        // 구조 예시: kim889_540_원영_1_result.json -> [kim889, 540, 원영, 1, result]
-                        val nameWithoutExt = targetFilename.substringBeforeLast(".")
-                        val parts = nameWithoutExt.split("_")
-
-                        // 변수 초기화
-                        var metaUserId = ""
-                        var metaSongId = ""
-                        var metaArtist = ""
-                        // [수정] Part 번호를 String으로 처리 (ParsedMetadata가 String을 요구함)
-                        var parsedPartNumber = "1"
-
-                        if (parts.size >= 4) {
-                            metaUserId = parts[0]
-                            metaSongId = parts[1]
-                            metaArtist = parts[2]
-                            // [수정] String 그대로 유지
-                            parsedPartNumber = parts[3]
-
-                            logText += """
-                                [성공] 파일명 파싱 성공:
-                                  - User: $metaUserId
-                                  - SongID: $metaSongId
-                                  - Artist: $metaArtist
-                                  - Part: $parsedPartNumber
-                            """.trimIndent() + "\n"
-                        } else {
-                            logText += "[주의] 파일명 형식이 예상과 다릅니다 (${parts.size}구획). 파싱 결과가 부정확할 수 있습니다.\n"
-                        }
-
-                        // 4. JSON 파싱
-                        val gson = Gson()
-                        val response = gson.fromJson(jsonString, AnalysisResultResponse::class.java)
-
-                        if (response.summary == null) {
-                            logText += "[주의] 경고: Summary 데이터가 null입니다. JSON 필드명(snake_case)이 DTO와 일치하는지 확인하세요.\n"
-                        } else {
-                            logText += "[성공] JSON 파싱 성공 (총점: ${response.summary.totalScore}점)\n"
-                        }
-
-                        logText += "   - 프레임 수: ${response.frames.size}\n"
-
-                        // 5. DB Entity 매핑 테스트 (파싱한 메타데이터 활용)
-                        try {
-                            // [수정] String 타입으로 PartNumber 전달
-                            val customMetadata = FilenameParser.ParsedMetadata(
-                                metaUserId,
-                                metaSongId,
-                                metaArtist,
-                                parsedPartNumber
-                            )
-
-                            val historyEntity = AnalysisMapper.mapToPracticeHistory(
-                                analysisResult = response,
-                                metadata = customMetadata,
-                                songTitle = "테스트 곡 ($metaArtist)" // 곡 제목은 파일명에 없으므로 임시 값
-                            )
-                            logText += "[성공] DB 매핑 성공: ${historyEntity.score}점 / 날짜: ${historyEntity.practiceDate}\n"
-                        } catch (e: Exception) {
-                            logText += "[에러] DB 매핑 에러: ${e.message} (FilenameParser 구조 확인 필요)\n"
-                        }
-
-                        // 6. 오버레이용 데이터 변환
-                        // keypoints가 비어있을 수 있으므로 첫 번째 유효한 프레임 또는 그냥 첫 프레임 확인
-                        val firstValidFrame = response.frames.firstOrNull { it.keypoints.isNotEmpty() }
-                            ?: response.frames.firstOrNull()
-
-                        if (firstValidFrame != null) {
-                            if (firstValidFrame.keypoints.isEmpty()) {
-                                logText += "[주의] 선택된 프레임의 Keypoints가 비어있습니다. 오버레이가 그려지지 않을 수 있습니다.\n"
-                            }
-
-                            testKeyPoints = DataConverter.convertToKeyPoints(firstValidFrame)
-                            testErrors = firstValidFrame.errors
-
-                            if (testKeyPoints.isNotEmpty()) {
-                                logText += "[성공] 오버레이 데이터 변환 완료 (${testKeyPoints.size} 관절)\n"
-                            } else {
-                                logText += "[정보] 변환된 관절 데이터가 0개입니다 (Keypoints가 비어있음).\n"
-                            }
-
-                            isParsingSuccess = true
-                            logText += "\n[완료] 파싱 완료! [Step 2] 버튼을 누르세요."
-                        } else {
-                            logText += "[실패] 프레임 데이터가 없습니다.\n"
-                        }
-
-                    } catch (e: Exception) {
-                        logText += "[에러] 에러 발생: ${e.message}\n"
-                        e.printStackTrace()
-                    }
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE))
-        ) {
-            Text("[Step 1] 랜덤 파일 로드 & 파싱")
-        }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // --- Step 2: 오버레이 시각화 ---
-        Button(
-            onClick = {
-                if (isParsingSuccess) {
-                    showOverlay = true
-                    logText += "\n> [Step 2] 오버레이 시각화 시도"
-                }
-            },
-            enabled = isParsingSuccess,
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = Color(0xFF03DAC5),
-                disabledContainerColor = Color.Gray
-            )
-        ) {
-            Text("[Step 2] 오버레이 시각화 확인")
-        }
-
+        Text("시스템 통합 테스트 (정밀 보정)", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 로그 출력 영역 ---
-        Text("실행 로그:", fontWeight = FontWeight.Bold)
+        // 파트 선택
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            (1..4).forEach { id ->
+                Button(
+                    onClick = { selectedPartNumber = id; isDataReady = false },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (selectedPartNumber == id) Color(0xFF6200EE) else Color.LightGray
+                    ),
+                    modifier = Modifier.weight(1f)
+                ) { Text("$id") }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+        Button(onClick = { loadAndParseData() }, modifier = Modifier.fillMaxWidth()) {
+            Text("Step 1: 데이터 로드")
+        }
+
+        // 로그창
+        Spacer(modifier = Modifier.height(12.dp))
         SelectionContainer {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(220.dp) // 로그창 높이 약간 증가
+                    .height(80.dp)
                     .background(Color.White, RoundedCornerShape(8.dp))
-                    .border(1.dp, Color.Gray, RoundedCornerShape(8.dp))
-                    .padding(12.dp)
+                    .padding(8.dp)
                     .verticalScroll(rememberScrollState())
             ) {
-                Text(text = logText, fontSize = 13.sp, color = Color.Black)
+                Text(text = logText, fontSize = 12.sp)
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-        // --- 오버레이 미리보기 영역 ---
-        Text("오버레이 화면:", fontWeight = FontWeight.Bold)
+        // 영상 영역
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(400.dp)
+                .aspectRatio(videoWidth.toFloat() / videoHeight.toFloat())
                 .clip(RoundedCornerShape(12.dp))
                 .background(Color.Black)
         ) {
-            if (showOverlay) {
-                if (testKeyPoints.isNotEmpty()) {
+            if (isDataReady) {
+                AndroidView(
+                    factory = { ctx ->
+                        PlayerView(ctx).apply {
+                            player = exoPlayer
+                            useController = false
+                            resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_FILL
+                        }
+                    },
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                if (currentKeyPoints.isNotEmpty()) {
                     SkeletonOverlay(
-                        keyPoints = testKeyPoints,
-                        errors = testErrors,
+                        keyPoints = currentKeyPoints,
+                        errors = currentErrors,
                         modifier = Modifier.fillMaxSize()
                     )
-                } else {
-                    Text(
-                        text = "[주의] 표시할 관절 데이터가 없습니다.\n(JSON의 keypoints 필드가 비어있음)",
-                        color = Color.Yellow,
-                        modifier = Modifier.align(Alignment.Center),
-                        fontWeight = FontWeight.Bold
+                }
+
+                // 컨트롤러
+                IconButton(
+                    onClick = { if (isPlaying) exoPlayer.pause() else exoPlayer.play() },
+                    modifier = Modifier.align(Alignment.Center).size(64.dp)
+                ) {
+                    Icon(
+                        if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = "Play/Pause",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(48.dp)
                     )
                 }
             } else {
-                Text(
-                    text = if (isParsingSuccess) "터치하여 오버레이 확인" else "데이터 준비 중...",
-                    color = Color.Gray,
-                    modifier = Modifier.align(Alignment.Center)
-                )
+                Text("데이터 로드 대기 중...", color = Color.Gray, modifier = Modifier.align(Alignment.Center))
             }
         }
+
+        // ⭐️ [정밀 보정 컨트롤러]
+        Spacer(modifier = Modifier.height(16.dp))
+
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            colors = CardDefaults.cardColors(containerColor = Color.White),
+            elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().clickable { showCalibration = !showCalibration },
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Tune, null, tint = Color(0xFF6200EE))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("오버레이 위치 미세 조정", fontWeight = FontWeight.Bold)
+                    }
+                    Switch(checked = showCalibration, onCheckedChange = { showCalibration = it })
+                }
+
+                if (showCalibration) {
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // X Scale
+                    Text("가로 비율 (X Scale): ${String.format("%.2f", scaleX)}", fontSize = 12.sp)
+                    Slider(
+                        value = scaleX,
+                        onValueChange = { scaleX = it },
+                        valueRange = 0.5f..2.5f
+                    )
+
+                    // X Offset
+                    Text("가로 위치 (X Offset): ${String.format("%.2f", offsetX)}", fontSize = 12.sp)
+                    Slider(
+                        value = offsetX,
+                        onValueChange = { offsetX = it },
+                        valueRange = -0.5f..0.5f
+                    )
+
+                    // Y Offset (높이 조절이 필요할 경우)
+                    Text("세로 위치 (Y Offset): ${String.format("%.2f", offsetY)}", fontSize = 12.sp)
+                    Slider(
+                        value = offsetY,
+                        onValueChange = { offsetY = it },
+                        valueRange = -0.2f..0.2f
+                    )
+
+                    // 초기화 버튼
+                    Button(
+                        onClick = {
+                            // 초기화 로직
+                            if (videoWidth < videoHeight) scaleX = videoHeight.toFloat() / videoWidth.toFloat() else scaleX = 1f
+                            scaleY = 1f
+                            offsetX = 0f
+                            offsetY = 0f
+                        },
+                        modifier = Modifier.align(Alignment.End),
+                        colors = ButtonDefaults.textButtonColors()
+                    ) {
+                        Text("값 초기화")
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(32.dp))
     }
+
+    DisposableEffect(Unit) { onDispose { exoPlayer.release() } }
 }
