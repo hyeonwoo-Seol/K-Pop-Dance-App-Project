@@ -1,3 +1,9 @@
+# >> sqs_bridge.py
+# >> AWS SQS를 지속적으로 모니터링하고, 수신된 이벤트를 Celery 작업 체인으로 변환하여 로컬 Worker에게 전달한다.
+# >> AWS SQS로부터 분석 요청 메시지를 수신한다.
+# >> 단일 작업이 아닌 "영상 다운로드 -> AI 분석" 순서대로 이어지는 작업 체인을 생성하여 실행 순서를 보장한다.
+# >> Config.USE_AWS = False를 대비해, 외부 통신 없이 로컬 테스트 데이터를 통해 파이프라인을 검증한다.
+
 import os
 import boto3
 import json
@@ -49,7 +55,7 @@ def process_video(message_data):
         # 3. 분석 (YOLOv11 등)
         result = analyze_video(local_video)
         
-        # ✅ 4. 결과 JSON 파일명 수정 (원본 파일명 활용)
+        # 4. 결과 JSON 파일명 수정 (원본 파일명 활용)
         # 확장자(.mp4)를 제거하고 _result.json을 붙입니다.
         name_without_ext = filename.rsplit('.', 1)[0]
         result_key = f"results/{name_without_ext}_result.json"
@@ -80,7 +86,7 @@ def process_video(message_data):
                 ':key': result_key
             }
         )
-        print(f"✅ DB 업데이트 완료: {filename}")
+        print(f"DB 업데이트 완료: {filename}")
         
         # 로컬 파일 삭제 (용량 관리)
         if os.path.exists(local_video):
@@ -103,7 +109,7 @@ def analyze_video(video_path):
     return {'score': 90, 'feedback': 'Great move!'}
 
 def main():
-    print("🚀 AI Server Polling Started...")
+    print("AI Server Polling Started...")
     while True:
         try:
             response = sqs.receive_message(
