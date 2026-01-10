@@ -267,63 +267,35 @@ fun RecordScreen(
 
                                                 // [추가됨] S3 업로드 트리거 (Task T3-1 핵심)
                                                 // TODO: 실제 userId를 로그인 정보에서 가져와야 함
-                                                val userId = "xooyong"
+                                                val userId = "user_test_01"
+                                                val safeSongTitle = songTitle.replace(" ", "_")
+                                                val safePart = part.replace(" ", "_").replace(":", "")
 
-                                                // 1. songTitle에서 공백과 언더바를 제거하여 한 단어로 만듦
-                                                val songId = songTitle.replace(" ", "").replace("_", "")
-
-                                                // 2. part 문자열에서 숫자만 추출하여 partNum 생성 (예: "Part 2" -> "2")
-                                                val partNum = part.filter { it.isDigit() }.ifEmpty { "0" }
-
-                                                // 3. ":" 뒤의 이름에서 공백과 언더바 제거하여 partName 생성 (예: "메인 파트" -> "메인파트")
-                                                val partName = part.split(":").lastOrNull()?.replace(" ", "")?.replace("_", "") ?: "None"
-
-                                                // 4. Polling과 공유할 정확한 타임스탬프
-                                                val timestamp = System.currentTimeMillis()
-
-                                                // 최종 파일명: xooyong_Dynamite_2_메인파트_1767882222994.mp4
-                                                val filename = "${userId}_${songId}_${partNum}_${partName}_${timestamp}.mp4"
+                                                val filename = "${userId}_${safeSongTitle}_${safePart}.mp4"
 
                                                 scope.launch {
                                                     uploader.uploadVideo(
                                                         fileUri = uri,
                                                         filename = filename,
                                                         onComplete = { s3Key ->
-                                                            Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
-                                                            Log.d("RecordScreen", "Upload Complete Key: $s3Key")
-                                                            Log.d("RecordScreen", "폴링 시작 요청값 확인 -> ID: $userId, TIME: $timestamp")
-                                                            scope.launch {
-                                                                uploader.pollAnalysisResult(
-                                                                    userId = userId,
-                                                                    timestamp = timestamp,
-                                                                    onProgress = { message ->
-                                                                        //  분석 중 상태 표시
-                                                                        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-                                                                    },
-                                                                    onComplete = { resultS3Key ->
-                                                                        //  분석 완료
-                                                                        Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
-                                                                        Log.d("RecordScreen", "Result Ready: $resultS3Key")
-
-                                                                        // JSON 다운로드
-                                                                        scope.launch {
-                                                                            try {
-                                                                                val jsonResult = uploader.downloadResultJson(resultS3Key)
-                                                                                Log.d("RecordScreen", "Result JSON: $jsonResult")
-                                                                                onRecordingComplete(resultS3Key)
-                                                                            } catch (e: Exception) {
-                                                                                Log.e("RecordScreen", "JSON 다운로드 실패", e)
-                                                                            }
-                                                                        }
-                                                                    },
-                                                                    onError = { e ->
-                                                                        Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show()
-                                                                    }
-                                                                )
-                                                            }
+                                                            // 메인 스레드 UI 업데이트 (Toast 등)
+                                                            Toast.makeText(
+                                                                context,
+                                                                "업로드 성공!",
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                            Log.d(
+                                                                "RecordScreen",
+                                                                "Upload Complete Key: $s3Key"
+                                                            )
+                                                            onRecordingComplete(s3Key)
                                                         },
                                                         onError = { e ->
-                                                            Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                                                            Toast.makeText(
+                                                                context,
+                                                                "업로드 실패: ${e.message}",
+                                                                Toast.LENGTH_LONG
+                                                            ).show()
                                                         }
                                                     )
                                                 }
