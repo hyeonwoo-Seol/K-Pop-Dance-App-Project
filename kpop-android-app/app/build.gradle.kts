@@ -73,6 +73,11 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraVersion")
     implementation("androidx.camera:camera-extensions:$cameraVersion")
 
+    //영상 재생을 위한 거에요
+    implementation("androidx.media3:media3-exoplayer:1.2.0")
+    implementation("androidx.media3:media3-ui:1.2.0")
+    implementation("androidx.media3:media3-common:1.2.0")
+
     // AWS SDK S3
     implementation("com.amazonaws:aws-android-sdk-s3:2.77.0")
 
