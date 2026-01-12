@@ -15,10 +15,12 @@ import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Request
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.zip.GZIPInputStream
 
 /**
  * [PresignedUrlUploader]
@@ -184,7 +186,7 @@ class PresignedUrlUploader(private val context: Context) {
             val connection = URL(url).openConnection() as HttpURLConnection
             try {
                 // [Step 1] S3 URL로부터 JSON 텍스트 데이터 읽기
-                val jsonString = connection.inputStream.bufferedReader().use { it.readText() }
+                val jsonString = readMaybeGzipped(connection)
 
                 // [Step 2] S3 경로에서 순수 파일명만 추출
                 val fileName = resultS3Key.split("/").last()
@@ -221,5 +223,20 @@ class PresignedUrlUploader(private val context: Context) {
         } catch (e: Exception) {
             Log.e("Storage", "파일 저장 중 오류 발생", e)
         }
+    }
+
+    // json Gzip 압축 해제
+    private fun readMaybeGzipped(connection: HttpURLConnection): String {
+        val encoding = connection.contentEncoding?.lowercase()
+        val rawBytes = connection.inputStream.use { it.readBytes() }
+        val isGzipMagic = rawBytes.size >= 2 &&
+            rawBytes[0] == 0x1f.toByte() &&
+            rawBytes[1] == 0x8b.toByte()
+        val inputStream = if (encoding == "gzip" || isGzipMagic) {
+            GZIPInputStream(ByteArrayInputStream(rawBytes))
+        } else {
+            ByteArrayInputStream(rawBytes)
+        }
+        return inputStream.bufferedReader().use { it.readText() }
     }
 }
