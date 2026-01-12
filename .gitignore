@@ -26,4 +26,5 @@ code_to_kotlin_kts.py
 compiled_python_*.txt
 compiled_code_*.txt
 compiled_kotlin_*.txt
-
+google-services.json
+kpopdancepracticeai-firebase-adminsdk-fbsvc-42a799e3f4.json

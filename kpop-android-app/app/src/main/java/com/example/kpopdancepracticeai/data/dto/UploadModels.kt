@@ -14,3 +14,16 @@ data class PresignedUrlResponse(
     @SerializedName("s3_key") val s3Key: String,
     @SerializedName("filename") val filename: String
 )
+
+//  3. 분석 상태 확인 요청
+data class AnalysisStatusRequest(
+    @SerializedName("user_id") val userId: String,
+    @SerializedName("timestamp") val timestamp: Long
+)
+
+//  4. 분석 상태 확인 응답
+data class AnalysisStatusResponse(
+    @SerializedName("status") val status: String,
+    @SerializedName("result_s3_key") val resultS3Key: String?,
+    @SerializedName("error_message") val errorMessage: String?
+)

@@ -1,5 +1,11 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.Manifest
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.os.Build
+import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -11,9 +17,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.outlined.CameraAlt
 import androidx.compose.material.icons.outlined.CloudUpload
-import androidx.compose.material.icons.outlined.LocationOn
+import androidx.compose.material.icons.outlined.Image // 사진 및 동영상 아이콘 대체
+import androidx.compose.material.icons.outlined.Mic // 마이크 아이콘
+import androidx.compose.material.icons.outlined.Notifications // 알림 아이콘
 import androidx.compose.material.icons.outlined.Shield
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.TrendingUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -22,10 +29,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.content.ContextCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 
 /**
@@ -36,6 +48,9 @@ import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 fun PrivacySettingsScreen(
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
+
     // 앱 전체의 그라데이션 배경
     val appGradient = Brush.verticalGradient(
         colors = listOf(
@@ -47,6 +62,40 @@ fun PrivacySettingsScreen(
     // 설정 값 상태 관리 (임시)
     var isServerUploadEnabled by remember { mutableStateOf(false) }
     var isAnalyticsEnabled by remember { mutableStateOf(false) }
+
+    // 권한 상태 갱신을 위한 키 (앱 설정에서 돌아왔을 때 갱신)
+    var refreshKey by remember { mutableLongStateOf(System.currentTimeMillis()) }
+
+    // 생명주기 감지: ON_RESUME 시 refreshKey 업데이트
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshKey = System.currentTimeMillis()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
+    // 권한 상태 체크 헬퍼 함수
+    fun checkPermission(permission: String): Boolean {
+        return if (permission.isEmpty()) {
+            true // 권한이 필요 없는 경우 (예: 구버전 안드로이드 알림 등)
+        } else {
+            ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED
+        }
+    }
+
+    // 권한 상태에 따른 텍스트와 색상 반환
+    fun getPermissionStatus(isGranted: Boolean): Pair<String, Color> {
+        return if (isGranted) {
+            "허용됨" to Color(0xFF00A63E) // Green
+        } else {
+            "거부됨" to Color.Red
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -109,32 +158,84 @@ fun PrivacySettingsScreen(
 
                 // --- 2. 기기 권한 카드 ---
                 item {
+                    // refreshKey가 변경될 때마다 이 블록이 리컴포지션되어 권한 상태를 다시 읽어옵니다.
+                    val trigger = refreshKey
+
+                    // 1. 마이크 권한
+                    val micPermission = Manifest.permission.RECORD_AUDIO
+                    val isMicGranted = checkPermission(micPermission)
+                    val (micStatus, micColor) = getPermissionStatus(isMicGranted)
+
+                    // 2. 사진 및 동영상 (저장소) 권한
+                    val storagePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Manifest.permission.READ_MEDIA_IMAGES // Android 13+ (이미지 기준)
+                    } else {
+                        Manifest.permission.READ_EXTERNAL_STORAGE // Android 12 이하
+                    }
+                    val isStorageGranted = checkPermission(storagePermission)
+                    val (storageStatus, storageColor) = getPermissionStatus(isStorageGranted)
+
+                    // 3. 알림 권한
+                    val notifPermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        Manifest.permission.POST_NOTIFICATIONS
+                    } else {
+                        "" // Android 12 이하는 별도 런타임 권한 없음 (자동 허용으로 간주)
+                    }
+                    val isNotifGranted = checkPermission(notifPermission)
+                    val (notifStatus, notifColor) = getPermissionStatus(isNotifGranted)
+
+                    // 4. 카메라 권한
+                    val cameraPermission = Manifest.permission.CAMERA
+                    val isCameraGranted = checkPermission(cameraPermission)
+                    val (cameraStatus, cameraColor) = getPermissionStatus(isCameraGranted)
+
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         SettingsCard(title = "기기 권한") {
                             SettingsClickableItem(
                                 title = "권한 설정",
-                                description = "카메라, 저장장치, 위치",
+                                description = "마이크, 사진 및 동영상, 알림, 카메라",
                                 icon = Icons.Outlined.Shield,
-                                onClick = { /* TODO: 기기 설정 화면으로 이동 (Intent) */ }
+                                onClick = {
+                                    // 앱 설정 화면으로 이동하는 Intent
+                                    val intent = Intent(
+                                        Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                                        Uri.parse("package:${context.packageName}")
+                                    )
+                                    context.startActivity(intent)
+                                }
                             )
                             SettingsDivider()
+
+                            // 마이크 항목
+                            PermissionStatusItem(
+                                label = "마이크",
+                                icon = Icons.Outlined.Mic,
+                                status = micStatus,
+                                statusColor = micColor
+                            )
+
+                            // 사진 및 동영상 항목
+                            PermissionStatusItem(
+                                label = "사진 및 동영상",
+                                icon = Icons.Outlined.Image, // PhotoLibrary 대용
+                                status = storageStatus,
+                                statusColor = storageColor
+                            )
+
+                            // 알림 항목
+                            PermissionStatusItem(
+                                label = "알림",
+                                icon = Icons.Outlined.Notifications,
+                                status = notifStatus,
+                                statusColor = notifColor
+                            )
+
+                            // 카메라 항목
                             PermissionStatusItem(
                                 label = "카메라",
                                 icon = Icons.Outlined.CameraAlt,
-                                status = "허용됨",
-                                statusColor = Color(0xFF00A63E) // Green
-                            )
-                            PermissionStatusItem(
-                                label = "저장장치",
-                                icon = Icons.Outlined.Storage,
-                                status = "허용됨",
-                                statusColor = Color(0xFF00A63E) // Green
-                            )
-                            PermissionStatusItem(
-                                label = "위치",
-                                icon = Icons.Outlined.LocationOn,
-                                status = "거부됨",
-                                statusColor = Color.Red
+                                status = cameraStatus,
+                                statusColor = cameraColor
                             )
                         }
                     }

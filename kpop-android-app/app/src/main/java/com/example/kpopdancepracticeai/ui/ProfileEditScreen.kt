@@ -15,8 +15,8 @@ import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CalendarToday
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MusicNote
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -52,7 +52,7 @@ fun ProfileEditScreen(
     // 상태 관리 (임시)
     var name by remember { mutableStateOf("김다연") }
     var email by remember { mutableStateOf("dayeon.kim@example.com") }
-    var phone by remember { mutableStateOf("010-1234-5678") }
+    var password by remember { mutableStateOf("********") } // 전화번호 상태를 비밀번호로 변경
     var birthdate by remember { mutableStateOf("") }
     var bio by remember { mutableStateOf("자신을 소개해주세요") }
 
@@ -134,7 +134,7 @@ fun ProfileEditScreen(
                         BasicInfoCard(
                             name = name, onNameChange = { name = it },
                             email = email, onEmailChange = { email = it },
-                            phone = phone, onPhoneChange = { phone = it },
+                            password = password, onPasswordChange = { password = it }, // 매개변수 변경
                             birthdate = birthdate, onBirthdateChange = { birthdate = it }
                         )
                     }
@@ -219,7 +219,7 @@ fun ProfileImageCard(onClick: () -> Unit) {
 fun BasicInfoCard(
     name: String, onNameChange: (String) -> Unit,
     email: String, onEmailChange: (String) -> Unit,
-    phone: String, onPhoneChange: (String) -> Unit,
+    password: String, onPasswordChange: (String) -> Unit, // phone -> password 변경
     birthdate: String, onBirthdateChange: (String) -> Unit,
 ) {
     Surface(
@@ -235,7 +235,7 @@ fun BasicInfoCard(
             Text("기본 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
             SettingsTextField(
-                label = "이름",
+                label = "닉네임",
                 value = name,
                 onValueChange = onNameChange
             )
@@ -245,11 +245,12 @@ fun BasicInfoCard(
                 onValueChange = onEmailChange,
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
             )
+            // 전화번호 필드를 비밀번호 필드로 변경
             SettingsTextField(
-                label = "전화번호",
-                value = phone,
-                onValueChange = onPhoneChange,
-                leadingIcon = { Icon(Icons.Default.Phone, contentDescription = null) }
+                label = "비밀번호",
+                value = password,
+                onValueChange = onPasswordChange,
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }
             )
             SettingsTextField(
                 label = "생년월일",

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     id("com.google.devtools.ksp") // KSP 플러그인 적용
+    id("com.google.gms.google-services") //firebase
 }
 
 android {
@@ -72,6 +73,11 @@ dependencies {
     implementation("androidx.camera:camera-view:$cameraVersion")
     implementation("androidx.camera:camera-extensions:$cameraVersion")
 
+    //영상 재생을 위한 거에요
+    implementation("androidx.media3:media3-exoplayer:1.2.0")
+    implementation("androidx.media3:media3-ui:1.2.0")
+    implementation("androidx.media3:media3-common:1.2.0")
+
     // AWS SDK S3
     implementation("com.amazonaws:aws-android-sdk-s3:2.77.0")
 
@@ -92,4 +98,11 @@ dependencies {
 
     // Gson (JSON Parsing)
     implementation("com.google.code.gson:gson:2.10.1")
+
+    // firebase
+    implementation(platform("com.google.firebase:firebase-bom:34.7.0"))
+    implementation("com.google.firebase:firebase-analytics")
+    implementation("com.google.firebase:firebase-auth")
+    implementation("com.google.android.gms:play-services-auth:21.0.0")
+
 }

@@ -26,6 +26,9 @@ class Config:
     # >> .env에 S3_BUCKET_NAME이 없으면 기본값인 'kpop-dance-app-data'를 사용한다.
     S3_BUCKET_NAME = os.getenv('S3_BUCKET_NAME', 'kpop-dance-app-data')
 
+    # >> DynamoDB 테이블 설정 (추가됨)
+    DYNAMODB_TABLE = os.getenv('DYNAMODB_TABLE', 'UserVideos')
+
     # >> 분석 완료 통보를 보낼 API Gateway 주소
     API_GATEWAY_URL = os.getenv('API_GATEWAY_URL', '')
 

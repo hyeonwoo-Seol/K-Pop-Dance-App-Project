@@ -30,13 +30,14 @@ def parse_analysis_request(body_json):
       "bucket_name": "...",
       "file_key": "raw/userID_songID_Artist_PartNumber.mp4",
       "song_id": "songID_Artist_PartNumber",
-      "user_id": "userID"
+      "user_id": "userID",
+      "timestamp": 1234567890 (추가됨)
     }
     """
     try:
         data = json.loads(body_json)
-        # >> 필수 필드 확인 (video_id 제거됨)
-        required_keys = ['bucket_name', 'file_key', 'song_id', 'user_id']
+        # >> 필수 필드 확인 (video_id 제거됨, timestamp 추가됨)
+        required_keys = ['bucket_name', 'file_key', 'song_id', 'user_id', 'timestamp']
         if all(key in data for key in required_keys):
             return data
     except Exception:
@@ -53,18 +54,20 @@ def run_bridge():
         
         # >> 테스트할 가짜 데이터 (통신 규격에 맞춤)
         # >> video_id 필드는 제거되었고, song_id와 user_id를 통해 식별한다.
+        # >> [추가] DB 키로 사용할 timestamp 추가
         test_payload = {
             "bucket_name": "test-bucket",
             "file_key": "raw/test_user_song_001_IVE_Part1.mp4", 
             "song_id": "song_001_IVE_Part1",
-            "user_id": "test_user"
+            "user_id": "test_user",
+            "timestamp": int(time.time() * 1000)
         }
         
         print(f"테스트 요청 전송: {test_payload}")
         
         # >> Chain: 다운로드 Task -> 분석 Task 연결
         # >> download_video_task의 리턴값(파일경로)이 pose_estimation_task의 첫 번째 인자로 자동 전달됨
-        # >> pose_estimation_task에서 video_id 인자 제거
+        # >> pose_estimation_task에서 video_id 인자 제거, timestamp 인자 추가
         workflow = chain(
             download_video_task.s(
                 test_payload['bucket_name'], 
@@ -72,7 +75,8 @@ def run_bridge():
             ) | 
             pose_estimation_task.s(
                 test_payload['song_id'],
-                test_payload['user_id']
+                test_payload['user_id'],
+                test_payload['timestamp']
             )
         )
         
@@ -97,9 +101,9 @@ def run_bridge():
                     
                     if req_data:
                         print(f"\n메시지 수신 ID: {message['MessageId']}")
-                        print(f"분석 요청: Song={req_data['song_id']}, User={req_data['user_id']}")
+                        print(f"분석 요청: Song={req_data['song_id']}, User={req_data['user_id']}, TS={req_data['timestamp']}")
                         
-                        # >> 체인으로 연결하여 실행 (video_id 제거)
+                        # >> 체인으로 연결하여 실행 (video_id 제거, timestamp 전달)
                         chain(
                             download_video_task.s(
                                 req_data['bucket_name'], 
@@ -107,7 +111,8 @@ def run_bridge():
                             ) | 
                             pose_estimation_task.s(
                                 req_data['song_id'],
-                                req_data['user_id']
+                                req_data['user_id'],
+                                req_data['timestamp']
                             )
                         ).delay()
                         
