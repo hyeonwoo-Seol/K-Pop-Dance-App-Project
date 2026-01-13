@@ -1,30 +1,51 @@
 package com.example.kpopdancepracticeai.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 사용자 요약 정보 테이블 (UserStats)
- * 역할: 사용자의 누적 데이터 저장 (총 연습 시간, 레벨, 경험치 등)
- * 특징: PK는 userId 하나만 존재하며, 계속 Update 되는 구조
+ * 사용자 통계 (Notion Section 7 & MD 파일 반영 통합본)
+ * 테이블명: user_statistics
  */
-@Entity(tableName = "user_stats")
+@Entity(
+    tableName = "user_statistics",
+    indices = [Index(value = ["user_uuid"], unique = true)]
+)
 data class UserStats(
-    @PrimaryKey
-    val userId: String, // 사용자 고유 ID (로그인 ID와 동일)
 
-    val totalPracticeTimeSeconds: Long = 0, // 총 연습 시간 (초 단위)
-    val completedSongCount: Int = 0, // 완료한 곡 총 개수
-    val completedPartCount: Int = 0, // 완료한 파트 총 개수
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "stat_id")
+    val statId: Long = 0,
 
-    // 복잡한 리스트 데이터는 JSON 문자열로 변환하여 저장 (전략 문서 B항 참조)
-    // 예: ["badge_newbie", "badge_perfect_score"]
-    val earnedBadgesJson: String = "[]",
+    @ColumnInfo(name = "user_uuid")
+    val userUuid: String,
 
-    val currentLevel: Int = 1, // 현재 레벨
-    val currentXp: Int = 0, // 현재 경험치
-    val averageAccuracy: Float = 0f, // 전체 평균 정확도
+    @ColumnInfo(name = "app_level")
+    val appLevel: Int = 1,
 
-    //마지막 연습 날짜
-    val lastPracticeDate: Long = 0L
+    @ColumnInfo(name = "current_exp")
+    val currentExp: Long = 0,
+
+    @ColumnInfo(name = "total_play_time")
+    val totalPlayTime: Long = 0L,
+
+    @ColumnInfo(name = "completed_parts")
+    val completedParts: Int = 0,
+
+    @ColumnInfo(name = "avg_accuracy")
+    val avgAccuracy: Double = 0.0,
+
+    @ColumnInfo(name = "badge_count")
+    val badgeCount: Int = 0,
+
+    @ColumnInfo(name = "lightstick_count")
+    val lightstickCount: Int = 0,
+
+    @ColumnInfo(name = "achievement_score")
+    val achievementScore: Int = 0,
+
+    @ColumnInfo(name = "last_updated")
+    val lastUpdated: String = ""
 )

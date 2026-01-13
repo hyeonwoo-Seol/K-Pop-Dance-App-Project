@@ -1,30 +1,61 @@
 package com.example.kpopdancepracticeai.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-/**
- * 연습 기록 테이블 (PracticeHistory)
- * 역할: 한 번의 춤 연습 결과를 저장
- * 전략: 저장 시 isSynced = false로 저장하고, AWS 전송 성공 시 true로 업데이트
- */
-@Entity(tableName = "practice_history")
+
+@Entity(tableName = "PracticeResults")
 data class PracticeHistory(
     @PrimaryKey(autoGenerate = true)
-    val id: Long = 0, // 로컬 DB 내 고유 ID (자동 증가)
+    @ColumnInfo(name = "result_id")
+    val resultId: Long = 0,
 
-    val userId: String, // 사용자 ID (Foreign Key 역할)
-    val songId: String, // 서버의 Song ID (예: "bts_dynamite")
-    val songTitle: String, // 곡 제목 (오프라인 표시용)
-    val artistName: String, // 아티스트 이름
-    val partName: String, // 연습한 파트 (예: "Part 2: 메인 파트")
+    @ColumnInfo(name = "user_uuid")
+    val userUuid: String,
 
-    val practiceDate: Long, // 연습 날짜 (Timestamp: System.currentTimeMillis())
-    val score: Int, // 점수 (0~100)
-    val accuracy: Float, // 정확도 (상세 소수점)
+    @ColumnInfo(name = "song_id")
+    val songId: Long,
 
-    // AWS 동기화 핵심 필드
-    // false: 아직 서버로 안 보냄 (동기화 필요)
-    // true: 서버에 저장됨
-    val isSynced: Boolean = false
+    @ColumnInfo(name = "part_number")
+    val partNumber: Int,
+
+    @ColumnInfo(name = "artist_name")
+    val artistName: String,
+
+    @ColumnInfo(name = "total_score")
+    val totalScore: Int,
+
+    @ColumnInfo(name = "grade")
+    val grade: String,
+
+    @ColumnInfo(name = "part_accuracies")
+    val partAccuracies: Map<String, Int>?,
+
+    @ColumnInfo(name = "worst_points")
+    val worstPoints: List<String>?,
+
+    @ColumnInfo(name = "duration_sec")
+    val durationSec: Double,
+
+    @ColumnInfo(name = "fps")
+    val fps: Double,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: String, // Date format String
+
+    @ColumnInfo(name = "full_json_path")
+    val fullJsonPath: String,
+
+    @ColumnInfo(name = "user_video_path")
+    val userVideoPath: String,
+
+    @ColumnInfo(name = "video_width")
+    val videoWidth: Int,
+
+    @ColumnInfo(name = "video_height")
+    val videoHeight: Int,
+
+    @ColumnInfo(name = "total_frames")
+    val totalFrames: Int
 )

@@ -1,122 +1,123 @@
 package com.example.kpopdancepracticeai.data.repository
 
-import android.util.Log
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
+import com.example.kpopdancepracticeai.data.dao.SongDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
-import com.example.kpopdancepracticeai.data.entity.Achievement
-import com.example.kpopdancepracticeai.data.entity.PracticeHistory
-import com.example.kpopdancepracticeai.data.entity.UserStats
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
+import com.example.kpopdancepracticeai.data.entity.*
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-/**
- * 앱 저장소 (Repository)
- * 역할: 데이터의 단일 진실 공급원 (Local DB + Remote Server)
- */
 class AppRepository(
     private val userDao: UserDao,
+    private val songDao: SongDao,
     private val historyDao: HistoryDao,
     private val achievementDao: AchievementDao
 ) {
+    // 앱 실행 시점부터 시간 추적 시작
+    private var lastSyncTime: Long = System.currentTimeMillis()
 
-
-    // --- 1. 사용자 통계 관련 ---
-
-    fun getUserStatsStream(userId: String): Flow<UserStats?> {
-        return userDao.getUserStats(userId)
+    // 헬퍼: 현재 시간 문자열
+    private fun getCurrentTime(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        return sdf.format(Date())
     }
 
-    // --- 2. 연습 기록 관련 ---
+    // --- User Statistics ---
+    fun getUserStats(userId: String): Flow<UserStats?> = userDao.getUserStats(userId)
 
-    suspend fun savePracticeResult(history: PracticeHistory) {
-        // A. 로컬 저장
-        val newId = historyDao.insertHistory(history)
-        Log.d("AppRepository", "로컬 DB 저장 완료. ID: $newId")
-
-        // B. 통계 업데이트 (완료한 곡 횟수, 총 시간 등)
-        updateUserStatsLocally(history)
-
-        // C. AWS 동기화 (비동기 호출 - 보내는 로직)
-        syncUnsyncedData()
+    suspend fun fetchInitialData(userId: String) {
+        val existingStats = userDao.getUserStatsOneShot(userId)
+        if (existingStats == null) {
+            // [수정] MD 파일에 명시된 기본값으로 초기화
+            val newStats = UserStats(
+                userUuid = userId,
+                totalPlayTime = 0L,
+                completedParts = 0,
+                avgAccuracy = 0.0,
+                badgeCount = 0,
+                lightstickCount = 0,
+                achievementScore = 0,
+                lastUpdated = getCurrentTime()
+            )
+            userDao.insertOrUpdate(newStats)
+        }
+        // 초기화 시점의 시간을 동기화 기준으로 설정
+        lastSyncTime = System.currentTimeMillis()
     }
 
-    /**
-     * 유저 통계 수동 업데이트
-     */
-    private suspend fun updateUserStatsLocally(history: PracticeHistory) {
-        val currentStats = userDao.getUserStatsOneShot(history.userId) ?: UserStats(userId = history.userId)
+    // 프로필 화면 등에서 주기적으로 호출하여 접속 시간 갱신
+    suspend fun syncAppUsageTime(userId: String) {
+        val currentTime = System.currentTimeMillis()
+        val timeElapsed = currentTime - lastSyncTime
 
-        val updatedStats = currentStats.copy(
-            completedSongCount = currentStats.completedSongCount + 1,
-            // 3분(180초) 연습했다고 가정 (실제로는 history.playTimeSeconds 사용 권장)
-            totalPracticeTimeSeconds = currentStats.totalPracticeTimeSeconds + 180,
-            lastPracticeDate = System.currentTimeMillis()
-        )
-        userDao.insertOrUpdate(updatedStats)
-    }
+        // 1초 이상 지났을 때만 업데이트 (DB 부하 방지 및 유효성 검사)
+        if (timeElapsed > 1000) {
+            val currentStats = userDao.getUserStatsOneShot(userId)
+            if (currentStats != null) {
+                // [중요 수정] 밀리초(ms) -> 초(s) 단위 변환
+                // MD 파일의 total_play_time은 "초 단위"입니다.
+                val addedSeconds = timeElapsed / 1000
 
-    // --- 3. 동기화 로직 (보내기: Push) ---
-
-    private fun syncUnsyncedData() {
-        CoroutineScope(Dispatchers.IO).launch {
-            val unsyncedList = historyDao.getUnsyncedData()
-            if (unsyncedList.isNotEmpty()) {
-                Log.d("AppRepository", "동기화 필요한 데이터 ${unsyncedList.size}건 발견.")
-                // 실제 전송 로직...
-                unsyncedList.forEach { history ->
-                    try {
-                        delay(1000) // 시뮬레이션
-                        historyDao.markAsSynced(history.id)
-                    } catch (e: Exception) {
-                        Log.e("AppRepository", "동기화 실패: ${e.message}")
-                    }
-                }
+                val updatedStats = currentStats.copy(
+                    totalPlayTime = currentStats.totalPlayTime + addedSeconds,
+                    lastUpdated = getCurrentTime()
+                )
+                userDao.insertOrUpdate(updatedStats)
             }
+            // 갱신 성공 여부와 상관없이 기준 시간 업데이트 (중복 누적 방지)
+            lastSyncTime = currentTime
         }
     }
 
-    /**
-     * [3단계 구현 완료] 서버 동기화 (받기: Pull)
-     * 설정 화면에서 '최신 데이터 동기화' 버튼 클릭 시 호출
-     */
-    suspend fun fetchInitialData(userId: String) = withContext(Dispatchers.IO) {
-        try {
-            Log.d("AppRepository", "서버로부터 최신 데이터 요청 중... User: $userId")
+    // --- Song ---
+    val allSongs: Flow<List<Song>> = songDao.getAllSongs()
+    fun getSongParts(songId: Long): Flow<List<SongPart>> = songDao.getPartsBySongId(songId)
+    fun searchSongs(query: String): Flow<List<Song>> = songDao.searchSongs(query)
 
-            // --- [시뮬레이션 모드] ---
-            // 실제 서버가 준비되면 RetrofitClient.apiService.getUserStats(userId) 호출로 대체
-            delay(1500) // 네트워크 지연 1.5초 시뮬레이션
+    // --- History & Stats Update ---
+    suspend fun savePracticeResult(result: PracticeHistory) {
+        // 1. 히스토리 저장
+        historyDao.insertHistory(result)
 
-            // 서버에서 받아왔다고 가정하는 최신 데이터 (Mock)
-            // 테스트를 위해 'completedSongCount'를 100으로 설정하여 UI 변화 확인
-            val mockServerStats = UserStats(
-                userId = userId,
-                completedSongCount = 100, // 버튼 누르면 이 값으로 업데이트됨!
-                totalPracticeTimeSeconds = 45000,
-                currentLevel = 5,
-                completedPartCount = 42,
-                averageAccuracy = 92.5f,
-                lastPracticeDate = System.currentTimeMillis()
+        // 2. 유저 통계 업데이트
+        val currentStats = userDao.getUserStatsOneShot(result.userUuid) // userId -> userUuid
+
+        if (currentStats != null) {
+            val currentTime = System.currentTimeMillis()
+            val timeElapsed = currentTime - lastSyncTime
+
+            // [중요 수정] 시간 갱신 (밀리초 -> 초 변환)
+            // 연습하는 동안 흐른 시간도 앱 사용 시간에 포함시킵니다.
+            val addedSeconds = if (timeElapsed > 0) timeElapsed / 1000 else 0L
+            val newTotalPlayTime = currentStats.totalPlayTime + addedSeconds
+
+            // 정확도 갱신
+            // [수정] result.score -> result.totalScore
+            val oldAvg = currentStats.avgAccuracy
+            val count = currentStats.completedParts
+            val newScore = result.totalScore.toDouble()
+
+            // 평균 계산: (기존평균 * 횟수 + 새점수) / (횟수 + 1)
+            val newAvgAccuracy = ((oldAvg * count) + newScore) / (count + 1)
+            val newCompletedParts = count + 1
+
+            val updatedStats = currentStats.copy(
+                totalPlayTime = newTotalPlayTime,
+                completedParts = newCompletedParts,
+                avgAccuracy = newAvgAccuracy,
+                lastUpdated = getCurrentTime()
             )
 
-            // 로컬 DB 업데이트 -> Flow를 통해 UI 자동 갱신
-            userDao.insertOrUpdate(mockServerStats)
+            userDao.insertOrUpdate(updatedStats)
 
-            Log.d("AppRepository", "데이터 동기화 완료!")
-
-        } catch (e: Exception) {
-            Log.e("AppRepository", "데이터 가져오기 실패", e)
-            throw e
+            // 통계 업데이트 시점 기준으로 시간 동기화
+            lastSyncTime = currentTime
         }
     }
 
-    // --- 4. 업적 관련 ---
-    fun getAllAchievements(): Flow<List<Achievement>> {
-        return achievementDao.getAllAchievements()
-    }
+    // [수정] userId 파라미터명 일치
+    fun getRecentHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getRecentHistory(userId)
 }

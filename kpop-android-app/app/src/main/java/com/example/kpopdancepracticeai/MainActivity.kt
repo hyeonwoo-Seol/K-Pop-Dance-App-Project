@@ -1,5 +1,4 @@
 package com.example.kpopdancepracticeai
-// MainActivity.kt
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -23,34 +22,20 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-// import androidx.room.Room // 추후 주석 해제 필요
-// import com.example.kpopdancepracticeai.data.database.AppDatabase // 추후 주석 해제 필요
-// import com.example.kpopdancepracticeai.data.repository.AppRepository // 추후 주석 해제 필요
-import com.example.kpopdancepracticeai.ui.LoginScreen
-import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme // 본인의 테마 이름
-import com.example.kpopdancepracticeai.ui.HomeScreen
+import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+// [중요] KpopDancePracticeApp은 같은 패키지 또는 ui 패키지에 있어야 합니다.
 import com.example.kpopdancepracticeai.ui.KpopDancePracticeApp
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // 전략 문서에 따른 DB 및 Repository 초기화 (신규 파일 생성 후 활성화)
-        // val database = Room.databaseBuilder(
-        //     applicationContext,
-        //     AppDatabase::class.java,
-        //     "kpop-dance-db"
-        // ).build()
-        // val repository = AppRepository(database.userDao(), database.historyDao(), database.achievementDao())
-
         setContent {
-            // 프로젝트 생성 시 만들어진 테마(Theme)를 적용합니다.
             KpopDancePracticeAITheme {
                 val context = LocalContext.current
                 var permissionsGranted by remember { mutableStateOf(false) }
                 var showPermissionDeniedDialog by remember { mutableStateOf(false) }
 
-                // 요청할 권한 목록 정의 (Android 13 이상 대응)
                 val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     arrayOf(
                         Manifest.permission.CAMERA,
@@ -79,7 +64,6 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                // 앱 시작 시 권한 체크 및 요청
                 LaunchedEffect(Unit) {
                     val allPermissionsGranted = permissionsToRequest.all {
                         ContextCompat.checkSelfPermission(context, it) == PackageManager.PERMISSION_GRANTED
@@ -97,27 +81,17 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     if (permissionsGranted) {
+                        // [수정] 이제 KpopDancePracticeApp이 정의되어 있으므로 호출 가능합니다.
                         KpopDancePracticeApp()
                     }
 
                     if (showPermissionDeniedDialog) {
                         AlertDialog(
-                            onDismissRequest = {
-                                // 다이얼로그 밖을 눌러도 닫히지 않게 하거나, 닫히면 앱 종료 처리
-                                finish()
-                            },
+                            onDismissRequest = { finish() },
                             title = { Text(text = "권한 필요") },
-                            text = {
-                                Text(text = "앱을 사용하기 위해서는 카메라, 마이크, 알림 및 저장소 권한이 필요합니다. 권한을 허용해야 앱을 사용할 수 있습니다.")
-                            },
+                            text = { Text(text = "앱을 사용하기 위해서는 권한 허용이 필요합니다.") },
                             confirmButton = {
-                                TextButton(
-                                    onClick = {
-                                        finish() // 권한 거부 시 앱 종료
-                                    }
-                                ) {
-                                    Text("종료")
-                                }
+                                TextButton(onClick = { finish() }) { Text("종료") }
                             }
                         )
                     }

@@ -3,47 +3,59 @@ package com.example.kpopdancepracticeai.data.mapper
 import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.util.FilenameParser
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
-/**
- * DTO -> Entity 변환 매퍼
- * 역할: 서버 응답(DTO) + 파일명 메타데이터 -> DB 엔티티(PracticeHistory) 변환
- */
 object AnalysisMapper {
 
-    /**
-     * FilenameParser.ParsedMetadata를 활용하는 개선된 매핑 함수
-     * * @param analysisResult 서버에서 받은 JSON 파싱 결과 (점수, 프레임 데이터 등)
-     * @param metadata 파일명에서 파싱한 정보 (userId, songId, artist, partNumber)
-     * @param songTitle 파일명에는 없어서 따로 받아야 하는 곡 제목
-     */
+    // 현재 시간을 문자열 포맷으로 반환하는 헬퍼 함수
+    private fun getCurrentDateTime(): String {
+        val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
+        return sdf.format(Date())
+    }
+
     fun mapToPracticeHistory(
         analysisResult: AnalysisResultResponse,
-        metadata: FilenameParser.ParsedMetadata, // 파싱된 메타데이터 객체를 통째로 받음
-        songTitle: String
+        metadata: FilenameParser.ParsedMetadata,
+        videoPath: String, // 녹화된 사용자 영상 경로
+        fullJsonPath: String // 저장된 전체 분석 JSON 파일 경로
     ): PracticeHistory {
 
         val summary = analysisResult.summary
+        val meta = analysisResult.metadata
 
         return PracticeHistory(
-            // 1. 메타데이터에서 추출한 정보 사용 (파일명 유래)
-            userId = metadata.userId,
-            songId = metadata.songId,
+            // AutoGenerate ID는 0으로 설정하면 Room이 자동 생성
+            resultId = 0,
+
+            // 1. 식별자 정보 (파일명 파싱 데이터)
+            userUuid = metadata.userId,
+            songId = metadata.songId.toLongOrNull() ?: 0L,
+            partNumber = metadata.partNumber.toIntOrNull() ?: 1,
             artistName = metadata.artist,
-            partName = metadata.partNumber,
 
-            // 2. 외부에서 따로 받은 정보 사용
-            songTitle = songTitle,
+            // 2. 핵심 분석 결과 (DTO summary)
+            totalScore = summary.totalScore,
+            grade = summary.accuracyGrade,
 
-            // 3. 현재 시간 기록 (저장 시점)
-            practiceDate = System.currentTimeMillis(),
+            // TypeConverter가 Map<String, Int> -> JSON String 자동 변환 처리
+            partAccuracies = summary.partAccuracies,
 
-            // 4. 분석 결과 매핑 (JSON 유래)
-            score = summary.totalScore,
-            // 필요 시 정확도를 별도 계산하거나 점수와 동일하게 처리
-            accuracy = summary.totalScore.toFloat(),
+            // TypeConverter가 List<String> -> JSON String 자동 변환 처리
+            worstPoints = summary.worstPoints,
 
-            // 5. 동기화 상태 (로컬 우선 저장 -> 추후 전송)
-            isSynced = false
+            // 3. 영상 메타데이터 (DTO metadata)
+            durationSec = meta.durationSec,
+            fps = meta.fps,
+            videoWidth = meta.videoWidth,
+            videoHeight = meta.videoHeight,
+            totalFrames = meta.totalFrames,
+
+            // 4. 파일 경로 및 생성 시간
+            createdAt = getCurrentDateTime(),
+            fullJsonPath = fullJsonPath,
+            userVideoPath = videoPath
         )
     }
 }

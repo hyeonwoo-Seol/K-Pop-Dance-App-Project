@@ -37,6 +37,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
+// 테마 색상 정의 (누락 방지)
+val BorderLight = Color(0xFFE0E0E0)
+val TextGray = Color(0xFF757575)
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -111,7 +115,6 @@ fun ProfileScreen(
                         onNavigateToAppInfo,
                         onNavigateToWithdrawal,
                         onNavigateToTest = onNavigateToTest,
-                        // [수정됨] 동기화 클릭 시 ViewModel 호출
                         onSyncClick = { viewModel.refreshData() },
                         isSyncing = isSyncing
                     )
@@ -138,13 +141,14 @@ fun ProfileHeaderCard(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val currentXp = userStats?.currentXp ?: 0
-                val currentLevel = userStats?.currentLevel ?: 1
-                val avgAccuracy = userStats?.averageAccuracy ?: 0f
+                // [수정] 변경된 UserStats 필드명 반영
+                val currentExp = userStats?.currentExp ?: 0L
+                val appLevel = userStats?.appLevel ?: 1
+                val avgAccuracy = userStats?.avgAccuracy?.toFloat() ?: 0f // Double -> Float 변환
 
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    StatColumn("경험치", "$currentXp XP")
-                    StatColumn("Level", "Lv. $currentLevel")
+                    StatColumn("경험치", "$currentExp XP")
+                    StatColumn("Level", "Lv. $appLevel")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Column {
@@ -189,13 +193,12 @@ fun CustomShadowButton(text: String, onClick: () -> Unit, width: androidx.compos
 
 @Composable
 fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserStats?) {
-    // [확인] DB에서 불러온 데이터를 UI에 매핑
-    val totalTimeMin = (userStats?.totalPracticeTimeSeconds ?: 0) / 60
+    // [수정] 변경된 UserStats 필드명 반영 (totalPlayTime, completedParts, avgAccuracy)
+    val totalTimeMin = (userStats?.totalPlayTime ?: 0) / 60
     val totalTimeText = if (totalTimeMin > 60) "${totalTimeMin/60}H" else "${totalTimeMin}M"
 
-    // [수정] completedSongCount 사용 (동기화 테스트 시 이 값이 변경됨)
-    val completedSongs = "${userStats?.completedSongCount ?: 0}개"
-    val avgAccuracy = "${userStats?.averageAccuracy?.toInt() ?: 0}%"
+    val completedSongs = "${userStats?.completedParts ?: 0}개"
+    val avgAccuracy = "${userStats?.avgAccuracy?.toInt() ?: 0}%"
 
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         StatCard(Modifier.weight(1f), totalTimeText, "총 연습시간")
@@ -271,7 +274,6 @@ fun SettingsContent(
                 SettingsMenuItem("개인정보 보호 및 권한", Icons.Outlined.Shield, Color(0xFFE6F7EB), onClick = onNavigateToPrivacySettings); SettingsMenuDivider()
                 SettingsMenuItem("앱 정보", Icons.Outlined.Info, Color(0xFFF3F4F6), onClick = onNavigateToAppInfo); SettingsMenuDivider()
 
-                // [수정됨] 최신 데이터 동기화 버튼 (상태에 따라 UI 변경)
                 SettingsMenuItem(
                     text = if (isSyncing) "데이터 받아오는 중..." else "최신 데이터 동기화",
                     icon = if (isSyncing) Icons.Default.HourglassEmpty else Icons.Default.Sync,
@@ -281,8 +283,8 @@ fun SettingsContent(
                 ); SettingsMenuDivider()
                 SettingsMenuItem(
                     text = "시스템 기능 테스트",
-                    icon = Icons.Default.Build, // 렌치(도구) 아이콘
-                    iconBgColor = Color(0xFFEEEEEE), // 회색 배경
+                    icon = Icons.Default.Build,
+                    iconBgColor = Color(0xFFEEEEEE),
                     onClick = onNavigateToTest
                 ); SettingsMenuDivider()
                 SettingsMenuItem("회원 탈퇴", Icons.Outlined.ExitToApp, Color(0xFFFFF0F0), textColor = Color.Red, onClick = onNavigateToWithdrawal)
@@ -316,6 +318,23 @@ fun AchievementCard(title: String, description: String, progress: Float, progres
             }
             LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), trackColor = Color(0x33030213), color = Color(0xff030213))
         }
+    }
+}
+
+// BadgeChip 컴포넌트가 누락되어 있어 추가
+@Composable
+fun BadgeChip(text: String, color: Color) {
+    Surface(
+        color = color,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.padding(2.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = Color.Black
+        )
     }
 }
 
