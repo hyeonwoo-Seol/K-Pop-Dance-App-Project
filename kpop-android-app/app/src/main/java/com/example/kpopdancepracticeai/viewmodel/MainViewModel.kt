@@ -34,7 +34,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userStats = MutableStateFlow<UserStats?>(null)
     val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
 
-    // [추가] ProfileScreen 호환을 위한 더미 데이터 (추후 실제 엔티티로 교체 필요)
+    // [추가] ProfileScreen 호환을 위한 더미 데이터
     private val _achievements = MutableStateFlow<List<Any>>(emptyList())
     val achievements: StateFlow<List<Any>> = _achievements.asStateFlow()
 
@@ -67,7 +67,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // [추가] 데이터 새로고침 (ProfileScreen에서 사용)
     fun refreshData() {
         val userId = _userStats.value?.userUuid
         if (userId != null) {
@@ -86,7 +85,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // 연습 결과 저장
+    // 연습 결과 저장 (기존 함수)
     fun savePracticeResult(userId: String, songId: Long, partId: Long, score: Int, videoPath: String) {
         viewModelScope.launch {
             val history = PracticeHistory(
@@ -107,6 +106,13 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 fullJsonPath = "",
                 userVideoPath = videoPath
             )
+            repository.savePracticeResult(history)
+        }
+    }
+
+    // [추가] 연습 결과 저장 (PracticeHistory 객체 직접 전달용 오버로딩)
+    fun savePracticeResult(history: PracticeHistory) {
+        viewModelScope.launch {
             repository.savePracticeResult(history)
         }
     }
