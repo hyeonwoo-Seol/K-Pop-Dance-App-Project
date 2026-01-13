@@ -22,11 +22,9 @@ interface AchievementDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertAchievements(achievements: List<Achievement>)
 
-    // 특정 업적의 진행도 업데이트
-    @Query("UPDATE achievements SET current_count = :progress, is_completed = :isCompleted WHERE achievement_id = :id")
-    suspend fun updateProgress(id: String, progress: Int, isCompleted: Boolean)
+    @Query("UPDATE achievements SET current_count = :progress, is_completed = :isCompleted, achieved_at = :achievedAt WHERE id = :id")
+    suspend fun updateProgress(id: String, progress: Int, isCompleted: Boolean, achievedAt: Long? = null)
 
-    // 특정 업적 조회
-    @Query("SELECT * FROM achievements WHERE achievement_id = :id")
+    @Query("SELECT * FROM achievements WHERE id = :id")
     suspend fun getAchievement(id: String): Achievement?
 }

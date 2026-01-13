@@ -1,215 +1,345 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.widget.Toast
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.HourglassEmpty
+import androidx.compose.material.icons.filled.Sync
+import androidx.compose.material.icons.outlined.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import androidx.lifecycle.viewModelScope
-import androidx.navigation.NavController
-import com.example.kpopdancepracticeai.KpopApplication
-import com.example.kpopdancepracticeai.data.entity.UserStats
-import com.example.kpopdancepracticeai.data.repository.AppRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.launch
-import java.util.concurrent.TimeUnit
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.ui.theme.*
 
-// 프로필 화면을 위한 뷰모델
-// DB에서 사용자 통계를 가져오는 역할을 합니다.
-class ProfileViewModel(private val repository: AppRepository) : ViewModel() {
+// 테마 색상 정의 (누락 방지)
+val BorderLight = Color(0xFFE0E0E0)
+val TextGray = Color(0xFF757575)
 
-    private val _userStats = MutableStateFlow<UserStats?>(null)
-    val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
-
-    // 사용자 ID를 기반으로 통계 로드
-    fun loadUserStats(userId: String) {
-        viewModelScope.launch {
-            // UserDao의 Flow를 수집하여 상태 업데이트
-            repository.userDao.getUserStats(userId).collect { stats ->
-                _userStats.value = stats
-            }
-        }
-    }
-}
-
-// 뷰모델 팩토리
-class ProfileViewModelFactory(private val repository: AppRepository) : ViewModelProvider.Factory {
-    override fun <T : ViewModel> create(modelClass: Class<T>): T {
-        if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
-            @Suppress("UNCHECKED_CAST")
-            return ProfileViewModel(repository) as T
-        }
-        throw IllegalArgumentException("Unknown ViewModel class")
-    }
-}
-
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
-    navController: NavController,
-    userId: String? // 로그인된 사용자 ID
+    paddingValues: PaddingValues,
+    onNavigateToProfileEdit: () -> Unit,
+    onNavigateToPracticeSettings: () -> Unit,
+    onNavigateToNotificationSettings: () -> Unit,
+    onNavigateToPrivacySettings: () -> Unit,
+    onNavigateToAppInfo: () -> Unit,
+    onNavigateToWithdrawal: () -> Unit,
+    onNavigateToAnalysis: () -> Unit,
+    onNavigateToTest: () -> Unit,
+    viewModel: MainViewModel = viewModel()
 ) {
-    // Repository 가져오기
+    // ViewModel 상태 구독
+    val userStats by viewModel.userStats.collectAsState()
+    val achievements by viewModel.achievements.collectAsState()
+    val isSyncing by viewModel.isSyncing.collectAsState()
+    val syncMessage by viewModel.syncMessage.collectAsState()
+
     val context = LocalContext.current
-    val application = context.applicationContext as KpopApplication
-    val repository = application.repository
 
-    // ViewModel 초기화
-    val viewModel: ProfileViewModel = viewModel(
-        factory = ProfileViewModelFactory(repository)
-    )
-
-    // 화면 진입 시 데이터 로드
-    LaunchedEffect(userId) {
-        if (userId != null) {
-            viewModel.loadUserStats(userId)
+    // 동기화 결과 메시지(Toast) 처리
+    LaunchedEffect(syncMessage) {
+        syncMessage?.let {
+            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            viewModel.clearSyncMessage()
         }
     }
 
-    // UI 상태 관찰
-    val userStats by viewModel.userStats.collectAsState()
+    var selectedTab by rememberSaveable { mutableStateOf("통계") }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .verticalScroll(rememberScrollState()),
-        horizontalAlignment = Alignment.CenterHorizontally
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+        contentPadding = paddingValues,
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        Text(
-            text = "마이 페이지",
-            style = MaterialTheme.typography.headlineMedium,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.padding(bottom = 24.dp)
-        )
+        // 프로필 헤더
+        item { ProfileHeaderCard(userStats = userStats, onDetailClick = onNavigateToAnalysis) }
+        // 탭 메뉴
+        item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
 
-        // 프로필 요약 카드
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 16.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFF5F5F5))
-        ) {
-            Column(
-                modifier = Modifier.padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                // 사용자 아이콘 또는 이미지 (임시 텍스트)
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .padding(bottom = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("User", fontSize = 20.sp, fontWeight = FontWeight.Bold)
+        when (selectedTab) {
+            "통계" -> {
+                item { StatisticsRow(userStats = userStats) }
+                item { AchievementsSummaryCard() }
+                item { AcquiredBadgesCard() }
+            }
+            "업적" -> {
+                item {
+                    Text(text = "업적 및 성과", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp))
                 }
-
-                Text(
-                    text = userId ?: "게스트",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
+                // TODO: 실제 achievements 데이터를 연동할 수 있음
+                val achievementsList = listOf(
+                    Triple("완벽주의자", "95% 이상의 정확도 5회 달성", 0.8f),
+                    Triple("연습 벌레", "총 연습 시간 100시간 달성", 0.41f),
+                    Triple("BTS 마스터", "BTS 챌린지 10개 완료", 0.5f),
+                    Triple("챌린지 헌터", "모든 챌린지 1회 이상 완료", 0.1f),
+                    Triple("신입 댄서", "첫 연습 영상 업로드", 1.0f)
                 )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                // 레벨 표시 (UserStats에 level 필드가 있다고 가정)
-                // 만약 UserStats에 level 필드가 없다면 이 부분은 주석 처리하세요.
-                Text(
-                    text = "Lv. ${userStats?.level ?: 1}",
-                    color = Color.Blue,
-                    fontWeight = FontWeight.Bold
-                )
+                items(achievementsList) { (title, description, progress) ->
+                    AchievementCard(title = title, description = description, progress = progress, progressText = "${(progress * 100).toInt()}%")
+                }
+            }
+            "설정" -> {
+                item {
+                    SettingsContent(
+                        onNavigateToProfileEdit,
+                        onNavigateToPracticeSettings,
+                        onNavigateToNotificationSettings,
+                        onNavigateToPrivacySettings,
+                        onNavigateToAppInfo,
+                        onNavigateToWithdrawal,
+                        onNavigateToTest = onNavigateToTest,
+                        onSyncClick = { viewModel.refreshData() },
+                        isSyncing = isSyncing
+                    )
+                }
             }
         }
+        item { Spacer(modifier = Modifier.height(16.dp)) }
+    }
+}
 
-        // 통계 정보 섹션
-        Text(
-            text = "내 활동 분석",
-            style = MaterialTheme.typography.titleMedium,
-            modifier = Modifier
-                .align(Alignment.Start)
-                .padding(bottom = 8.dp)
-        )
+@Composable
+fun ProfileHeaderCard(
+    userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
+    onDetailClick: () -> Unit
+) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 4.dp) {
+        Row(modifier = Modifier.fillMaxWidth().padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.AccountCircle, "프로필 이미지", modifier = Modifier.size(64.dp).clip(CircleShape), tint = Color.LightGray)
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+                    Column { Text("내 프로필", style = MaterialTheme.typography.bodySmall, color = Color.Gray); Text("김원준", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold) }
+                    CustomShadowButton("상세 통계 보기", onDetailClick, 92.dp, 35.dp, 11.sp)
+                }
+                Spacer(modifier = Modifier.height(16.dp))
 
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            // 총 연습 시간
-            StatCard(
-                title = "총 연습 시간",
-                value = formatTime(userStats?.totalPlayTime ?: 0L),
-                modifier = Modifier.weight(1f)
-            )
+                // [수정] 변경된 UserStats 필드명 반영
+                val currentExp = userStats?.currentExp ?: 0L
+                val appLevel = userStats?.appLevel ?: 1
+                val avgAccuracy = userStats?.avgAccuracy?.toFloat() ?: 0f // Double -> Float 변환
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            // 평균 정확도
-            StatCard(
-                title = "평균 정확도",
-                // UserStats에 averageAccuracy 필드가 있다고 가정 (없다면 totalScore 등으로 대체)
-                value = "${String.format("%.1f", userStats?.averageAccuracy ?: 0f)}%",
-                modifier = Modifier.weight(1f)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // 추가 메뉴 버튼들
-        Button(
-            onClick = { /* 내 영상 보관함 이동 로직 */ },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF6200EE))
-        ) {
-            Text("내 연습 영상 보기")
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Button(
-            onClick = {
-                // 로그아웃 또는 뒤로가기 로직
-                navController.popBackStack()
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
-        ) {
-            Text("뒤로 가기")
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    StatColumn("경험치", "$currentExp XP")
+                    StatColumn("Level", "Lv. $appLevel")
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                Column {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                        Text("평균 정확도", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
+                        Text("${avgAccuracy.toInt()}/100", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    LinearProgressIndicator(
+                        progress = { avgAccuracy / 100f },
+                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
+                    )
+                }
+            }
         }
     }
 }
 
 @Composable
-fun StatCard(title: String, value: String, modifier: Modifier = Modifier) {
-    Card(
-        modifier = modifier,
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Text(text = title, style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(text = value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+fun StatColumn(label: String, value: String) {
+    Column { Text(label, style = MaterialTheme.typography.labelSmall, color = Color.Gray); Text(value, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold) }
+}
+
+@Composable
+fun ProfileTabRow(selectedTab: String, onTabSelected: (String) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        listOf("통계", "업적", "설정").forEach { tabName ->
+            val isSelected = selectedTab == tabName
+            Box(modifier = Modifier.weight(1f).height(40.dp).shadow(2.dp, RoundedCornerShape(50.dp)).background(if (isSelected) Color(0xFF4C5E8A) else Color.White, RoundedCornerShape(50.dp)).then(if (!isSelected) Modifier.border(1.dp, BorderLight, RoundedCornerShape(50.dp)) else Modifier).clip(RoundedCornerShape(50.dp)).clickable { onTabSelected(tabName) }, contentAlignment = Alignment.Center) {
+                Text(tabName, style = TextStyle(fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = if (isSelected) Color.White else TextGray))
+            }
         }
     }
 }
 
-// 밀리세컨드를 시간 문자열로 변환하는 유틸리티 함수
-fun formatTime(millis: Long): String {
-    val hours = TimeUnit.MILLISECONDS.toHours(millis)
-    val minutes = TimeUnit.MILLISECONDS.toMinutes(millis) % 60
-    return if (hours > 0) "${hours}시간 ${minutes}분" else "${minutes}분"
+@Composable
+fun CustomShadowButton(text: String, onClick: () -> Unit, width: androidx.compose.ui.unit.Dp, height: androidx.compose.ui.unit.Dp, fontSize: androidx.compose.ui.unit.TextUnit = 12.sp, containerColor: Color = Color.White, contentColor: Color = TextGray, borderColor: Color = BorderLight) {
+    Box(modifier = Modifier.width(width).height(height).shadow(2.dp, RoundedCornerShape(15.dp)).background(containerColor, RoundedCornerShape(15.dp)).border(1.dp, borderColor, RoundedCornerShape(15.dp)).clip(RoundedCornerShape(15.dp)).clickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        Text(text, style = TextStyle(fontSize = fontSize, fontWeight = FontWeight.Bold, color = contentColor, textAlign = TextAlign.Center))
+    }
+}
+
+@Composable
+fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserStats?) {
+    // [수정] 변경된 UserStats 필드명 반영 (totalPlayTime, completedParts, avgAccuracy)
+    val totalTimeMin = (userStats?.totalPlayTime ?: 0) / 60
+    val totalTimeText = if (totalTimeMin > 60) "${totalTimeMin/60}H" else "${totalTimeMin}M"
+
+    val completedSongs = "${userStats?.completedParts ?: 0}개"
+    val avgAccuracy = "${userStats?.avgAccuracy?.toInt() ?: 0}%"
+
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+        StatCard(Modifier.weight(1f), totalTimeText, "총 연습시간")
+        StatCard(Modifier.weight(1f), completedSongs, "완료한 곡 개수")
+        StatCard(Modifier.weight(1f), avgAccuracy, "평균 정확도")
+    }
+}
+
+@Composable
+fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
+    Surface(modifier = modifier.height(100.dp), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
+        Column(modifier = Modifier.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(value, style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 24.sp), color = Color.Black); Spacer(modifier = Modifier.height(8.dp)); Text(label, style = TextStyle(fontSize = 12.sp, color = Color.Gray), textAlign = TextAlign.Center)
+        }
+    }
+}
+
+@Composable
+fun AchievementsSummaryCard() {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            listOf("완벽주의자" to 0.8f, "연습 벌레" to 0.3f, "BTS 마스터" to 0.5f, "챌린지 헌터" to 0.1f).forEach { (l, p) -> AchievementProgressItem(l, p, "${(p * 100).toInt()}%") }
+        }
+    }
+}
+
+@Composable
+fun AchievementProgressItem(label: String, progress: Float, progressText: String) {
+    Column {
+        Text(label, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.weight(1f).height(8.dp).clip(RoundedCornerShape(4.dp)))
+            Text(progressText, style = MaterialTheme.typography.bodySmall, color = Color.Gray, modifier = Modifier.width(36.dp), textAlign = TextAlign.End)
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun AcquiredBadgesCard() {
+    val badges = mapOf("BTS 마스터" to Color(0xFFEBEBFF), "NewJeans 팬" to Color(0xFFD6F5FF), "BLACKPINK 전문가" to Color(0xFFFFD6EB), "초급자 졸업" to Color(0xFFD9FFE5), "중급자" to Color(0xFFFFFAD6))
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(16.dp), color = Color.White, shadowElevation = 4.dp) {
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("획득한 뱃지", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                badges.forEach { (text, color) -> BadgeChip(text = text, color = color) }
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsContent(
+    onNavigateToProfileEdit: () -> Unit,
+    onNavigateToPracticeSettings: () -> Unit,
+    onNavigateToNotificationSettings: () -> Unit,
+    onNavigateToPrivacySettings: () -> Unit,
+    onNavigateToAppInfo: () -> Unit,
+    onNavigateToWithdrawal: () -> Unit,
+    onSyncClick: () -> Unit,
+    onNavigateToTest: () -> Unit,
+    isSyncing: Boolean
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("설정", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp))
+        Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White, shadowElevation = 4.dp) {
+            Column(modifier = Modifier.padding(vertical = 16.dp)) {
+                SettingsMenuItem("프로필 설정", Icons.Outlined.Person, Color(0xFFEBF0FF), onClick = onNavigateToProfileEdit); SettingsMenuDivider()
+                SettingsMenuItem("연습 화면 설정", Icons.Outlined.Tv, Color(0xFFF0EFFF), onClick = onNavigateToPracticeSettings); SettingsMenuDivider()
+                SettingsMenuItem("알림 설정", Icons.Outlined.Notifications, Color(0xFFFFF9E6), onClick = onNavigateToNotificationSettings); SettingsMenuDivider()
+                SettingsMenuItem("개인정보 보호 및 권한", Icons.Outlined.Shield, Color(0xFFE6F7EB), onClick = onNavigateToPrivacySettings); SettingsMenuDivider()
+                SettingsMenuItem("앱 정보", Icons.Outlined.Info, Color(0xFFF3F4F6), onClick = onNavigateToAppInfo); SettingsMenuDivider()
+
+                SettingsMenuItem(
+                    text = if (isSyncing) "데이터 받아오는 중..." else "최신 데이터 동기화",
+                    icon = if (isSyncing) Icons.Default.HourglassEmpty else Icons.Default.Sync,
+                    iconBgColor = Color(0xFFE3F2FD),
+                    textColor = if (isSyncing) Color.Gray else Color.Black,
+                    onClick = onSyncClick
+                ); SettingsMenuDivider()
+                SettingsMenuItem(
+                    text = "시스템 기능 테스트",
+                    icon = Icons.Default.Build,
+                    iconBgColor = Color(0xFFEEEEEE),
+                    onClick = onNavigateToTest
+                ); SettingsMenuDivider()
+                SettingsMenuItem("회원 탈퇴", Icons.Outlined.ExitToApp, Color(0xFFFFF0F0), textColor = Color.Red, onClick = onNavigateToWithdrawal)
+            }
+        }
+    }
+}
+
+@Composable
+fun SettingsMenuItem(text: String, icon: ImageVector, iconBgColor: Color, textColor: Color = Color.Unspecified, onClick: () -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 20.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Box(modifier = Modifier.size(40.dp).clip(CircleShape).background(iconBgColor), contentAlignment = Alignment.Center) { Icon(icon, text, modifier = Modifier.size(24.dp), tint = Color.Black.copy(alpha = 0.8f)) }
+        Text(text, style = MaterialTheme.typography.bodyLarge, color = textColor, modifier = Modifier.weight(1f))
+        Icon(Icons.Default.ChevronRight, null, tint = Color.Gray.copy(alpha = 0.7f))
+    }
+}
+
+@Composable
+fun SettingsMenuDivider() { HorizontalDivider(color = Color.Gray.copy(alpha = 0.15f), thickness = 1.dp, modifier = Modifier.padding(start = 76.dp, end = 20.dp)) }
+
+@Composable
+fun AchievementCard(title: String, description: String, progress: Float, progressText: String) {
+    Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp), color = Color.White, border = BorderStroke(1.dp, Color(0xFFDAE0FF))) {
+        Column(modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Text("진행률", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, color = Color.Black)
+                Text(progressText, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+            }
+            LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)), trackColor = Color(0x33030213), color = Color(0xff030213))
+        }
+    }
+}
+
+// BadgeChip 컴포넌트가 누락되어 있어 추가
+@Composable
+fun BadgeChip(text: String, color: Color) {
+    Surface(
+        color = color,
+        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.padding(2.dp)
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            color = Color.Black
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun ProfileScreenPreview() {
+    KpopDancePracticeAITheme { ProfileScreen(PaddingValues(), {}, {}, {}, {}, {}, {}, {}, onNavigateToTest = {}) }
 }

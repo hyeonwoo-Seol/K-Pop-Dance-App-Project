@@ -4,13 +4,15 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-//뱃지 테이블
-
+/**
+ * 배지 (Notion Section 4 - MD 파일 반영)
+ * 테이블명: badges
+ */
 @Entity(tableName = "badges")
 data class Badge(
     @PrimaryKey
     @ColumnInfo(name = "id")
-    val id: String, // 예: badge_ive_master
+    val id: String,
 
     @ColumnInfo(name = "name")
     val name: String,
@@ -18,15 +20,15 @@ data class Badge(
     @ColumnInfo(name = "description")
     val description: String,
 
-    @ColumnInfo(name = "icon_res_name")
+    @ColumnInfo(name = "iconResName")
     val iconResName: String,
 
     @ColumnInfo(name = "category")
     val category: String,
 
-    @ColumnInfo(name = "is_unlocked")
+    @ColumnInfo(name = "isUnlocked")
     val isUnlocked: Boolean = false,
 
-    @ColumnInfo(name = "obtained_at")
+    @ColumnInfo(name = "obtainedAt")
     val obtainedAt: Long? = null
 )

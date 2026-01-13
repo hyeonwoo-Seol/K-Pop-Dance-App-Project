@@ -4,58 +4,58 @@ import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
 
-@Entity(tableName = "practice_history")
+
+@Entity(tableName = "PracticeResults")
 data class PracticeHistory(
     @PrimaryKey(autoGenerate = true)
-    @ColumnInfo(name = "history_id")
-    val historyId: Long = 0, // 기본값 0 지정으로 생성 시 생략 가능
+    @ColumnInfo(name = "result_id")
+    val resultId: Long = 0,
 
     @ColumnInfo(name = "user_uuid")
-    val userId: String,
+    val userUuid: String,
 
     @ColumnInfo(name = "song_id")
     val songId: Long,
 
-    @ColumnInfo(name = "part_id")
-    val partId: Long,
+    @ColumnInfo(name = "part_number")
+    val partNumber: Int,
 
-    @ColumnInfo(name = "score")
-    val score: Int,
+    @ColumnInfo(name = "artist_name")
+    val artistName: String,
 
-    @ColumnInfo(name = "date")
-    val date: Long,
+    @ColumnInfo(name = "total_score")
+    val totalScore: Int,
 
-    @ColumnInfo(name = "video_path")
-    val videoPath: String,
+    @ColumnInfo(name = "grade")
+    val grade: String,
 
-    // --- 추가 필드 (오류 해결을 위해 기본값 지정) ---
-    @ColumnInfo(name = "is_synced")
-    val isSynced: Boolean = false,
+    @ColumnInfo(name = "part_accuracies")
+    val partAccuracies: Map<String, Int>?,
 
-    @ColumnInfo(name = "analysis_result_json")
-    val analysisResultJson: String? = null,
-
-    @ColumnInfo(name = "server_result_id")
-    val serverResultId: String? = null,
-
-    @ColumnInfo(name = "uploaded_url")
-    val uploadedUrl: String? = null,
-
-    @ColumnInfo(name = "analysis_status")
-    val analysisStatus: String = "PENDING",
+    @ColumnInfo(name = "worst_points")
+    val worstPoints: List<String>?,
 
     @ColumnInfo(name = "duration_sec")
-    val durationSec: Double = 0.0,
+    val durationSec: Double,
 
     @ColumnInfo(name = "fps")
-    val fps: Double = 0.0,
+    val fps: Double,
+
+    @ColumnInfo(name = "created_at")
+    val createdAt: String, // Date format String
+
+    @ColumnInfo(name = "full_json_path")
+    val fullJsonPath: String,
+
+    @ColumnInfo(name = "user_video_path")
+    val userVideoPath: String,
 
     @ColumnInfo(name = "video_width")
-    val videoWidth: Int = 0,
+    val videoWidth: Int,
 
     @ColumnInfo(name = "video_height")
-    val videoHeight: Int = 0,
+    val videoHeight: Int,
 
     @ColumnInfo(name = "total_frames")
-    val totalFrames: Int = 0
+    val totalFrames: Int
 )

@@ -1,6 +1,7 @@
 package com.example.kpopdancepracticeai.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.entity.Song
@@ -11,6 +12,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
@@ -30,12 +34,15 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userStats = MutableStateFlow<UserStats?>(null)
     val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
 
+    // [추가] ProfileScreen 호환을 위한 더미 데이터 (추후 실제 엔티티로 교체 필요)
+    private val _achievements = MutableStateFlow<List<Any>>(emptyList())
+    val achievements: StateFlow<List<Any>> = _achievements.asStateFlow()
+
     // 앱 시작 시 또는 로그인 후 호출
     fun loadInitialData(userId: String) {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                // Repository에 해당 함수들이 존재하는지 확인해주세요 (AppRepository.kt 업데이트 필요)
                 repository.fetchInitialData(userId)
 
                 launch {
@@ -60,6 +67,16 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
+    // [추가] 데이터 새로고침 (ProfileScreen에서 사용)
+    fun refreshData() {
+        val userId = _userStats.value?.userUuid
+        if (userId != null) {
+            loadInitialData(userId)
+        } else {
+            _syncMessage.value = "로그인 정보가 없습니다."
+        }
+    }
+
     // 노래 선택 시 파트 정보 로드
     fun selectSong(songId: Long) {
         viewModelScope.launch {
@@ -73,22 +90,22 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun savePracticeResult(userId: String, songId: Long, partId: Long, score: Int, videoPath: String) {
         viewModelScope.launch {
             val history = PracticeHistory(
-                // historyId는 기본값이 0이므로 생략 가능 (DB 저장 시 자동 증가)
-                userId = userId,
+                userUuid = userId,
                 songId = songId,
-                partId = partId,
-                score = score,
-                date = System.currentTimeMillis(),
-                videoPath = videoPath,
-
-                // 나머지 필드는 기본값 또는 초기값 설정
-                isSynced = false,
-                analysisStatus = "PENDING",
+                partNumber = partId.toInt(),
+                artistName = "Unknown",
+                totalScore = score,
+                grade = "PENDING",
+                partAccuracies = emptyMap(),
+                worstPoints = emptyList(),
                 durationSec = 0.0,
                 fps = 0.0,
                 videoWidth = 0,
                 videoHeight = 0,
-                totalFrames = 0
+                totalFrames = 0,
+                createdAt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
+                fullJsonPath = "",
+                userVideoPath = videoPath
             )
             repository.savePracticeResult(history)
         }
@@ -96,5 +113,18 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun clearSyncMessage() {
         _syncMessage.value = null
+    }
+
+    // ViewModel Factory 정의
+    companion object {
+        fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
+                    return MainViewModel(repository) as T
+                }
+                throw IllegalArgumentException("Unknown ViewModel class")
+            }
+        }
     }
 }
