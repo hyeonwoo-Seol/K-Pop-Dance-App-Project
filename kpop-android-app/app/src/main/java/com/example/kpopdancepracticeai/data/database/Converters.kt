@@ -3,37 +3,37 @@ package com.example.kpopdancepracticeai.data.database
 import androidx.room.TypeConverter
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import java.util.Date
 
 /**
- * Room Type Converters
- * 역할: Room이 이해할 수 없는 타입(List, Date 등)을 저장 가능한 타입(String, Long)으로 변환
+ * Room Database용 Type Converter
+ * 복잡한 데이터(List, Map)를 DB에 저장하기 위해 JSON String으로 변환합니다.
  */
 class Converters {
     private val gson = Gson()
 
-    // --- 날짜(Date) <-> 타임스탬프(Long) 변환 ---
+    // --- 1. Map<String, Int> 변환기 (예: 부위별 정확도 {"LeftArm": 80, "Leg": 90}) ---
     @TypeConverter
-    fun fromTimestamp(value: Long?): Date? {
-        return value?.let { Date(it) }
+    fun fromStringMap(value: String?): Map<String, Int>? {
+        if (value == null) return null
+        val type = object : TypeToken<Map<String, Int>>() {}.type
+        return gson.fromJson(value, type)
     }
 
     @TypeConverter
-    fun dateToTimestamp(date: Date?): Long? {
-        return date?.time
+    fun fromMap(map: Map<String, Int>?): String? {
+        return map?.let { gson.toJson(it) }
     }
 
-    // --- 리스트(List<String>) <-> JSON 문자열(String) 변환 ---
-    // 예: ["badge1", "badge2"] <-> "[\"badge1\", \"badge2\"]"
+    // --- 2. List<String> 변환기 (예: 많이 틀린 부위 ["Knee", "Elbow"]) ---
     @TypeConverter
-    fun fromStringList(value: List<String>?): String {
-        return gson.toJson(value)
+    fun fromStringList(value: String?): List<String>? {
+        if (value == null) return null
+        val type = object : TypeToken<List<String>>() {}.type
+        return gson.fromJson(value, type)
     }
 
     @TypeConverter
-    fun toStringList(value: String?): List<String> {
-        if (value == null) return emptyList()
-        val listType = object : TypeToken<List<String>>() {}.type
-        return gson.fromJson(value, listType)
+    fun fromList(list: List<String>?): String? {
+        return list?.let { gson.toJson(it) }
     }
 }

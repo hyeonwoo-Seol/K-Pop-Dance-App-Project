@@ -23,10 +23,10 @@ interface AchievementDao {
     suspend fun insertAchievements(achievements: List<Achievement>)
 
     // 특정 업적의 진행도 업데이트
-    @Query("UPDATE achievements SET currentProgress = :progress, isCompleted = :isCompleted WHERE achievementId = :id")
+    @Query("UPDATE achievements SET current_count = :progress, is_completed = :isCompleted WHERE achievement_id = :id")
     suspend fun updateProgress(id: String, progress: Int, isCompleted: Boolean)
 
     // 특정 업적 조회
-    @Query("SELECT * FROM achievements WHERE achievementId = :id")
+    @Query("SELECT * FROM achievements WHERE achievement_id = :id")
     suspend fun getAchievement(id: String): Achievement?
 }
