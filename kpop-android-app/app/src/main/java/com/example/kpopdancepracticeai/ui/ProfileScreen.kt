@@ -53,7 +53,7 @@ fun ProfileScreen(
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
     onNavigateToTest: () -> Unit,
-    viewModel: MainViewModel = viewModel()
+    viewModel: MainViewModel
 ) {
     // ViewModel 상태 구독
     val userStats by viewModel.userStats.collectAsState()
@@ -144,21 +144,26 @@ fun ProfileHeaderCard(
                 // [수정] 변경된 UserStats 필드명 반영
                 val currentExp = userStats?.currentExp ?: 0L
                 val appLevel = userStats?.appLevel ?: 1
-                val avgAccuracy = userStats?.avgAccuracy?.toFloat() ?: 0f // Double -> Float 변환
+                val avgAccuracy = userStats?.avgAccuracy?.toFloat() ?: 0f
+                // 경험치 최대치 (임시: 레벨 * 1000)
+                val maxExp = (appLevel * 1000).toLong()
 
+                // [수정] 상단 통계: 평균 정확도 & 레벨
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    StatColumn("경험치", "$currentExp XP")
+                    StatColumn("평균 정확도", "${avgAccuracy.toInt()}%") // 기존 경험치 자리 -> 평균 정확도
                     StatColumn("Level", "Lv. $appLevel")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
+
+                // [수정] 하단 진행 바: 경험치
                 Column {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("평균 정확도", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
-                        Text("${avgAccuracy.toInt()}/100", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
+                        Text("경험치", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium) // 기존 평균 정확도 -> 경험치
+                        Text("$currentExp / $maxExp XP", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
                     LinearProgressIndicator(
-                        progress = { avgAccuracy / 100f },
+                        progress = { if (maxExp > 0) (currentExp.toFloat() / maxExp).coerceIn(0f, 1f) else 0f },
                         modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp))
                     )
                 }
@@ -341,5 +346,6 @@ fun BadgeChip(text: String, color: Color) {
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    KpopDancePracticeAITheme { ProfileScreen(PaddingValues(), {}, {}, {}, {}, {}, {}, {}, onNavigateToTest = {}) }
+    // Preview를 위한 가짜 ViewModel은 제공하기 어려우므로, MainViewModel 파라미터가 있는 Composable Preview는 제한적일 수 있습니다.
+    // KpopDancePracticeAITheme { ProfileScreen(PaddingValues(), {}, {}, {}, {}, {}, {}, {}, onNavigateToTest = {}, viewModel = ...) }
 }
