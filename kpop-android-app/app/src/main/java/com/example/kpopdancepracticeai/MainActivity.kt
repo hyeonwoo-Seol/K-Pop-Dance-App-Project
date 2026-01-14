@@ -22,9 +22,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
-// [중요] KpopDancePracticeApp은 같은 패키지 또는 ui 패키지에 있어야 합니다.
 import com.example.kpopdancepracticeai.ui.KpopDancePracticeApp
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -35,6 +36,15 @@ class MainActivity : ComponentActivity() {
                 val context = LocalContext.current
                 var permissionsGranted by remember { mutableStateOf(false) }
                 var showPermissionDeniedDialog by remember { mutableStateOf(false) }
+
+                // [수정] Application에서 Repository 가져오기
+                val application = application as KpopApplication
+                val repository = application.repository
+
+                // [수정] Factory를 사용하여 MainViewModel 생성
+                val mainViewModel: MainViewModel = viewModel(
+                    factory = MainViewModel.provideFactory(repository)
+                )
 
                 val permissionsToRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                     arrayOf(
@@ -81,8 +91,8 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     if (permissionsGranted) {
-                        // [수정] 이제 KpopDancePracticeApp이 정의되어 있으므로 호출 가능합니다.
-                        KpopDancePracticeApp()
+                        // [수정] 생성된 ViewModel을 전달
+                        KpopDancePracticeApp(viewModel = mainViewModel)
                     }
 
                     if (showPermissionDeniedDialog) {

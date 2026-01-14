@@ -55,7 +55,7 @@ val bodyConnections = listOf(
     BodyPart.RIGHT_HIP to BodyPart.RIGHT_KNEE,
     BodyPart.RIGHT_KNEE to BodyPart.RIGHT_ANKLE,
 
-    // [선택 사항] Neck 연결 (필요 시 주석 해제하여 사용)
+    // Neck 연결 (필요 시 주석 해제하여 사용)
     // BodyPart.NOSE to BodyPart.NECK,
     // BodyPart.NECK to BodyPart.LEFT_SHOULDER,
     // BodyPart.NECK to BodyPart.RIGHT_SHOULDER

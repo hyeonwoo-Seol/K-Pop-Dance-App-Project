@@ -6,7 +6,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
@@ -37,7 +36,7 @@ object Routes {
 fun AppNavigation(
     modifier: Modifier = Modifier,
     navController: NavHostController = rememberNavController(),
-    viewModel: MainViewModel = viewModel()
+    viewModel: MainViewModel // [수정] 기본값(= viewModel()) 제거하여 외부 주입 강제
 ) {
     NavHost(
         navController = navController,

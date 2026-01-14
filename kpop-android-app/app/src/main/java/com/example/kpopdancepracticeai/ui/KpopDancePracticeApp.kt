@@ -7,9 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 
 @Composable
-fun KpopDancePracticeApp() {
+fun KpopDancePracticeApp(
+    viewModel: MainViewModel // [수정] ViewModel을 매개변수로 받음
+) {
     KpopDancePracticeAITheme {
         Surface(
             modifier = Modifier.fillMaxSize(),
@@ -17,7 +20,8 @@ fun KpopDancePracticeApp() {
         ) {
             val navController = rememberNavController()
             AppNavigation(
-                navController = navController
+                navController = navController,
+                viewModel = viewModel // [수정] 전달받은 ViewModel을 넘겨줌
             )
         }
     }
