@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
-// [중요] KpopDancePracticeApp은 같은 패키지 또는 ui 패키지에 있어야 합니다.
 import com.example.kpopdancepracticeai.ui.KpopDancePracticeApp
 
 class MainActivity : ComponentActivity() {
@@ -81,7 +80,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     if (permissionsGranted) {
-                        // [수정] 이제 KpopDancePracticeApp이 정의되어 있으므로 호출 가능합니다.
+                        // [수정] 인자 없이 호출합니다.
                         KpopDancePracticeApp()
                     }
 

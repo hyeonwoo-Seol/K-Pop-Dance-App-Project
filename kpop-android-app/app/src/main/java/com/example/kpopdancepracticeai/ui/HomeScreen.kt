@@ -7,67 +7,124 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
+import com.example.kpopdancepracticeai.data.entity.Song
+import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    viewModel: MainViewModel = viewModel(),
+    viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
     onSongClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier // AppNavigation에서 전달하는 패딩을 받기 위해 modifier 사용
 ) {
+    // DB에서 불러온 노래 목록을 상태로 관리
     val dbSongs by viewModel.songs.collectAsState()
     var searchText by remember { mutableStateOf("") }
 
-    Scaffold(
-        topBar = {
-            CenterAlignedTopAppBar(
-                title = { Text("K-Pop Dance AI", fontWeight = FontWeight.Bold, fontSize = 20.sp) }
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = modifier.padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp)
-        ) {
-            item {
-                SearchBarSection(searchText, { searchText = it }, { onSearch(searchText) })
+    // 화면 진입 시 최신 데이터 로드 (필요한 경우)
+    LaunchedEffect(Unit) {
+        viewModel.refreshData()
+    }
+
+    LazyColumn(
+        modifier = modifier.fillMaxSize(),
+        contentPadding = PaddingValues(bottom = 24.dp), // 하단 여백 추가
+        verticalArrangement = Arrangement.spacedBy(24.dp)
+    ) {
+        // 1. 타이틀 및 검색창 섹션
+        item {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp)
+            ) {
+                Text(
+                    text = "KPOP 댄스 연습 AI",
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onBackground,
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+
+                OutlinedTextField(
+                    value = searchText,
+                    onValueChange = { searchText = it },
+                    placeholder = { Text("연습할 곡을 검색하세요") }, // label 대신 placeholder 사용
+                    leadingIcon = { Icon(Icons.Default.Search, contentDescription = "검색") },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp), // 둥근 모서리
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedContainerColor = MaterialTheme.colorScheme.surface,
+                        unfocusedContainerColor = MaterialTheme.colorScheme.surface,
+                        disabledContainerColor = MaterialTheme.colorScheme.surface,
+                    ),
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(
+                        onSearch = { onSearch(searchText) }
+                    )
+                )
             }
+        }
 
-            item {
-                Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                    Text("등록된 안무 목록", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
+        // 2. 등록된 안무 목록 (DB 연동)
+        item {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SectionTitle(
+                    title = "등록된 안무 목록",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
 
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    if (dbSongs.isEmpty()) {
-                        item { Text("등록된 곡이 없습니다.", modifier = Modifier.padding(10.dp)) }
-                    } else {
+                if (dbSongs.isEmpty()) {
+                    // 데이터가 없을 때 표시할 UI
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(150.dp)
+                            .padding(horizontal = 16.dp)
+                            .background(Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "등록된 곡이 없습니다.\n데이터를 동기화해주세요.",
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                    }
+                } else {
+                    // 데이터가 있을 때 가로 스크롤 리스트 표시
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
                         items(dbSongs) { song ->
-                            // [오류 해결] Song 엔티티 필드명 수정 (title -> titleKr, artistName -> artistKr 등)
                             SongCard(
-                                title = song.titleKr,
-                                artist = song.artistKr,
-                                views = "난이도 ${song.difficulty}",
+                                artist = song.artistKr ?: "Unknown Artist",
+                                title = song.titleKr ?: "Unknown Title",
+                                views = "난이도 ${song.difficulty}", // 조회수 대신 난이도 표시 (DB 필드 활용)
                                 imageUrl = song.coverUrl,
                                 onClick = { onSongClick(song.songId.toString()) }
                             )
@@ -76,34 +133,129 @@ fun HomeScreen(
                 }
             }
         }
+
+        // 3. 인기 급상승 챌린지 (현재는 DB 데이터 재사용 또는 더미)
+        item {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SectionTitle(
+                    title = "인기 급상승 챌린지",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+
+                // 임시로 DB 데이터를 역순으로 보여줌 (실제 로직 구현 시 변경)
+                if (dbSongs.isNotEmpty()) {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(dbSongs.reversed()) { song ->
+                            SongCard(
+                                artist = song.artistKr ?: "",
+                                title = song.titleKr ?: "",
+                                views = "인기",
+                                imageUrl = song.coverUrl,
+                                onClick = { onSongClick(song.songId.toString()) }
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = "챌린지 목록을 불러올 수 없습니다.",
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
     }
 }
 
+// 섹션 제목 컴포넌트
 @Composable
-fun SearchBarSection(text: String, onValueChange: (String) -> Unit, onSearch: () -> Unit) {
-    OutlinedTextField(
-        value = text,
-        onValueChange = onValueChange,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-        placeholder = { Text("검색") },
-        leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) }
+fun SectionTitle(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        fontSize = 18.sp,
+        modifier = modifier
     )
 }
 
+// 곡 정보 카드 컴포넌트
 @Composable
-fun SongCard(title: String, artist: String, views: String, imageUrl: String?, onClick: () -> Unit) {
+fun SongCard(
+    artist: String,
+    title: String,
+    views: String,
+    imageUrl: String?,
+    onClick: () -> Unit
+) {
     Column(
-        modifier = Modifier.width(140.dp).clickable(onClick = onClick)
+        modifier = Modifier
+            .width(140.dp) // 카드 너비 조정
+            .clickable(onClick = onClick)
     ) {
-        AsyncImage(
-            model = imageUrl,
-            contentDescription = null,
-            modifier = Modifier.size(140.dp).clip(RoundedCornerShape(12.dp)).background(MaterialTheme.colorScheme.surfaceVariant),
-            contentScale = ContentScale.Crop
-        )
+        // 앨범 커버 이미지
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceVariant), // 로딩 중 배경색
+            contentAlignment = Alignment.Center
+        ) {
+            if (!imageUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = imageUrl,
+                    contentDescription = "$title cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                // 이미지가 없을 때 아이콘 표시
+                Icon(
+                    imageVector = Icons.Default.MusicNote,
+                    contentDescription = null,
+                    tint = Color.Gray,
+                    modifier = Modifier.size(48.dp)
+                )
+            }
+        }
+
         Spacer(modifier = Modifier.height(8.dp))
-        Text(title, fontWeight = FontWeight.Bold, maxLines = 1)
-        Text(artist, style = MaterialTheme.typography.bodySmall, maxLines = 1)
-        Text(views, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+
+        // 곡 제목
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        // 아티스트
+        Text(
+            text = artist,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        // 부가 정보 (조회수/난이도)
+        Text(
+            text = views,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun HomeScreenPreview() {
+    KpopDancePracticeAITheme {
+        // Preview를 위한 더미 데이터 구성은 실제 런타임에는 영향을 주지 않습니다.
+        HomeScreen(onSearch = {}, onSongClick = {}, modifier = Modifier)
     }
 }
