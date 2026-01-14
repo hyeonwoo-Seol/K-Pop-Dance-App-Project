@@ -59,5 +59,7 @@ data class SongPart(
 
     @ColumnInfo(name = "skeleton_url") val skeletonUrl: String?,
 
+    @ColumnInfo(name = "start_time_ms") val startTimeMs: Long,
 
+    @ColumnInfo(name = "end_time_ms") val endTimeMs: Long
 )
