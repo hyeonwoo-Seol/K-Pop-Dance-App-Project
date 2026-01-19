@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.data.entity.SongPart
+import com.example.kpopdancepracticeai.data.entity.User // [추가]
 import com.example.kpopdancepracticeai.data.entity.UserStats
 import com.example.kpopdancepracticeai.data.repository.AppRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -15,6 +16,15 @@ import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+// [추가] 로그인 상태 정의
+sealed interface LoginState {
+    object Idle : LoginState
+    object Loading : LoginState
+    object Success : LoginState // 기존 유저 -> 메인 화면 이동
+    object NeedProfile : LoginState // 신규 유저 -> 프로필 입력 화면 이동
+    data class Error(val message: String) : LoginState
+}
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
@@ -37,6 +47,58 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     // [추가] ProfileScreen 호환을 위한 더미 데이터
     private val _achievements = MutableStateFlow<List<Any>>(emptyList())
     val achievements: StateFlow<List<Any>> = _achievements.asStateFlow()
+
+    // [추가] 로그인 상태 관리
+    private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
+    val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
+
+    // ----------------------------------------------------------------
+    // [추가] 로그인 및 회원가입 관련 로직
+    // ----------------------------------------------------------------
+
+    // 1. 로그인 시도 (Firebase UID로 DB 조회)
+    fun checkUserExists(uid: String) {
+        viewModelScope.launch {
+            _loginState.value = LoginState.Loading
+            try {
+                val user = repository.getUserByUuid(uid)
+                if (user != null) {
+                    // 유저 정보가 있음 -> 로그인 성공 및 초기 데이터 로드
+                    loadInitialData(uid)
+                    _loginState.value = LoginState.Success
+                } else {
+                    // 유저 정보가 없음 -> 프로필 입력 필요
+                    _loginState.value = LoginState.NeedProfile
+                }
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error("로그인 확인 중 오류: ${e.message}")
+            }
+        }
+    }
+
+    // 2. 회원가입 완료 (유저 정보 저장)
+    fun registerUser(user: User) {
+        viewModelScope.launch {
+            _loginState.value = LoginState.Loading
+            try {
+                repository.saveUser(user)
+                // 저장 후 초기 데이터(통계 등) 세팅
+                loadInitialData(user.userUuid)
+                _loginState.value = LoginState.Success
+            } catch (e: Exception) {
+                _loginState.value = LoginState.Error("회원가입 저장 실패: ${e.message}")
+            }
+        }
+    }
+
+    // 로그인 상태 초기화 (화면 이동 후 호출)
+    fun resetLoginState() {
+        _loginState.value = LoginState.Idle
+    }
+
+    // ----------------------------------------------------------------
+    // 기존 기능 유지
+    // ----------------------------------------------------------------
 
     // 앱 시작 시 또는 로그인 후 호출
     fun loadInitialData(userId: String) {
