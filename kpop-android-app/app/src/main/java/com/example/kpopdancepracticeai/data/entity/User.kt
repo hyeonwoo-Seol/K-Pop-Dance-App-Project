@@ -37,5 +37,17 @@ data class User(
     val gender: String,
 
     @ColumnInfo(name = "created_at")
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+
+    @ColumnInfo(name = "dance_skill")
+    val danceSkill: String = "BEGINNER", // 댄스 실력 (BEGINNER, INTERMEDIATE, ADVANCED)
+
+    @ColumnInfo(name = "favorite_genres")
+    val favoriteGenres: String = "[]", // 관심 장르 목록
+
+    @ColumnInfo(name = "bio")
+    val bio: String? = null, // 자기소개
+
+    @ColumnInfo(name = "join_date")
+    val joinDate: String // 회원가입 일시 (YYYY-MM-DD HH:mm:ss)
 )
