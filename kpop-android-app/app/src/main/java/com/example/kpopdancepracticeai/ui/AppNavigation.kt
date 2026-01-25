@@ -344,6 +344,7 @@ fun AppNavHost(
         // 로그인 화면 (패딩 적용 X)
         composable(Screen.Login.route) {
             LoginScreen(
+                viewModel = viewModel, // [추가] ViewModel 전달
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) {
@@ -389,6 +390,7 @@ fun AppNavHost(
                 backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
 
             SignUpSecondScreen(
+                viewModel = viewModel, // [추가] ViewModel 전달
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->

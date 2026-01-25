@@ -25,6 +25,24 @@ class AppRepository(
         return sdf.format(Date())
     }
 
+    // ----------------------------------------------------------------
+    // [추가] User 정보 관리 (로그인/회원가입 연동)
+    // ----------------------------------------------------------------
+
+    // 로그인 시 DB에 유저 정보가 있는지 확인
+    suspend fun getUserByUuid(userUuid: String): User? {
+        return userDao.getUser(userUuid)
+    }
+
+    // 회원가입 완료 또는 프로필 수정 시 유저 정보 저장
+    suspend fun saveUser(user: User) {
+        userDao.insertUser(user)
+    }
+
+    // ----------------------------------------------------------------
+    // 기존 기능 유지
+    // ----------------------------------------------------------------
+
     // --- User Statistics ---
     fun getUserStats(userId: String): Flow<UserStats?> = userDao.getUserStats(userId)
 

@@ -5,7 +5,6 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-
 @Entity(
     tableName = "users",
     indices = [
@@ -14,6 +13,7 @@ import androidx.room.PrimaryKey
     ]
 )
 data class User(
+    // Firebase UID를 저장할 Primary Key
     @PrimaryKey
     @ColumnInfo(name = "user_uuid")
     val userUuid: String,
@@ -24,8 +24,9 @@ data class User(
     @ColumnInfo(name = "email")
     val email: String,
 
+    // [수정] 구글 로그인 등 소셜 로그인의 경우 비밀번호가 없으므로 Nullable로 변경
     @ColumnInfo(name = "password_hash")
-    val passwordHash: String,
+    val passwordHash: String? = null,
 
     @ColumnInfo(name = "name")
     val name: String,
