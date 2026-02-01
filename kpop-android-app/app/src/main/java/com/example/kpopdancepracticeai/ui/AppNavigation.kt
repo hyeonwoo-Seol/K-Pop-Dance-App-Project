@@ -65,7 +65,6 @@ import com.example.kpopdancepracticeai.KpopApplication
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.test.IntegrationTestScreen
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
-// import com.example.kpopdancepracticeai.viewmodel.MainViewModelFactory // [삭제] MainViewModel 내부 Factory 사용
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -73,7 +72,6 @@ import java.nio.charset.StandardCharsets
 // --- 1. 내비게이션 경로(Route) 정의 ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Login : Screen("login", "로그인", Icons.Default.Home)
-    // [추가] 회원가입 관련 화면 경로 정의
     object SignUp : Screen("signUp", "회원가입", Icons.Default.Person)
     object SignUpSecond : Screen("signUpSecond", "회원가입2", Icons.Default.Person)
 
@@ -88,29 +86,29 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object AppInfo : Screen("appInfo", "앱 정보", Icons.Outlined.Info)
     object Withdrawal : Screen("withdrawal", "회원 탈퇴", Icons.Outlined.ExitToApp)
 
-    // 검색 시스템을 위한 경로
     object SearchResults : Screen("searchResults/{query}", "검색 결과", Icons.Default.Search)
     object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
 
     object Test : Screen("test", "시스템 테스트", Icons.Default.Build)
-    // 곡 파트 선택 화면 경로
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
 
-    // 댄스 연습 화면 경로
     object DancePractice : Screen(
         "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}",
         "댄스 연습",
         Icons.Default.MusicNote
     )
-    //  [추가] 녹화 화면 경로 정의 (인자 전달 포함)
     object Record : Screen(
         "record/{songTitle}/{artistPart}/{difficulty}",
         "녹화",
         Icons.Default.CameraAlt
     )
 
-    // 연습 결과 화면 경로
-    object PracticeResult : Screen("practiceResult", "연습 결과", Icons.Default.Analytics)
+    // [수정] 연습 결과 화면 경로: JSON 파일명과 비디오 경로를 인자로 받음
+    object PracticeResult : Screen(
+        "practiceResult/{jsonFileName}/{videoPath}",
+        "연습 결과",
+        Icons.Default.Analytics
+    )
 
     object AnalysisLoading : Screen("analysisLoading", "분석 중", Icons.Default.Analytics)
     companion object {
@@ -123,7 +121,6 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     }
 }
 
-// 탭 목록
 val bottomNavItems = listOf(
     Screen.Home,
     Screen.Search,
@@ -140,19 +137,13 @@ fun AppNavigation(
     val currentRoute = navBackStackEntry?.destination?.route
 
     val context = LocalContext.current
-    // [추가] ViewModel 생성 로직 복원 (Factory 사용)
     val app = context.applicationContext as KpopApplication
     val repository = app.repository
-
-    // 앱 전체에서 공유할 뷰모델 인스턴스 생성
     val viewModel: MainViewModel = viewModel(
         factory = MainViewModel.provideFactory(repository)
     )
-
-    // [수정] 앱 시작 시 로그인 상태 확인 로직 추가
     val authRepository = remember { AuthRepository(context) }
 
-    // [중요 수정] remember를 사용하여 초기 계산된 startDestination 값을 유지하도록 변경
     val startDestination = remember {
         if (authRepository.getCurrentUser() != null) {
             Screen.Home.route
@@ -175,43 +166,41 @@ fun AppNavigation(
         Screen.SongDetail.route,
         Screen.SongPartSelect.route,
         Screen.DancePractice.route,
-        Screen.PracticeResult.route,
-        Screen.AnalysisLoading.route, // 로딩 화면에서도 바 숨김
-        Screen.Record.route, // RecordScreenMobile 화면에서 상단 제목과 하단 툴바 숨김
-        Screen.Analysis.route, // [수정됨] 분석 화면에서도 상단 바 숨김
+        // PracticeResult는 인자가 포함된 경로이므로 아래 showMainBars 로직에서 처리됨
+        Screen.AnalysisLoading.route,
+        Screen.Record.route,
+        Screen.Analysis.route,
         Screen.Test.route
     )
 
-    // 동적 경로(인자가 있는 경로)에 대한 바 숨김 처리 보완
     val showMainBars = if (currentRoute != null) {
-        screensToHideBars.none { route ->
-            // 단순 일치 또는 인자가 붙는 경로(/) 앞부분 일치 확인
+        // PracticeResult 경로의 경우 인자 때문에 startsWith로 체크해야 함
+        val isResultScreen = currentRoute.startsWith("practiceResult/")
+        if (isResultScreen) false
+        else screensToHideBars.none { route ->
             currentRoute == route || currentRoute.startsWith("$route/")
         }
     } else {
         false
     }
 
-    // 피그마 디자인의 그라데이션 배경
     val appGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFDDE3FF), // 상단 연한 파랑
-            Color(0xFFF0E8FF)  // 하단 연한 보라
+            Color(0xFFDDE3FF),
+            Color(0xFFF0E8FF)
         )
     )
 
-    // 그라데이션을 Scaffold 배경으로 적용
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(appGradient)
     ) {
         Scaffold(
-            modifier = Modifier.systemBarsPadding(), // [수정] 시스템 바와 겹치지 않도록 패딩 추가
-            containerColor = Color.Transparent, // Scaffold 배경을 투명하게
+            modifier = Modifier.systemBarsPadding(),
+            containerColor = Color.Transparent,
             topBar = {
                 AnimatedVisibility(
-                    // [수정됨] 홈, 프로필, 검색, 그리고 검색 결과 화면일 때는 상단 바를 숨깁니다
                     visible = showMainBars &&
                             currentRoute != Screen.Home.route &&
                             currentRoute != Screen.Profile.route &&
@@ -233,18 +222,16 @@ fun AppNavigation(
                 }
             }
         ) { innerPadding ->
-            // --- 3. 내비게이션 호스트 ---
             AppNavHost(
                 navController = navController,
                 innerPadding = innerPadding,
-                viewModel = viewModel, // [오류 해결] 생성한 ViewModel을 하위로 전달
+                viewModel = viewModel,
                 startDestination = startDestination
             )
         }
     }
 }
 
-// 상단 앱 바
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppTopBar() {
@@ -258,22 +245,20 @@ fun AppTopBar() {
             )
         },
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = Color.Transparent // 그라데이션 배경이 보이도록 투명화
+            containerColor = Color.Transparent
         )
     )
 }
 
-// --- 4. 하단 네비게이션 바 (완전 커스텀) ---
 @Composable
 fun AppBottomNavigationBar(navController: NavController) {
-    // Surface로 배경을 만들고 Row로 직접 배치합니다.
     Surface(
-        color = Color.White.copy(alpha = 0.8f), // 반투명 흰색
+        color = Color.White.copy(alpha = 0.8f),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp) // 플로팅 여백
-            .height(64.dp) //  [높이 고정] 64dp로 얇게 설정
-            .clip(RoundedCornerShape(50.dp)), // 둥근 모서리
+            .padding(horizontal = 16.dp, vertical = 12.dp)
+            .height(64.dp)
+            .clip(RoundedCornerShape(50.dp)),
         tonalElevation = 4.dp
     ) {
         val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -281,20 +266,19 @@ fun AppBottomNavigationBar(navController: NavController) {
 
         Row(
             modifier = Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceAround, // 아이템 균등 배치
-            verticalAlignment = Alignment.CenterVertically // 세로 중앙 정렬
+            horizontalArrangement = Arrangement.SpaceAround,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             bottomNavItems.forEach { screen ->
                 val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
 
-                // 커스텀 탭 아이템
                 Column(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = null // 클릭 시 물결 효과 제거
+                            indication = null
                         ) {
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
@@ -327,13 +311,12 @@ fun AppBottomNavigationBar(navController: NavController) {
     }
 }
 
-// --- 5. 내비게이션 경로 설정 ---
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     modifier: Modifier = Modifier,
     innerPadding: PaddingValues,
-    viewModel: MainViewModel, // 전달받은 ViewModel
+    viewModel: MainViewModel,
     startDestination: String
 ) {
     NavHost(
@@ -341,14 +324,12 @@ fun AppNavHost(
         startDestination = startDestination,
         modifier = modifier
     ) {
-        // 로그인 화면 (패딩 적용 X)
+        // 로그인 화면
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
                 onNavigateToSignUp = {
@@ -361,12 +342,10 @@ fun AppNavHost(
             )
         }
 
-        // [추가] 회원가입 첫 번째 화면
+        // 회원가입 1단계
         composable(Screen.SignUp.route) {
             SignUpScreen(
-                onNavigateToLogin = {
-                    navController.popBackStack()
-                },
+                onNavigateToLogin = { navController.popBackStack() },
                 onSignUpSubmit = { email, password ->
                     val encodedEmail = Screen.encodeArg(email)
                     val encodedPassword = Screen.encodeArg(password)
@@ -375,7 +354,7 @@ fun AppNavHost(
             )
         }
 
-        // [추가] 회원가입 두 번째 화면 (인자 받도록 수정)
+        // 회원가입 2단계
         composable(
             route = "${Screen.SignUpSecond.route}/{email}/{password}",
             arguments = listOf(
@@ -383,28 +362,23 @@ fun AppNavHost(
                 navArgument("password") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val email =
-                backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
-            val password =
-                backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
+            val email = backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
+            val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
 
             SignUpSecondScreen(
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->
                     navController.navigate(Screen.Home.route) {
-                        popUpTo(Screen.Login.route) {
-                            inclusive = true
-                        }
+                        popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
             )
         }
 
-        // 홈 화면 (Scaffold 패딩 적용)
+        // 홈 화면
         composable(Screen.Home.route) {
             HomeScreen(
-                // [중요 수정] viewModel을 직접 전달하여 기본값 생성자 호출을 방지합니다.
                 viewModel = viewModel,
                 onSearch = { query ->
                     if (query.isNotBlank()) {
@@ -418,7 +392,7 @@ fun AppNavHost(
             )
         }
 
-        // 검색 화면 (Scaffold 패딩 적용)
+        // 검색 화면
         composable(Screen.Search.route) {
             SearchScreen(
                 paddingValues = innerPadding,
@@ -430,101 +404,56 @@ fun AppNavHost(
         composable(Screen.Analysis.route) {
             AnalysisScreen(
                 paddingValues = innerPadding,
-                onBackClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = { navController.popBackStack() }
             )
         }
 
-        // 프로필 화면 (Scaffold 패딩 적용)
+        // 프로필 화면
         composable(Screen.Profile.route) {
             ProfileScreen(
                 paddingValues = innerPadding,
-                onNavigateToProfileEdit = {
-                    navController.navigate(Screen.ProfileEdit.route)
-                },
-                onNavigateToPracticeSettings = {
-                    navController.navigate(Screen.PracticeSettings.route)
-                },
-                onNavigateToNotificationSettings = {
-                    navController.navigate(Screen.NotificationSettings.route)
-                },
-                onNavigateToPrivacySettings = {
-                    navController.navigate(Screen.PrivacySettings.route)
-                },
-                onNavigateToAppInfo = {
-                    navController.navigate(Screen.AppInfo.route)
-                },
-                onNavigateToWithdrawal = {
-                    navController.navigate(Screen.Withdrawal.route)
-                },
-                onNavigateToAnalysis = {
-                    navController.navigate(Screen.Analysis.route)
-                },
+                onNavigateToProfileEdit = { navController.navigate(Screen.ProfileEdit.route) },
+                onNavigateToPracticeSettings = { navController.navigate(Screen.PracticeSettings.route) },
+                onNavigateToNotificationSettings = { navController.navigate(Screen.NotificationSettings.route) },
+                onNavigateToPrivacySettings = { navController.navigate(Screen.PrivacySettings.route) },
+                onNavigateToAppInfo = { navController.navigate(Screen.AppInfo.route) },
+                onNavigateToWithdrawal = { navController.navigate(Screen.Withdrawal.route) },
+                onNavigateToAnalysis = { navController.navigate(Screen.Analysis.route) },
                 onNavigateToTest = { navController.navigate(Screen.Test.route) },
-                // [오류 해결] 전달받은 viewModel을 사용
                 viewModel = viewModel
             )
         }
+
         composable(Screen.Test.route) {
-            IntegrationTestScreen()
+            IntegrationTestScreen(navController)
         }
-        // 프로필 설정 화면
+
         composable(Screen.ProfileEdit.route) {
-            ProfileEditScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            ProfileEditScreen(onBackClick = { navController.popBackStack() })
         }
 
-        // 연습 화면 설정
         composable(Screen.PracticeSettings.route) {
-            PracticeSettingsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            PracticeSettingsScreen(onBackClick = { navController.popBackStack() })
         }
 
-        // 알림 설정 화면
         composable(Screen.NotificationSettings.route) {
-            NotificationSettingsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            NotificationSettingsScreen(onBackClick = { navController.popBackStack() })
         }
 
-        // 개인정보 보호 및 권한 화면
         composable(Screen.PrivacySettings.route) {
-            PrivacySettingsScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            PrivacySettingsScreen(onBackClick = { navController.popBackStack() })
         }
 
-        // 앱 정보 화면
         composable(Screen.AppInfo.route) {
-            AppInfoScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                }
-            )
+            AppInfoScreen(onBackClick = { navController.popBackStack() })
         }
 
-        // 회원 탈퇴 화면
         composable(Screen.Withdrawal.route) {
             WithdrawalScreen(
-                onBackClick = {
-                    navController.popBackStack()
-                },
+                onBackClick = { navController.popBackStack() },
                 onWithdrawConfirm = {
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(navController.graph.findStartDestination().id) {
-                            inclusive = true
-                        }
+                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
                     }
                 }
             )
@@ -543,7 +472,7 @@ fun AppNavHost(
             )
         }
 
-        // 곡 상세 화면 (SongDetailScreen)
+        // 곡 상세 화면
         composable(
             route = Screen.SongDetail.route,
             arguments = listOf(navArgument("songId") { type = NavType.StringType })
@@ -551,16 +480,13 @@ fun AppNavHost(
             val songId = backStackEntry.arguments?.getString("songId") ?: ""
             SongDetailScreen(
                 songId = songId,
-                // [수정] viewModel 전달
                 viewModel = viewModel,
                 navController = navController,
-                onBackClick = {
-                    navController.popBackStack()
-                }
+                onBackClick = { navController.popBackStack() }
             )
         }
 
-        // 곡 파트 선택 화면 (SongPartSelectScreen)
+        // 곡 파트 선택 화면
         composable(
             route = Screen.SongPartSelect.route,
             arguments = listOf(navArgument("songId") { type = NavType.StringType })
@@ -568,25 +494,19 @@ fun AppNavHost(
             val songId = backStackEntry.arguments?.getString("songId") ?: ""
             SongPartSelectScreen(
                 songId = songId,
-                // [수정] viewModel 전달
                 viewModel = viewModel,
-                onBackClick = {
-                    navController.popBackStack()
-                },
+                onBackClick = { navController.popBackStack() },
                 onNavigateToPractice = { songTitle, artistPart, difficulty, length ->
                     val encodedTitle = Screen.encodeArg(songTitle)
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
                     val encodedLength = Screen.encodeArg(length)
-
-                    navController.navigate(
-                        "dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength"
-                    )
+                    navController.navigate("dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength")
                 }
             )
         }
 
-        // 댄스 연습 화면 (PracticeScreenMobile)
+        // 댄스 연습 화면
         composable(
             route = Screen.DancePractice.route,
             arguments = listOf(
@@ -596,64 +516,60 @@ fun AppNavHost(
                 navArgument("length") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val songTitle =
-                backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) }
-                    ?: "곡 정보 없음"
-            val artistPart =
-                backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) }
-                    ?: "아티스트 정보 없음"
-            val difficulty =
-                backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) }
-                    ?: "난이도 정보 없음"
-            val length =
-                backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) }
-                    ?: "시간 정보 없음"
+            val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
+            val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
+            val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
+            val length = backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) } ?: ""
 
             PracticeScreenMobile(
                 songTitle = songTitle,
                 artistPart = artistPart,
                 difficulty = difficulty,
                 length = length,
-                onBackClick = {
-                    navController.navigate(Screen.AnalysisLoading.route) {
-                        popUpTo(Screen.DancePractice.route) { inclusive = true }
-                    }
-                },
+                onBackClick = { navController.popBackStack() },
                 onRecordClick = {
                     val encodedTitle = Screen.encodeArg(songTitle)
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
-
                     navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty")
                 },
-                onSettingsClick = {
-                    navController.navigate(Screen.PracticeSettings.route)
-                }
+                onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
             )
         }
 
-        // 로딩 화면 (분석 대기)
+        // 분석 대기 화면 (사용 안 함)
         composable(Screen.AnalysisLoading.route) {
             AnalysisWaitingScreen(
                 onAnalysisComplete = {
-                    navController.navigate(Screen.PracticeResult.route) {
-                        popUpTo(Screen.AnalysisLoading.route) { inclusive = true }
-                    }
+                    // 결과 화면으로 직접 이동하지 않고, 녹화 화면의 로직을 따름
                 }
             )
         }
-        // 연습 결과 화면
-        composable(Screen.PracticeResult.route) {
+
+        // [수정] 연습 결과 화면 (JSON 파일명과 비디오 경로 인자 처리)
+        composable(
+            route = Screen.PracticeResult.route,
+            arguments = listOf(
+                navArgument("jsonFileName") { type = NavType.StringType },
+                navArgument("videoPath") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val jsonFileName = backStackEntry.arguments?.getString("jsonFileName")?.let { Screen.decodeArg(it) } ?: ""
+            val videoPath = backStackEntry.arguments?.getString("videoPath")?.let { Screen.decodeArg(it) } ?: ""
+
             PracticeResultScreen(
-                score = 0,
+                jsonFileName = jsonFileName,
+                videoPath = videoPath,
                 viewModel = viewModel,
-                onBackClick = {
-                    navController.popBackStack(
-                        Screen.Home.route,
-                        inclusive = false
-                    )
+                onBackClick = { navController.popBackStack(Screen.Home.route, false) },
+                onReplayClick = {
+                    // 현재 화면 재진입 (재생 초기화 효과)
+                    navController.navigate(
+                        "practiceResult/${Screen.encodeArg(jsonFileName)}/${Screen.encodeArg(videoPath)}"
+                    ) {
+                        popUpTo(Screen.PracticeResult.route) { inclusive = true }
+                    }
                 },
-                onReplayClick = { navController.popBackStack() },
                 onHomeClick = { navController.popBackStack(Screen.Home.route, false) }
             )
         }
@@ -667,15 +583,9 @@ fun AppNavHost(
                 navArgument("difficulty") { type = NavType.StringType }
             )
         ) { backStackEntry ->
-            val songTitle =
-                backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) }
-                    ?: "제목 없음"
-            val artistPart =
-                backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) }
-                    ?: "정보 없음"
-            val difficulty =
-                backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) }
-                    ?: "보통"
+            val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
+            val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
+            val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
 
             val parts = artistPart.split("·").map { it.trim() }
             val artistName = parts.getOrNull(0) ?: "Unknown"
@@ -687,8 +597,22 @@ fun AppNavHost(
                 artist = artistName,
                 part = partName,
                 onBack = { navController.popBackStack() },
-                onRecordingComplete = { s3Key ->
-                    navController.popBackStack()
+                onRecordingComplete = { resultString ->
+                    // 결과 문자열 분리 ("S3Key_or_Path|VideoUri" 형식)
+                    // 파이프(|)를 기준으로 앞부분은 JSON 파일 관련 경로, 뒷부분은 로컬 비디오 URI입니다.
+                    val dataParts = resultString.split("|")
+                    val rawPath = dataParts[0]
+                    val videoUriString = if (dataParts.size > 1) dataParts[1] else ""
+
+                    // 경로에서 순수 JSON 파일명만 추출 (예: "s3/path/file.json" -> "file.json")
+                    val jsonFileName = rawPath.split("/").last()
+
+                    val encodedJson = Screen.encodeArg(jsonFileName)
+                    val encodedVideo = Screen.encodeArg(videoUriString)
+
+                    navController.navigate("practiceResult/$encodedJson/$encodedVideo") {
+                        popUpTo(Screen.Record.route) { inclusive = true }
+                    }
                 }
             )
         }

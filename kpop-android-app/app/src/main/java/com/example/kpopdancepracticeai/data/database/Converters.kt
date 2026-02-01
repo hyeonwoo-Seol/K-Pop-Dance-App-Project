@@ -36,4 +36,5 @@ class Converters {
     fun fromList(list: List<String>?): String? {
         return list?.let { gson.toJson(it) }
     }
+
 }
