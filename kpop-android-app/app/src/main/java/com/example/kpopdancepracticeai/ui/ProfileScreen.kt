@@ -34,7 +34,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.kpopdancepracticeai.KpopApplication
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.viewmodel.ProfileViewModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
 // 테마 색상 정의 (누락 방지)
@@ -53,15 +56,38 @@ fun ProfileScreen(
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
     onNavigateToTest: () -> Unit,
-    viewModel: MainViewModel
+    viewModel: MainViewModel // 글로벌 동기화 상태(isSyncing)를 위해 MainViewModel은 유지
 ) {
-    // ViewModel 상태 구독
-    val userStats by viewModel.userStats.collectAsState()
-    val achievements by viewModel.achievements.collectAsState()
+    val context = LocalContext.current
+    val app = context.applicationContext as KpopApplication
+    val repository = app.repository
+
+    // [핵심 변경] ProfileScreen 전용 ViewModel 생성
+    // MainViewModel 대신 ProfileViewModel이 통계 데이터를 전담합니다.
+    val profileViewModel: ProfileViewModel = viewModel(
+        factory = ProfileViewModel.provideFactory(repository)
+    )
+
+    // 상태 구독 (ProfileViewModel 사용)
+    val userStats by profileViewModel.userStats.collectAsState()
+
+    // 글로벌 상태 (MainViewModel 사용)
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncMessage by viewModel.syncMessage.collectAsState()
 
-    val context = LocalContext.current
+    // [핵심 로직] 화면 진입 시 현재 사용자 ID로 데이터 로드 및 시간 갱신
+    LaunchedEffect(Unit) {
+        val authRepo = AuthRepository(context)
+        val currentUser = authRepo.getCurrentUser()
+        if (currentUser != null) {
+            // 1. ProfileViewModel 데이터 로드 및 시간 갱신
+            profileViewModel.loadData(currentUser.uid)
+
+            // 2. [추가] MainViewModel도 사용자 정보를 알 수 있도록 초기화
+            // 이렇게 해야 MainViewModel의 refreshData 등이 정상 작동합니다.
+            viewModel.loadInitialData(currentUser.uid)
+        }
+    }
 
     // 동기화 결과 메시지(Toast) 처리
     LaunchedEffect(syncMessage) {
@@ -115,7 +141,17 @@ fun ProfileScreen(
                         onNavigateToAppInfo,
                         onNavigateToWithdrawal,
                         onNavigateToTest = onNavigateToTest,
-                        onSyncClick = { viewModel.refreshData() },
+                        onSyncClick = {
+                            // [수정] 버튼 클릭 시 현재 보고 있는 userStats의 ID를 명시적으로 전달
+                            // 이렇게 하면 MainViewModel이 초기화되지 않았어도 ID를 받아 동작합니다.
+                            val userId = userStats?.userUuid
+                            if (userId != null) {
+                                viewModel.refreshData(userId)
+                                profileViewModel.refreshAppUsageTime()
+                            } else {
+                                Toast.makeText(context, "사용자 정보를 불러오는 중입니다.", Toast.LENGTH_SHORT).show()
+                            }
+                        },
                         isSyncing = isSyncing
                     )
                 }
@@ -141,24 +177,20 @@ fun ProfileHeaderCard(
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // [수정] 변경된 UserStats 필드명 반영
                 val currentExp = userStats?.currentExp ?: 0L
                 val appLevel = userStats?.appLevel ?: 1
                 val avgAccuracy = userStats?.avgAccuracy?.toFloat() ?: 0f
-                // 경험치 최대치 (임시: 레벨 * 1000)
                 val maxExp = (appLevel * 1000).toLong()
 
-                // [수정] 상단 통계: 평균 정확도 & 레벨
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    StatColumn("평균 정확도", "${avgAccuracy.toInt()}%") // 기존 경험치 자리 -> 평균 정확도
+                    StatColumn("평균 정확도", "${avgAccuracy.toInt()}%")
                     StatColumn("Level", "Lv. $appLevel")
                 }
                 Spacer(modifier = Modifier.height(12.dp))
 
-                // [수정] 하단 진행 바: 경험치
                 Column {
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text("경험치", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium) // 기존 평균 정확도 -> 경험치
+                        Text("경험치", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Medium)
                         Text("$currentExp / $maxExp XP", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
                     }
                     Spacer(modifier = Modifier.height(4.dp))
@@ -198,9 +230,16 @@ fun CustomShadowButton(text: String, onClick: () -> Unit, width: androidx.compos
 
 @Composable
 fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserStats?) {
-    // [수정] 변경된 UserStats 필드명 반영 (totalPlayTime, completedParts, avgAccuracy)
-    val totalTimeMin = (userStats?.totalPlayTime ?: 0) / 60
-    val totalTimeText = if (totalTimeMin > 60) "${totalTimeMin/60}H" else "${totalTimeMin}M"
+    // 초 단위 시간을 분, 시간으로 변환
+    val totalSeconds = userStats?.totalPlayTime ?: 0L
+    val totalTimeMin = totalSeconds / 60
+    val totalTimeText = if (totalTimeMin >= 60) {
+        val hours = totalTimeMin / 60
+        val mins = totalTimeMin % 60
+        "${hours}H ${mins}M"
+    } else {
+        "${totalTimeMin}M"
+    }
 
     val completedSongs = "${userStats?.completedParts ?: 0}개"
     val avgAccuracy = "${userStats?.avgAccuracy?.toInt() ?: 0}%"
@@ -326,7 +365,6 @@ fun AchievementCard(title: String, description: String, progress: Float, progres
     }
 }
 
-// BadgeChip 컴포넌트가 누락되어 있어 추가
 @Composable
 fun BadgeChip(text: String, color: Color) {
     Surface(
@@ -346,6 +384,4 @@ fun BadgeChip(text: String, color: Color) {
 @Preview(showBackground = true)
 @Composable
 fun ProfileScreenPreview() {
-    // Preview를 위한 가짜 ViewModel은 제공하기 어려우므로, MainViewModel 파라미터가 있는 Composable Preview는 제한적일 수 있습니다.
-    // KpopDancePracticeAITheme { ProfileScreen(PaddingValues(), {}, {}, {}, {}, {}, {}, {}, onNavigateToTest = {}, viewModel = ...) }
 }

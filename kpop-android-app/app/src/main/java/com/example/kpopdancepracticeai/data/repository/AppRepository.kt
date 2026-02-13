@@ -16,13 +16,76 @@ class AppRepository(
     private val historyDao: HistoryDao,
     private val achievementDao: AchievementDao
 ) {
-    // 앱 실행 시점부터 시간 추적 시작
-    private var lastSyncTime: Long = System.currentTimeMillis()
+    // 앱 세션 시작 시간 (앱이 포그라운드로 올 때 설정)
+    private var sessionStartTime: Long = 0L
 
     // 헬퍼: 현재 시간 문자열
     private fun getCurrentTime(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         return sdf.format(Date())
+    }
+
+    // --- Lifecycle Aware Time Tracking (앱 사용 시간 추적) ---
+
+    // 앱이 활성화될 때 (ON_START) 호출
+    fun onAppForeground() {
+        sessionStartTime = System.currentTimeMillis()
+    }
+
+    // 앱이 비활성화될 때 (ON_STOP) 호출 -> 사용 시간 저장
+    suspend fun onAppBackground(userId: String) {
+        // 세션 시작 시간이 0이면(초기화 안됨) 저장하지 않고 리턴
+        if (sessionStartTime == 0L) return
+
+        val currentTime = System.currentTimeMillis()
+        val durationMs = currentTime - sessionStartTime
+
+        // 최소 1초 이상 사용했을 때만 저장 (짧은 전환 무시)
+        if (durationMs > 1000) {
+            val addedSeconds = durationMs / 1000
+
+            // DB에서 현재 통계 가져와서 시간 업데이트
+            val currentStats = userDao.getUserStatsOneShot(userId)
+            if (currentStats != null) {
+                val updatedStats = currentStats.copy(
+                    totalPlayTime = currentStats.totalPlayTime + addedSeconds,
+                    lastUpdated = getCurrentTime()
+                )
+                userDao.insertOrUpdate(updatedStats)
+            }
+        }
+
+        // 백그라운드로 갔으므로 세션 시간 초기화
+        sessionStartTime = 0L
+    }
+
+    // [핵심 수정] 화면 진입 시 현재까지의 시간을 강제 저장하는 함수
+    // ProfileViewModel 등에서 호출하여 실시간 갱신 효과를 줌
+    suspend fun syncAppUsageTime(userId: String) {
+        val currentTime = System.currentTimeMillis()
+
+        // 만약 sessionStartTime이 0이라면(앱 실행 후 첫 진입 등), 현재 시간으로 초기화만 하고 빠져나감
+        // 이렇게 해야 다음 번 호출 때 차이를 계산할 수 있음.
+        if (sessionStartTime == 0L) {
+            sessionStartTime = currentTime
+            return
+        }
+
+        val durationMs = currentTime - sessionStartTime
+
+        if (durationMs > 1000) { // 1초 이상 지났을 때만 반영
+            val addedSeconds = durationMs / 1000
+            val currentStats = userDao.getUserStatsOneShot(userId)
+            if (currentStats != null) {
+                val updatedStats = currentStats.copy(
+                    totalPlayTime = currentStats.totalPlayTime + addedSeconds,
+                    lastUpdated = getCurrentTime()
+                )
+                userDao.insertOrUpdate(updatedStats)
+            }
+            // [중요] 저장했으므로, 시작 시간을 '방금 저장한 시간(현재)'으로 갱신하여 연속 측정 유지
+            sessionStartTime = currentTime
+        }
     }
 
     // --- User Statistics ---
@@ -31,7 +94,6 @@ class AppRepository(
     suspend fun fetchInitialData(userId: String) {
         val existingStats = userDao.getUserStatsOneShot(userId)
         if (existingStats == null) {
-            // [수정] MD 파일에 명시된 기본값으로 초기화
             val newStats = UserStats(
                 userUuid = userId,
                 totalPlayTime = 0L,
@@ -44,31 +106,9 @@ class AppRepository(
             )
             userDao.insertOrUpdate(newStats)
         }
-        // 초기화 시점의 시간을 동기화 기준으로 설정
-        lastSyncTime = System.currentTimeMillis()
-    }
-
-    // 프로필 화면 등에서 주기적으로 호출하여 접속 시간 갱신
-    suspend fun syncAppUsageTime(userId: String) {
-        val currentTime = System.currentTimeMillis()
-        val timeElapsed = currentTime - lastSyncTime
-
-        // 1초 이상 지났을 때만 업데이트 (DB 부하 방지 및 유효성 검사)
-        if (timeElapsed > 1000) {
-            val currentStats = userDao.getUserStatsOneShot(userId)
-            if (currentStats != null) {
-                // [중요 수정] 밀리초(ms) -> 초(s) 단위 변환
-                // MD 파일의 total_play_time은 "초 단위"입니다.
-                val addedSeconds = timeElapsed / 1000
-
-                val updatedStats = currentStats.copy(
-                    totalPlayTime = currentStats.totalPlayTime + addedSeconds,
-                    lastUpdated = getCurrentTime()
-                )
-                userDao.insertOrUpdate(updatedStats)
-            }
-            // 갱신 성공 여부와 상관없이 기준 시간 업데이트 (중복 누적 방지)
-            lastSyncTime = currentTime
+        // 데이터 초기화 시점에 세션이 시작된 것으로 간주할 수도 있음
+        if (sessionStartTime == 0L) {
+            sessionStartTime = System.currentTimeMillis()
         }
     }
 
@@ -82,42 +122,29 @@ class AppRepository(
         // 1. 히스토리 저장
         historyDao.insertHistory(result)
 
-        // 2. 유저 통계 업데이트
-        val currentStats = userDao.getUserStatsOneShot(result.userUuid) // userId -> userUuid
+        // 2. 유저 통계 업데이트 (평균 정확도, 완료 횟수 등)
+        val currentStats = userDao.getUserStatsOneShot(result.userUuid)
 
         if (currentStats != null) {
-            val currentTime = System.currentTimeMillis()
-            val timeElapsed = currentTime - lastSyncTime
-
-            // [중요 수정] 시간 갱신 (밀리초 -> 초 변환)
-            // 연습하는 동안 흐른 시간도 앱 사용 시간에 포함시킵니다.
-            val addedSeconds = if (timeElapsed > 0) timeElapsed / 1000 else 0L
-            val newTotalPlayTime = currentStats.totalPlayTime + addedSeconds
-
-            // 정확도 갱신
-            // [수정] result.score -> result.totalScore
             val oldAvg = currentStats.avgAccuracy
             val count = currentStats.completedParts
             val newScore = result.totalScore.toDouble()
 
             // 평균 계산: (기존평균 * 횟수 + 새점수) / (횟수 + 1)
-            val newAvgAccuracy = ((oldAvg * count) + newScore) / (count + 1)
+            // count가 0일 때의 예외 처리 포함
+            val newAvgAccuracy = if (count == 0) newScore else ((oldAvg * count) + newScore) / (count + 1)
             val newCompletedParts = count + 1
 
             val updatedStats = currentStats.copy(
-                totalPlayTime = newTotalPlayTime,
                 completedParts = newCompletedParts,
                 avgAccuracy = newAvgAccuracy,
                 lastUpdated = getCurrentTime()
             )
 
             userDao.insertOrUpdate(updatedStats)
-
-            // 통계 업데이트 시점 기준으로 시간 동기화
-            lastSyncTime = currentTime
         }
     }
 
-    // [수정] userId 파라미터명 일치
     fun getRecentHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getRecentHistory(userId)
+    fun getAllHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getAllHistory(userId)
 }

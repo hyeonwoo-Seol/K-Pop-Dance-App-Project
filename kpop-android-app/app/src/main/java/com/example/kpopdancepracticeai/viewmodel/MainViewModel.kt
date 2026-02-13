@@ -12,9 +12,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
@@ -34,30 +31,48 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userStats = MutableStateFlow<UserStats?>(null)
     val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
 
-    // [추가] ProfileScreen 호환을 위한 더미 데이터
+    private val _recentHistory = MutableStateFlow<List<PracticeHistory>>(emptyList())
+    val recentHistory: StateFlow<List<PracticeHistory>> = _recentHistory.asStateFlow()
+
     private val _achievements = MutableStateFlow<List<Any>>(emptyList())
     val achievements: StateFlow<List<Any>> = _achievements.asStateFlow()
 
+    private var currentUserId: String? = null
+
     // 앱 시작 시 또는 로그인 후 호출
     fun loadInitialData(userId: String) {
+        // 이미 같은 ID로 로드된 상태라면 중복 호출 방지
+        if (currentUserId == userId) return
+        currentUserId = userId
+
         viewModelScope.launch {
             _isSyncing.value = true
             try {
+                // 1. 초기 데이터 세팅 (DB 없을 시 생성)
                 repository.fetchInitialData(userId)
 
+                // 2. 유저 통계 실시간 구독
                 launch {
                     repository.getUserStats(userId).collect { stats ->
                         _userStats.value = stats
                     }
                 }
 
+                // 3. 전체 곡 목록 실시간 구독
                 launch {
                     repository.allSongs.collect { songList ->
                         _songs.value = songList
                     }
                 }
 
-                _syncMessage.value = "데이터 동기화 완료"
+                // 4. 최근 기록 실시간 구독
+                launch {
+                    repository.getRecentHistory(userId).collect { history ->
+                        _recentHistory.value = history
+                    }
+                }
+
+                // _syncMessage.value = "데이터 동기화 완료" // 자동 로드 시엔 메시지 생략
             } catch (e: Exception) {
                 e.printStackTrace()
                 _syncMessage.value = "동기화 실패: ${e.message}"
@@ -67,10 +82,37 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun refreshData() {
-        val userId = _userStats.value?.userUuid
+    // [수정] ProfileViewModel로 기능이 이관되었으나, 하위 호환성 및 다른 화면에서의 호출을 위해 유지
+    // [개선] 외부에서 userId를 명시적으로 전달받을 수 있도록 변경 (로그인 정보 유실 시 대응)
+    fun updateUsageTime(explicitUserId: String? = null) {
+        // 1. 파라미터로 받은 ID, 2. 현재 로드된 통계의 ID, 3. 저장된 currentUserId 순으로 유효한 ID 탐색
+        val userId = explicitUserId ?: _userStats.value?.userUuid ?: currentUserId
+
         if (userId != null) {
+            viewModelScope.launch {
+                repository.syncAppUsageTime(userId)
+            }
+        } else {
+            // 디버깅을 위해 로그 출력 (사용자에게 보이지 않음)
+            println("MainViewModel: updateUsageTime failed - No User ID found")
+        }
+    }
+
+    // [핵심 수정] 외부에서 ID를 주입받아 갱신할 수 있도록 매개변수 추가
+    fun refreshData(explicitUserId: String? = null) {
+        // 1. 명시적 ID -> 2. 이미 로드된 통계의 ID -> 3. 내부 저장 ID 순으로 확인
+        val userId = explicitUserId ?: _userStats.value?.userUuid ?: currentUserId
+
+        if (userId != null && userId.isNotBlank()) {
+            // ID를 찾았다면 현재 ID로 업데이트 (누락 방지)
+            currentUserId = userId
+
+            // 데이터 갱신 시 시간도 같이 동기화
+            updateUsageTime(userId)
+
+            // 데이터 재로딩
             loadInitialData(userId)
+            _syncMessage.value = "데이터를 새로고침했습니다."
         } else {
             _syncMessage.value = "로그인 정보가 없습니다."
         }
@@ -85,32 +127,10 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // 연습 결과 저장 (기존 함수)
-    fun savePracticeResult(userId: String, songId: Long, partId: Long, score: Int, videoPath: String) {
-        viewModelScope.launch {
-            val history = PracticeHistory(
-                userUuid = userId,
-                songId = songId,
-                partNumber = partId.toInt(),
-                artistName = "Unknown",
-                totalScore = score,
-                grade = "PENDING",
-                partAccuracies = emptyMap(),
-                worstPoints = emptyList(),
-                durationSec = 0.0,
-                fps = 0.0,
-                videoWidth = 0,
-                videoHeight = 0,
-                totalFrames = 0,
-                createdAt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                fullJsonPath = "",
-                userVideoPath = videoPath
-            )
-            repository.savePracticeResult(history)
-        }
-    }
+    // 검색 기능
+    fun searchSongs(query: String) = repository.searchSongs(query)
 
-    // [추가] 연습 결과 저장 (PracticeHistory 객체 직접 전달용 오버로딩)
+    // 연습 결과 저장
     fun savePracticeResult(history: PracticeHistory) {
         viewModelScope.launch {
             repository.savePracticeResult(history)
@@ -121,7 +141,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         _syncMessage.value = null
     }
 
-    // ViewModel Factory 정의
+    // ViewModel Factory
     companion object {
         fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")

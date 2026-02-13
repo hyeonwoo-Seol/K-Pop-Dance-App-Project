@@ -14,24 +14,62 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
-import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.lifecycleScope
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.KpopDancePracticeApp
+import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // Repository 및 Auth 초기화
+        val app = application as KpopApplication
+        val repository = app.repository
+        val authRepository = AuthRepository(this)
+
         setContent {
             KpopDancePracticeAITheme {
                 val context = LocalContext.current
+
+                // [수정] 앱 생명주기 감지 로직 추가 (ON_START, ON_STOP)
+                val lifecycleOwner = LocalLifecycleOwner.current
+
+                DisposableEffect(lifecycleOwner) {
+                    val observer = LifecycleEventObserver { _, event ->
+                        when (event) {
+                            Lifecycle.Event.ON_START -> {
+                                // 앱이 화면에 나타날 때 (포그라운드 진입) -> 타이머 시작
+                                repository.onAppForeground()
+                            }
+                            Lifecycle.Event.ON_STOP -> {
+                                // 앱이 화면에서 사라질 때 (백그라운드/종료) -> 시간 계산 및 저장
+                                val currentUser = authRepository.getCurrentUser()
+                                if (currentUser != null) {
+                                    // Composable 외부이므로 lifecycleScope를 사용하여 코루틴 실행
+                                    lifecycleScope.launch {
+                                        repository.onAppBackground(currentUser.uid)
+                                    }
+                                }
+                            }
+                            else -> {}
+                        }
+                    }
+                    lifecycleOwner.lifecycle.addObserver(observer)
+                    onDispose {
+                        lifecycleOwner.lifecycle.removeObserver(observer)
+                    }
+                }
+
+                // --- 기존 권한 요청 로직 유지 ---
                 var permissionsGranted by remember { mutableStateOf(false) }
                 var showPermissionDeniedDialog by remember { mutableStateOf(false) }
 
@@ -80,7 +118,7 @@ class MainActivity : ComponentActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     if (permissionsGranted) {
-                        // [수정] 인자 없이 호출합니다.
+                        // KpopDancePracticeApp은 메인 네비게이션을 담고 있는 Composable이라고 가정
                         KpopDancePracticeApp()
                     }
 
