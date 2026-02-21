@@ -5,7 +5,6 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
-
 @Entity(
     tableName = "users",
     indices = [
@@ -49,5 +48,9 @@ data class User(
     val bio: String? = null, // 자기소개
 
     @ColumnInfo(name = "join_date")
-    val joinDate: String // 회원가입 일시 (YYYY-MM-DD HH:mm:ss)
+    val joinDate: String, // 회원가입 일시 (YYYY-MM-DD HH:mm:ss)
+
+// 프로필 이미지 저장
+    @ColumnInfo(name = "profile_image_url")
+    val profileImageUrl: String? = null
 )
