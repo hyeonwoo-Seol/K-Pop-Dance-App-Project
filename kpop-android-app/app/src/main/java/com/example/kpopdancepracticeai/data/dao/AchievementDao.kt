@@ -4,27 +4,29 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import com.example.kpopdancepracticeai.data.entity.Achievement
+import com.example.kpopdancepracticeai.data.entity.Badge
+import com.example.kpopdancepracticeai.data.entity.UserAchievementProgress
 import kotlinx.coroutines.flow.Flow
 
-/**
- * 업적 접근 객체
- * 역할: 업적 목록 조회 및 진행도 업데이트
- */
 @Dao
 interface AchievementDao {
+    // 사용자의 모든 업적 진행도 조회
+    @Query("SELECT * FROM user_achievement_progress WHERE user_uuid = :userId")
+    fun getUserAchievementProgress(userId: String): Flow<List<UserAchievementProgress>>
 
-    // 모든 업적 목록 조회
-    @Query("SELECT * FROM achievements")
-    fun getAllAchievements(): Flow<List<Achievement>>
+    // [수정됨] 이제 Badge.kt에 user_uuid가 추가되었으므로 오류 없이 정상 작동합니다!
+    @Query("SELECT * FROM badges WHERE user_uuid = :userId")
+    fun getUserBadges(userId: String): Flow<List<Badge>>
 
-    // 초기 업적 데이터 세팅용 (여러 개 동시 삽입)
+    // 초기 데이터 세팅용: 업적 진행도 삽입
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun insertAchievements(achievements: List<Achievement>)
+    suspend fun insertProgress(progress: List<UserAchievementProgress>)
 
-    @Query("UPDATE achievements SET current_count = :progress, is_completed = :isCompleted, achieved_at = :achievedAt WHERE id = :id")
-    suspend fun updateProgress(id: String, progress: Int, isCompleted: Boolean, achievedAt: Long? = null)
+    // 배지 획득 처리
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertBadge(badge: Badge)
 
-    @Query("SELECT * FROM achievements WHERE id = :id")
-    suspend fun getAchievement(id: String): Achievement?
+    // 업적 진행도 업데이트
+    @Query("UPDATE user_achievement_progress SET current_step = :step, is_completed = :completed, achieved_date = :date WHERE user_uuid = :userId AND achievement_code = :code")
+    suspend fun updateProgress(userId: String, code: String, step: Int, completed: Boolean, date: String?)
 }
