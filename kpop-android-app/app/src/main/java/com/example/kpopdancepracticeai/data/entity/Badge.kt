@@ -14,6 +14,9 @@ data class Badge(
     @ColumnInfo(name = "id")
     val id: String,
 
+    @ColumnInfo(name = "user_uuid")
+    val userUuid: String,
+
     @ColumnInfo(name = "name")
     val name: String,
 
