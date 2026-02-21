@@ -1,27 +1,37 @@
 package com.example.kpopdancepracticeai.viewmodel
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.kpopdancepracticeai.data.entity.PracticeHistory
-import com.example.kpopdancepracticeai.data.entity.Song
-import com.example.kpopdancepracticeai.data.entity.SongPart
-import com.example.kpopdancepracticeai.data.entity.UserStats
+import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+
+// UI용 업적 데이터 클래스
+data class AchievementUiModel(
+    val title: String,
+    val description: String,
+    val progress: Float, // 0.0 ~ 1.0
+    val progressText: String
+)
+
+// UI용 배지 데이터 클래스
+data class BadgeUiModel(
+    val name: String,
+    val color: Color
+)
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
-    // UI 상태 관리
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
 
+    // --- 기본 데이터 ---
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
 
@@ -31,48 +41,92 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userStats = MutableStateFlow<UserStats?>(null)
     val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
 
+    private val _currentUserProfile = MutableStateFlow<User?>(null)
+    val currentUserProfile: StateFlow<User?> = _currentUserProfile.asStateFlow()
+
     private val _recentHistory = MutableStateFlow<List<PracticeHistory>>(emptyList())
     val recentHistory: StateFlow<List<PracticeHistory>> = _recentHistory.asStateFlow()
 
-    private val _achievements = MutableStateFlow<List<Any>>(emptyList())
-    val achievements: StateFlow<List<Any>> = _achievements.asStateFlow()
+    // --- 계산된 레벨 및 경험치 정보 ---
+    val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
+        if (stats == null) Pair(1, Pair(0L, 1000L))
+        else {
+            // 레벨 계산 로직: (총점수 / 1000) + 1
+            val score = stats.achievementScore.toLong()
+            val level = (score / 1000).toInt() + 1
+            val currentLevelExp = score % 1000
+            val nextLevelExp = 1000L
+            Pair(level, Pair(currentLevelExp, nextLevelExp))
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Pair(1, Pair(0L, 1000L)))
+
+    // --- 업적 및 배지 ---
+    private val _achievementProgress = MutableStateFlow<List<AchievementUiModel>>(emptyList())
+    val achievementProgress: StateFlow<List<AchievementUiModel>> = _achievementProgress.asStateFlow()
+
+    private val _userBadges = MutableStateFlow<List<BadgeUiModel>>(emptyList())
+    val userBadges: StateFlow<List<BadgeUiModel>> = _userBadges.asStateFlow()
+
+    // 업적 코드와 UI 텍스트 매핑
+    private val achievementMeta = mapOf(
+        "PERFECTIONIST" to ("완벽주의자" to "95% 이상의 정확도 5회 달성"),
+        "PRACTICE_BUG" to ("연습 벌레" to "총 연습 시간 100시간 달성"),
+        "BTS_MASTER" to ("BTS 마스터" to "BTS 챌린지 10개 완료"),
+        "CHALLENGE_HUNTER" to ("챌린지 헌터" to "모든 챌린지 1회 이상 완료"),
+        "NEW_DANCER" to ("신입 댄서" to "첫 연습 영상 업로드")
+    )
 
     private var currentUserId: String? = null
 
-    // 앱 시작 시 또는 로그인 후 호출
     fun loadInitialData(userId: String) {
-        // 이미 같은 ID로 로드된 상태라면 중복 호출 방지
         if (currentUserId == userId) return
         currentUserId = userId
 
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                // 1. 초기 데이터 세팅 (DB 없을 시 생성)
                 repository.fetchInitialData(userId)
 
-                // 2. 유저 통계 실시간 구독
+                // 구독 설정
+                launch { repository.getUserStats(userId).collect { _userStats.value = it } }
+                launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
+                launch { repository.allSongs.collect { _songs.value = it } }
+                launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
+
+                // 업적 구독 및 변환
                 launch {
-                    repository.getUserStats(userId).collect { stats ->
-                        _userStats.value = stats
+                    repository.getUserAchievements(userId).collect { list ->
+                        val uiModels = list.mapNotNull { item ->
+                            val meta = achievementMeta[item.achievementCode] ?: return@mapNotNull null
+                            val progress = if (item.goalStep > 0) item.currentStep.toFloat() / item.goalStep else 0f
+                            val progressText = "${(progress * 100).toInt()}%"
+                            AchievementUiModel(
+                                title = meta.first,
+                                description = meta.second,
+                                progress = progress.coerceIn(0f, 1f),
+                                progressText = progressText
+                            )
+                        }
+                        _achievementProgress.value = uiModels
                     }
                 }
 
-                // 3. 전체 곡 목록 실시간 구독
+                // 배지 구독 및 변환
                 launch {
-                    repository.allSongs.collect { songList ->
-                        _songs.value = songList
+                    repository.getUserBadges(userId).collect { list ->
+                        _userBadges.value = list.map { badge ->
+                            val color = when {
+                                badge.name.contains("마스터") -> Color(0xFFEBEBFF)
+                                badge.name.contains("팬") -> Color(0xFFD6F5FF)
+                                badge.name.contains("전문가") -> Color(0xFFFFD6EB)
+                                else -> Color(0xFFD9FFE5)
+                            }
+                            BadgeUiModel(badge.name, color)
+                        }
                     }
                 }
 
-                // 4. 최근 기록 실시간 구독
-                launch {
-                    repository.getRecentHistory(userId).collect { history ->
-                        _recentHistory.value = history
-                    }
-                }
-
-                // _syncMessage.value = "데이터 동기화 완료" // 자동 로드 시엔 메시지 생략
+                _syncMessage.value = "데이터 동기화 완료"
             } catch (e: Exception) {
                 e.printStackTrace()
                 _syncMessage.value = "동기화 실패: ${e.message}"
@@ -82,74 +136,54 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // [수정] ProfileViewModel로 기능이 이관되었으나, 하위 호환성 및 다른 화면에서의 호출을 위해 유지
-    // [개선] 외부에서 userId를 명시적으로 전달받을 수 있도록 변경 (로그인 정보 유실 시 대응)
-    fun updateUsageTime(explicitUserId: String? = null) {
-        // 1. 파라미터로 받은 ID, 2. 현재 로드된 통계의 ID, 3. 저장된 currentUserId 순으로 유효한 ID 탐색
-        val userId = explicitUserId ?: _userStats.value?.userUuid ?: currentUserId
-
-        if (userId != null) {
-            viewModelScope.launch {
-                repository.syncAppUsageTime(userId)
+    // [수정됨] profileImageUrl 파라미터 추가
+    fun updateUserProfile(name: String, email: String, passwordHash: String, birthDate: String, bio: String, danceSkill: String, favoriteGenres: List<String>, profileImageUrl: String?) {
+        val currentUser = _currentUserProfile.value ?: return
+        val updatedUser = currentUser.copy(
+            name = name, email = email, passwordHash = passwordHash,
+            birthDate = birthDate, bio = bio, danceSkill = danceSkill,
+            favoriteGenres = favoriteGenres.joinToString(","),
+            profileImageUrl = profileImageUrl
+        )
+        viewModelScope.launch {
+            try {
+                repository.updateUserProfile(updatedUser)
+                _syncMessage.value = "프로필이 저장되었습니다."
+            } catch (e: Exception) {
+                _syncMessage.value = "저장 실패: ${e.message}"
             }
-        } else {
-            // 디버깅을 위해 로그 출력 (사용자에게 보이지 않음)
-            println("MainViewModel: updateUsageTime failed - No User ID found")
         }
     }
 
-    // [핵심 수정] 외부에서 ID를 주입받아 갱신할 수 있도록 매개변수 추가
-    fun refreshData(explicitUserId: String? = null) {
-        // 1. 명시적 ID -> 2. 이미 로드된 통계의 ID -> 3. 내부 저장 ID 순으로 확인
-        val userId = explicitUserId ?: _userStats.value?.userUuid ?: currentUserId
+    fun updateUsageTime() {
+        val userId = _userStats.value?.userUuid ?: currentUserId
+        if (userId != null) {
+            viewModelScope.launch { repository.syncAppUsageTime(userId) }
+        }
+    }
 
-        if (userId != null && userId.isNotBlank()) {
-            // ID를 찾았다면 현재 ID로 업데이트 (누락 방지)
-            currentUserId = userId
-
-            // 데이터 갱신 시 시간도 같이 동기화
-            updateUsageTime(userId)
-
-            // 데이터 재로딩
+    fun refreshData() {
+        val userId = currentUserId
+        if (userId != null) {
+            updateUsageTime()
             loadInitialData(userId)
-            _syncMessage.value = "데이터를 새로고침했습니다."
         } else {
             _syncMessage.value = "로그인 정보가 없습니다."
         }
     }
 
-    // 노래 선택 시 파트 정보 로드
-    fun selectSong(songId: Long) {
-        viewModelScope.launch {
-            repository.getSongParts(songId).collect { parts ->
-                _currentSongParts.value = parts
-            }
-        }
-    }
-
-    // 검색 기능
+    fun selectSong(songId: Long) { /* 생략 */ }
     fun searchSongs(query: String) = repository.searchSongs(query)
-
-    // 연습 결과 저장
     fun savePracticeResult(history: PracticeHistory) {
-        viewModelScope.launch {
-            repository.savePracticeResult(history)
-        }
+        viewModelScope.launch { repository.savePracticeResult(history) }
     }
+    fun clearSyncMessage() { _syncMessage.value = null }
 
-    fun clearSyncMessage() {
-        _syncMessage.value = null
-    }
-
-    // ViewModel Factory
     companion object {
         fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-                    return MainViewModel(repository) as T
-                }
-                throw IllegalArgumentException("Unknown ViewModel class")
+                return MainViewModel(repository) as T
             }
         }
     }

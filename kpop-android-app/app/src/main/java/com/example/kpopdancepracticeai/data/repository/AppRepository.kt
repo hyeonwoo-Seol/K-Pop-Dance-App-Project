@@ -16,66 +16,32 @@ class AppRepository(
     private val historyDao: HistoryDao,
     private val achievementDao: AchievementDao
 ) {
-    // 앱 세션 시작 시간 (앱이 포그라운드로 올 때 설정)
-    private var sessionStartTime: Long = 0L
+    // [수정됨] 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
+    private var sessionStartTime: Long = System.currentTimeMillis()
 
-    // 헬퍼: 현재 시간 문자열
     private fun getCurrentTime(): String {
         val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault())
         return sdf.format(Date())
     }
 
-    // --- Lifecycle Aware Time Tracking (앱 사용 시간 추적) ---
-
-    // 앱이 활성화될 때 (ON_START) 호출
+    // --- Time Tracking ---
     fun onAppForeground() {
         sessionStartTime = System.currentTimeMillis()
     }
 
-    // 앱이 비활성화될 때 (ON_STOP) 호출 -> 사용 시간 저장
     suspend fun onAppBackground(userId: String) {
-        // 세션 시작 시간이 0이면(초기화 안됨) 저장하지 않고 리턴
-        if (sessionStartTime == 0L) return
-
-        val currentTime = System.currentTimeMillis()
-        val durationMs = currentTime - sessionStartTime
-
-        // 최소 1초 이상 사용했을 때만 저장 (짧은 전환 무시)
-        if (durationMs > 1000) {
-            val addedSeconds = durationMs / 1000
-
-            // DB에서 현재 통계 가져와서 시간 업데이트
-            val currentStats = userDao.getUserStatsOneShot(userId)
-            if (currentStats != null) {
-                val updatedStats = currentStats.copy(
-                    totalPlayTime = currentStats.totalPlayTime + addedSeconds,
-                    lastUpdated = getCurrentTime()
-                )
-                userDao.insertOrUpdate(updatedStats)
-            }
-        }
-
-        // 백그라운드로 갔으므로 세션 시간 초기화
-        sessionStartTime = 0L
+        syncAppUsageTime(userId)
     }
 
-    // [핵심 수정] 화면 진입 시 현재까지의 시간을 강제 저장하는 함수
-    // ProfileViewModel 등에서 호출하여 실시간 갱신 효과를 줌
     suspend fun syncAppUsageTime(userId: String) {
         val currentTime = System.currentTimeMillis()
-
-        // 만약 sessionStartTime이 0이라면(앱 실행 후 첫 진입 등), 현재 시간으로 초기화만 하고 빠져나감
-        // 이렇게 해야 다음 번 호출 때 차이를 계산할 수 있음.
-        if (sessionStartTime == 0L) {
-            sessionStartTime = currentTime
-            return
-        }
-
         val durationMs = currentTime - sessionStartTime
 
-        if (durationMs > 1000) { // 1초 이상 지났을 때만 반영
+        // [수정됨] 1초라도 지났으면 과거의 총 시간(totalPlayTime)에 누적해서 더합니다.
+        if (durationMs >= 1000) {
             val addedSeconds = durationMs / 1000
             val currentStats = userDao.getUserStatsOneShot(userId)
+
             if (currentStats != null) {
                 val updatedStats = currentStats.copy(
                     totalPlayTime = currentStats.totalPlayTime + addedSeconds,
@@ -83,15 +49,21 @@ class AppRepository(
                 )
                 userDao.insertOrUpdate(updatedStats)
             }
-            // [중요] 저장했으므로, 시작 시간을 '방금 저장한 시간(현재)'으로 갱신하여 연속 측정 유지
+            // 누적했으므로 시작 시간을 '현재'로 리셋하여 중복 계산을 방지합니다.
             sessionStartTime = currentTime
         }
     }
 
-    // --- User Statistics ---
+    // --- User Statistics & Profile ---
     fun getUserStats(userId: String): Flow<UserStats?> = userDao.getUserStats(userId)
+    fun getUserProfile(userId: String): Flow<User?> = userDao.getUserProfile(userId)
+
+    suspend fun updateUserProfile(user: User) {
+        userDao.updateUser(user)
+    }
 
     suspend fun fetchInitialData(userId: String) {
+        // 1. 통계 데이터 초기화
         val existingStats = userDao.getUserStatsOneShot(userId)
         if (existingStats == null) {
             val newStats = UserStats(
@@ -106,11 +78,53 @@ class AppRepository(
             )
             userDao.insertOrUpdate(newStats)
         }
-        // 데이터 초기화 시점에 세션이 시작된 것으로 간주할 수도 있음
-        if (sessionStartTime == 0L) {
-            sessionStartTime = System.currentTimeMillis()
+
+        // 2. 사용자 프로필 초기화
+        val existingUser = userDao.getUserProfileOneShot(userId)
+        if (existingUser == null) {
+            val newUser = User(
+                userUuid = userId,
+                loginId = "user_$userId",
+                email = "user@example.com",
+                passwordHash = "",
+                name = "New Dancer",
+                birthDate = "2000-01-01",
+                gender = "Unknown",
+                joinDate = getCurrentTime()
+            )
+            userDao.insertUser(newUser)
+        }
+
+        // 3. 초기 업적 데이터 세팅
+        val initialAchievements = listOf(
+            UserAchievementProgress(userUuid = userId, achievementCode = "PERFECTIONIST", currentStep = 0, goalStep = 5, isCompleted = false, achievedDate = null),
+            UserAchievementProgress(userUuid = userId, achievementCode = "PRACTICE_BUG", currentStep = 0, goalStep = 100, isCompleted = false, achievedDate = null),
+            UserAchievementProgress(userUuid = userId, achievementCode = "BTS_MASTER", currentStep = 0, goalStep = 10, isCompleted = false, achievedDate = null),
+            UserAchievementProgress(userUuid = userId, achievementCode = "CHALLENGE_HUNTER", currentStep = 0, goalStep = 10, isCompleted = false, achievedDate = null),
+            UserAchievementProgress(userUuid = userId, achievementCode = "NEW_DANCER", currentStep = 1, goalStep = 1, isCompleted = true, achievedDate = getCurrentTime())
+        )
+        achievementDao.insertProgress(initialAchievements)
+
+        // 4. 초기 배지 세팅
+        if (existingStats == null) {
+            achievementDao.insertBadge(
+                Badge(
+                    id = "badge_new_dancer_$userId",
+                    userUuid = userId,
+                    name = "신입 댄서",
+                    description = "첫 연습 영상 업로드",
+                    iconResName = "ic_badge_default",
+                    category = "초보자",
+                    isUnlocked = true,
+                    obtainedAt = System.currentTimeMillis()
+                )
+            )
         }
     }
+
+    // --- Achievements & Badges ---
+    fun getUserAchievements(userId: String): Flow<List<UserAchievementProgress>> = achievementDao.getUserAchievementProgress(userId)
+    fun getUserBadges(userId: String): Flow<List<Badge>> = achievementDao.getUserBadges(userId)
 
     // --- Song ---
     val allSongs: Flow<List<Song>> = songDao.getAllSongs()
@@ -119,28 +133,28 @@ class AppRepository(
 
     // --- History & Stats Update ---
     suspend fun savePracticeResult(result: PracticeHistory) {
-        // 1. 히스토리 저장
         historyDao.insertHistory(result)
 
-        // 2. 유저 통계 업데이트 (평균 정확도, 완료 횟수 등)
         val currentStats = userDao.getUserStatsOneShot(result.userUuid)
-
         if (currentStats != null) {
             val oldAvg = currentStats.avgAccuracy
             val count = currentStats.completedParts
             val newScore = result.totalScore.toDouble()
 
-            // 평균 계산: (기존평균 * 횟수 + 새점수) / (횟수 + 1)
-            // count가 0일 때의 예외 처리 포함
+            // 정확도 갱신
             val newAvgAccuracy = if (count == 0) newScore else ((oldAvg * count) + newScore) / (count + 1)
             val newCompletedParts = count + 1
 
+            val gainedExp = (result.totalScore / 10) + 50
+            val newTotalScore = currentStats.achievementScore + gainedExp
+
+            // [수정됨] 연습 시간은 syncAppUsageTime 에서 전담하여 더하므로 여기서 중복으로 더하지 않도록 복사합니다.
             val updatedStats = currentStats.copy(
                 completedParts = newCompletedParts,
                 avgAccuracy = newAvgAccuracy,
+                achievementScore = newTotalScore,
                 lastUpdated = getCurrentTime()
             )
-
             userDao.insertOrUpdate(updatedStats)
         }
     }

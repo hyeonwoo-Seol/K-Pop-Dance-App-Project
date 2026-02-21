@@ -103,7 +103,6 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
         Icons.Default.CameraAlt
     )
 
-    // [수정] 연습 결과 화면 경로: JSON 파일명과 비디오 경로를 인자로 받음
     object PracticeResult : Screen(
         "practiceResult/{jsonFileName}/{videoPath}",
         "연습 결과",
@@ -152,6 +151,14 @@ fun AppNavigation(
         }
     }
 
+    // 로그인 시 데이터 로드 트리거
+    val currentUser = authRepository.getCurrentUser()
+    if (currentUser != null) {
+        androidx.compose.runtime.LaunchedEffect(currentUser.uid) {
+            viewModel.loadInitialData(currentUser.uid)
+        }
+    }
+
     // 상/하단 바 숨길 화면 목록
     val screensToHideBars = listOf(
         Screen.Login.route,
@@ -166,7 +173,6 @@ fun AppNavigation(
         Screen.SongDetail.route,
         Screen.SongPartSelect.route,
         Screen.DancePractice.route,
-        // PracticeResult는 인자가 포함된 경로이므로 아래 showMainBars 로직에서 처리됨
         Screen.AnalysisLoading.route,
         Screen.Record.route,
         Screen.Analysis.route,
@@ -174,7 +180,6 @@ fun AppNavigation(
     )
 
     val showMainBars = if (currentRoute != null) {
-        // PracticeResult 경로의 경우 인자 때문에 startsWith로 체크해야 함
         val isResultScreen = currentRoute.startsWith("practiceResult/")
         if (isResultScreen) false
         else screensToHideBars.none { route ->
@@ -324,7 +329,7 @@ fun AppNavHost(
         startDestination = startDestination,
         modifier = modifier
     ) {
-        // 로그인 화면
+        // ... (기존 로그인, 회원가입 라우트 생략 - 동일함) ...
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
@@ -341,8 +346,6 @@ fun AppNavHost(
                 }
             )
         }
-
-        // 회원가입 1단계
         composable(Screen.SignUp.route) {
             SignUpScreen(
                 onNavigateToLogin = { navController.popBackStack() },
@@ -353,8 +356,6 @@ fun AppNavHost(
                 }
             )
         }
-
-        // 회원가입 2단계
         composable(
             route = "${Screen.SignUpSecond.route}/{email}/{password}",
             arguments = listOf(
@@ -424,30 +425,32 @@ fun AppNavHost(
             )
         }
 
+        // 시스템 테스트
         composable(Screen.Test.route) {
             IntegrationTestScreen(navController)
         }
 
+        // [수정] 프로필 수정 화면에 ViewModel 주입
         composable(Screen.ProfileEdit.route) {
-            ProfileEditScreen(onBackClick = { navController.popBackStack() })
+            ProfileEditScreen(
+                onBackClick = { navController.popBackStack() },
+                viewModel = viewModel
+            )
         }
 
+        // ... (나머지 화면 라우트 생략 - 동일함) ...
         composable(Screen.PracticeSettings.route) {
             PracticeSettingsScreen(onBackClick = { navController.popBackStack() })
         }
-
         composable(Screen.NotificationSettings.route) {
             NotificationSettingsScreen(onBackClick = { navController.popBackStack() })
         }
-
         composable(Screen.PrivacySettings.route) {
             PrivacySettingsScreen(onBackClick = { navController.popBackStack() })
         }
-
         composable(Screen.AppInfo.route) {
             AppInfoScreen(onBackClick = { navController.popBackStack() })
         }
-
         composable(Screen.Withdrawal.route) {
             WithdrawalScreen(
                 onBackClick = { navController.popBackStack() },
@@ -458,8 +461,6 @@ fun AppNavHost(
                 }
             )
         }
-
-        // 검색 결과 화면
         composable(
             route = Screen.SearchResults.route,
             arguments = listOf(navArgument("query") { type = NavType.StringType })
@@ -471,8 +472,6 @@ fun AppNavHost(
                 paddingValues = innerPadding
             )
         }
-
-        // 곡 상세 화면
         composable(
             route = Screen.SongDetail.route,
             arguments = listOf(navArgument("songId") { type = NavType.StringType })
@@ -485,8 +484,6 @@ fun AppNavHost(
                 onBackClick = { navController.popBackStack() }
             )
         }
-
-        // 곡 파트 선택 화면
         composable(
             route = Screen.SongPartSelect.route,
             arguments = listOf(navArgument("songId") { type = NavType.StringType })
@@ -505,8 +502,6 @@ fun AppNavHost(
                 }
             )
         }
-
-        // 댄스 연습 화면
         composable(
             route = Screen.DancePractice.route,
             arguments = listOf(
@@ -536,17 +531,11 @@ fun AppNavHost(
                 onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
             )
         }
-
-        // 분석 대기 화면 (사용 안 함)
         composable(Screen.AnalysisLoading.route) {
             AnalysisWaitingScreen(
-                onAnalysisComplete = {
-                    // 결과 화면으로 직접 이동하지 않고, 녹화 화면의 로직을 따름
-                }
+                onAnalysisComplete = { }
             )
         }
-
-        // [수정] 연습 결과 화면 (JSON 파일명과 비디오 경로 인자 처리)
         composable(
             route = Screen.PracticeResult.route,
             arguments = listOf(
@@ -563,7 +552,6 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onBackClick = { navController.popBackStack(Screen.Home.route, false) },
                 onReplayClick = {
-                    // 현재 화면 재진입 (재생 초기화 효과)
                     navController.navigate(
                         "practiceResult/${Screen.encodeArg(jsonFileName)}/${Screen.encodeArg(videoPath)}"
                     ) {
@@ -573,8 +561,6 @@ fun AppNavHost(
                 onHomeClick = { navController.popBackStack(Screen.Home.route, false) }
             )
         }
-
-        // 녹화 화면
         composable(
             route = Screen.Record.route,
             arguments = listOf(
@@ -586,7 +572,6 @@ fun AppNavHost(
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
-
             val parts = artistPart.split("·").map { it.trim() }
             val artistName = parts.getOrNull(0) ?: "Unknown"
             val partName = parts.getOrNull(1) ?: artistPart
@@ -598,18 +583,12 @@ fun AppNavHost(
                 part = partName,
                 onBack = { navController.popBackStack() },
                 onRecordingComplete = { resultString ->
-                    // 결과 문자열 분리 ("S3Key_or_Path|VideoUri" 형식)
-                    // 파이프(|)를 기준으로 앞부분은 JSON 파일 관련 경로, 뒷부분은 로컬 비디오 URI입니다.
                     val dataParts = resultString.split("|")
                     val rawPath = dataParts[0]
                     val videoUriString = if (dataParts.size > 1) dataParts[1] else ""
-
-                    // 경로에서 순수 JSON 파일명만 추출 (예: "s3/path/file.json" -> "file.json")
                     val jsonFileName = rawPath.split("/").last()
-
                     val encodedJson = Screen.encodeArg(jsonFileName)
                     val encodedVideo = Screen.encodeArg(videoUriString)
-
                     navController.navigate("practiceResult/$encodedJson/$encodedVideo") {
                         popUpTo(Screen.Record.route) { inclusive = true }
                     }

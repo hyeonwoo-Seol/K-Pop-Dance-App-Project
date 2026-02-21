@@ -23,7 +23,7 @@ import com.example.kpopdancepracticeai.data.entity.*
         Badge::class,
         UserAchievementProgress::class
     ],
-    version = 3, // [수정] 버전을 2에서 3으로 증가 (스키마 변경 반영)
+    version = 4, // [수정됨] 스키마 변경(프로필 이미지 필드 추가)으로 인한 버전 3 -> 4 로 증가
     exportSchema = false
 )
 @TypeConverters(Converters::class)
