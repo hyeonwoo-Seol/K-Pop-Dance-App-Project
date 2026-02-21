@@ -26,6 +26,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -33,10 +34,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
+import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
+import com.example.kpopdancepracticeai.viewmodel.BadgeUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
-// 테마 색상 정의 (누락 방지)
 val BorderLight = Color(0xFFE0E0E0)
 val TextGray = Color(0xFF757575)
 
@@ -52,22 +55,23 @@ fun ProfileScreen(
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
     onNavigateToTest: () -> Unit,
-    viewModel: MainViewModel // MainViewModel 하나로 통합 관리
+    viewModel: MainViewModel
 ) {
-    // ViewModel 상태 구독
     val userStats by viewModel.userStats.collectAsState()
-    val achievements by viewModel.achievements.collectAsState()
+    val userProfile by viewModel.currentUserProfile.collectAsState()
     val isSyncing by viewModel.isSyncing.collectAsState()
     val syncMessage by viewModel.syncMessage.collectAsState()
 
+    val levelInfo by viewModel.userLevelInfo.collectAsState()
+    val achievements by viewModel.achievementProgress.collectAsState()
+    val badges by viewModel.userBadges.collectAsState()
+
     val context = LocalContext.current
 
-    // [핵심 수정] 화면 진입 시 시간 동기화 (인자 없이 호출)
     LaunchedEffect(Unit) {
         viewModel.updateUsageTime()
     }
 
-    // 동기화 결과 메시지(Toast) 처리
     LaunchedEffect(syncMessage) {
         syncMessage?.let {
             Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
@@ -84,16 +88,21 @@ fun ProfileScreen(
         contentPadding = paddingValues,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // 프로필 헤더
-        item { ProfileHeaderCard(userStats = userStats, onDetailClick = onNavigateToAnalysis) }
-        // 탭 메뉴
+        item {
+            ProfileHeaderCard(
+                userProfile = userProfile,
+                userStats = userStats,
+                levelInfo = levelInfo,
+                onDetailClick = onNavigateToAnalysis
+            )
+        }
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
 
         when (selectedTab) {
             "통계" -> {
                 item { StatisticsRow(userStats = userStats) }
-                item { AchievementsSummaryCard() }
-                item { AcquiredBadgesCard() }
+                item { AchievementsSummaryCard(achievements = achievements) }
+                item { AcquiredBadgesCard(badges = badges) }
             }
             "업적" -> {
                 item {
@@ -105,20 +114,24 @@ fun ProfileScreen(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                     )
                 }
-                val achievementsList = listOf(
-                    Triple("완벽주의자", "95% 이상의 정확도 5회 달성", 0.8f),
-                    Triple("연습 벌레", "총 연습 시간 100시간 달성", 0.41f),
-                    Triple("BTS 마스터", "BTS 챌린지 10개 완료", 0.5f),
-                    Triple("챌린지 헌터", "모든 챌린지 1회 이상 완료", 0.1f),
-                    Triple("신입 댄서", "첫 연습 영상 업로드", 1.0f)
-                )
-                items(achievementsList) { (title, description, progress) ->
-                    AchievementCard(
-                        title = title,
-                        description = description,
-                        progress = progress,
-                        progressText = "${(progress * 100).toInt()}%"
-                    )
+                if (achievements.isEmpty()) {
+                    item {
+                        Text(
+                            "아직 진행중인 업적이 없습니다.",
+                            modifier = Modifier.fillMaxWidth().padding(20.dp),
+                            textAlign = TextAlign.Center,
+                            color = Color.Gray
+                        )
+                    }
+                } else {
+                    items(achievements) { item ->
+                        AchievementCard(
+                            title = item.title,
+                            description = item.description,
+                            progress = item.progress,
+                            progressText = item.progressText
+                        )
+                    }
                 }
             }
             "설정" -> {
@@ -131,10 +144,7 @@ fun ProfileScreen(
                         onNavigateToAppInfo,
                         onNavigateToWithdrawal,
                         onNavigateToTest = onNavigateToTest,
-                        onSyncClick = {
-                            // [수정] 인자 없이 호출 (내부적으로 userStats의 ID 사용)
-                            viewModel.refreshData()
-                        },
+                        onSyncClick = { viewModel.refreshData() },
                         isSyncing = isSyncing
                     )
                 }
@@ -146,7 +156,9 @@ fun ProfileScreen(
 
 @Composable
 fun ProfileHeaderCard(
+    userProfile: com.example.kpopdancepracticeai.data.entity.User?,
     userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
+    levelInfo: Pair<Int, Pair<Long, Long>>,
     onDetailClick: () -> Unit
 ) {
     Surface(
@@ -159,12 +171,26 @@ fun ProfileHeaderCard(
             modifier = Modifier.fillMaxWidth().padding(20.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                Icons.Default.AccountCircle,
-                "프로필 이미지",
-                modifier = Modifier.size(64.dp).clip(CircleShape),
-                tint = Color.LightGray
-            )
+            // [수정됨] DB에 프로필 이미지 경로가 있으면 노출
+            if (!userProfile?.profileImageUrl.isNullOrEmpty()) {
+                AsyncImage(
+                    model = userProfile?.profileImageUrl,
+                    contentDescription = "프로필 이미지",
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .border(1.dp, Color.LightGray, CircleShape),
+                    contentScale = ContentScale.Crop
+                )
+            } else {
+                Icon(
+                    Icons.Default.AccountCircle,
+                    "프로필 이미지",
+                    modifier = Modifier.size(64.dp).clip(CircleShape),
+                    tint = Color.LightGray
+                )
+            }
+
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Row(
@@ -174,16 +200,20 @@ fun ProfileHeaderCard(
                 ) {
                     Column {
                         Text("내 프로필", style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-                        Text("김원준", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(
+                            text = userProfile?.name ?: "사용자",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold
+                        )
                     }
                     CustomShadowButton("상세 통계 보기", onDetailClick, 92.dp, 35.dp, 11.sp)
                 }
                 Spacer(modifier = Modifier.height(16.dp))
 
-                val currentExp = userStats?.currentExp ?: 0L
-                val appLevel = userStats?.appLevel ?: 1
+                val appLevel = levelInfo.first
+                val currentExp = levelInfo.second.first
+                val maxExp = levelInfo.second.second
                 val avgAccuracy = userStats?.avgAccuracy?.toFloat() ?: 0f
-                val maxExp = (appLevel * 1000).toLong()
 
                 Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                     StatColumn("평균 정확도", "${avgAccuracy.toInt()}%")
@@ -289,8 +319,16 @@ fun CustomShadowButton(
 
 @Composable
 fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserStats?) {
-    val totalTimeMin = (userStats?.totalPlayTime ?: 0) / 60
-    val totalTimeText = if (totalTimeMin > 60) "${totalTimeMin / 60}H" else "${totalTimeMin}M"
+    val totalSeconds = userStats?.totalPlayTime ?: 0L
+    val totalMinutes = totalSeconds / 60
+    val hours = totalMinutes / 60
+    val mins = totalMinutes % 60
+
+    val totalTimeText = if (hours > 0) {
+        "${hours}H ${mins}M"
+    } else {
+        "${mins}M" // 1시간 미만이면 분 단위로 표시
+    }
 
     val completedSongs = "${userStats?.completedParts ?: 0}개"
     val avgAccuracy = "${userStats?.avgAccuracy?.toInt() ?: 0}%"
@@ -299,7 +337,7 @@ fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserSta
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard(Modifier.weight(1f), totalTimeText, "총 연습시간")
+        StatCard(Modifier.weight(1f), totalTimeText, "총 접속시간")
         StatCard(Modifier.weight(1f), completedSongs, "완료한 곡 개수")
         StatCard(Modifier.weight(1f), avgAccuracy, "평균 정확도")
     }
@@ -326,7 +364,7 @@ fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
 }
 
 @Composable
-fun AchievementsSummaryCard() {
+fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -338,13 +376,12 @@ fun AchievementsSummaryCard() {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            listOf(
-                "완벽주의자" to 0.8f,
-                "연습 벌레" to 0.3f,
-                "BTS 마스터" to 0.5f,
-                "챌린지 헌터" to 0.1f
-            ).forEach { (l, p) ->
-                AchievementProgressItem(l, p, "${(p * 100).toInt()}%")
+            if (achievements.isEmpty()) {
+                Text("진행 중인 업적이 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            } else {
+                achievements.take(4).forEach { item ->
+                    AchievementProgressItem(item.title, item.progress, item.progressText)
+                }
             }
         }
     }
@@ -376,14 +413,7 @@ fun AchievementProgressItem(label: String, progress: Float, progressText: String
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun AcquiredBadgesCard() {
-    val badges = mapOf(
-        "BTS 마스터" to Color(0xFFEBEBFF),
-        "NewJeans 팬" to Color(0xFFD6F5FF),
-        "BLACKPINK 전문가" to Color(0xFFFFD6EB),
-        "초급자 졸업" to Color(0xFFD9FFE5),
-        "중급자" to Color(0xFFFFFAD6)
-    )
+fun AcquiredBadgesCard(badges: List<BadgeUiModel>) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -395,11 +425,17 @@ fun AcquiredBadgesCard() {
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text("획득한 뱃지", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                badges.forEach { (text, color) -> BadgeChip(text = text, color = color) }
+            if (badges.isEmpty()) {
+                Text("획득한 뱃지가 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    badges.forEach { badge ->
+                        BadgeChip(text = badge.name, color = badge.color)
+                    }
+                }
             }
         }
     }
