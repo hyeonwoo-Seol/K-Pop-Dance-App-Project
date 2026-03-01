@@ -169,6 +169,7 @@ fun AppNavigation(
         Screen.NotificationSettings.route,
         Screen.PrivacySettings.route,
         Screen.AppInfo.route,
+        "faq", // ⭐️ [수정] FAQ 화면에서 하단 바 숨김 처리 추가
         Screen.Withdrawal.route,
         Screen.SongDetail.route,
         Screen.SongPartSelect.route,
@@ -329,7 +330,6 @@ fun AppNavHost(
         startDestination = startDestination,
         modifier = modifier
     ) {
-        // ... (기존 로그인, 회원가입 라우트 생략 - 동일함) ...
         composable(Screen.Login.route) {
             LoginScreen(
                 onLoginSuccess = {
@@ -430,7 +430,7 @@ fun AppNavHost(
             IntegrationTestScreen(navController)
         }
 
-        // [수정] 프로필 수정 화면에 ViewModel 주입
+        // 프로필 수정 화면
         composable(Screen.ProfileEdit.route) {
             ProfileEditScreen(
                 onBackClick = { navController.popBackStack() },
@@ -438,7 +438,6 @@ fun AppNavHost(
             )
         }
 
-        // ... (나머지 화면 라우트 생략 - 동일함) ...
         composable(Screen.PracticeSettings.route) {
             PracticeSettingsScreen(onBackClick = { navController.popBackStack() })
         }
@@ -448,8 +447,17 @@ fun AppNavHost(
         composable(Screen.PrivacySettings.route) {
             PrivacySettingsScreen(onBackClick = { navController.popBackStack() })
         }
-        composable(Screen.AppInfo.route) {
-            AppInfoScreen(onBackClick = { navController.popBackStack() })
+        composable("appInfo") {
+            AppInfoScreen(
+                onBackClick = { navController.popBackStack() },
+                onNavigateToFaq = { navController.navigate("faq") }
+            )
+        }
+        // ⭐️ [수정] FAQ 화면 라우트 추가
+        composable("faq") {
+            FaqScreen(
+                onBackClick = { navController.popBackStack() }
+            )
         }
         composable(Screen.Withdrawal.route) {
             WithdrawalScreen(

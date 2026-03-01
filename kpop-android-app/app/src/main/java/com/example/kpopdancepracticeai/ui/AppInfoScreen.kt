@@ -35,7 +35,8 @@ import com.example.kpopdancepracticeai.util.sendSupportEmail // 확장 함수 �
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppInfoScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    onNavigateToFaq: () -> Unit // [추가됨] FAQ 화면 이동을 위한 파라미터 추가
 ) {
     // Context 획득
     val context = LocalContext.current
@@ -122,7 +123,7 @@ fun AppInfoScreen(
                                 title = "FAQ",
                                 description = "",
                                 icon = Icons.Outlined.HelpOutline,
-                                onClick = { /* TODO: FAQ 화면 이동 */ }
+                                onClick = onNavigateToFaq // [수정됨] TODO 였던 부분을 파라미터로 받은 이벤트와 연결
                             )
                         }
                     }
@@ -236,6 +237,9 @@ fun AppIcon() {
 @Composable
 fun AppInfoScreenPreview() {
     KpopDancePracticeAITheme {
-        AppInfoScreen(onBackClick = {})
+        AppInfoScreen(
+            onBackClick = {},
+            onNavigateToFaq = {} // [추가됨] 프리뷰 오류 방지를 위해 더미 연결
+        )
     }
 }
