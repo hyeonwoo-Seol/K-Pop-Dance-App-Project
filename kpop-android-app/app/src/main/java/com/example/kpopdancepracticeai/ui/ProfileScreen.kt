@@ -337,7 +337,7 @@ fun StatisticsRow(userStats: com.example.kpopdancepracticeai.data.entity.UserSta
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        StatCard(Modifier.weight(1f), totalTimeText, "총 접속시간")
+        StatCard(Modifier.weight(1f), totalTimeText, "총 연습시간")
         StatCard(Modifier.weight(1f), completedSongs, "완료한 곡 개수")
         StatCard(Modifier.weight(1f), avgAccuracy, "평균 정확도")
     }
