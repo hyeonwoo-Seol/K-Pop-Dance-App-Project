@@ -1,6 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -21,11 +22,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext // Context 획득을 위해 추가
+import androidx.compose.ui.res.painterResource // 이미지 리소스를 위해 추가
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kpopdancepracticeai.R // 앱 리소스(R.mipmap.ic_launcher)를 위해 추가
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.util.sendSupportEmail // 확장 함수 임포트
 
@@ -123,7 +126,7 @@ fun AppInfoScreen(
                                 title = "FAQ",
                                 description = "",
                                 icon = Icons.Outlined.HelpOutline,
-                                onClick = onNavigateToFaq // [수정됨] TODO 였던 부분을 파라미터로 받은 이벤트와 연결
+                                onClick = onNavigateToFaq // FAQ 네비게이션 적용
                             )
                         }
                     }
@@ -207,31 +210,18 @@ fun AppInfoScreen(
  */
 @Composable
 fun AppIcon() {
-    val iconGradient = Brush.verticalGradient(
-        colors = listOf(
-            Color(0xFF8A2BE2), // Violet
-            Color(0xFFFF69B4)  // HotPink
-        )
-    )
     Surface(
         modifier = Modifier.size(80.dp),
         shape = RoundedCornerShape(20.dp), // 부드러운 사각형
         shadowElevation = 8.dp
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(iconGradient),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "💃",
-                fontSize = 40.sp
-            )
-        }
+        Image(
+            painter = painterResource(id = R.mipmap.ic_launcher),
+            contentDescription = "앱 아이콘",
+            modifier = Modifier.fillMaxSize()
+        )
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable
@@ -239,7 +229,7 @@ fun AppInfoScreenPreview() {
     KpopDancePracticeAITheme {
         AppInfoScreen(
             onBackClick = {},
-            onNavigateToFaq = {} // [추가됨] 프리뷰 오류 방지를 위해 더미 연결
+            onNavigateToFaq = {} // 프리뷰 오류 방지를 위해 더미 연결
         )
     }
 }
