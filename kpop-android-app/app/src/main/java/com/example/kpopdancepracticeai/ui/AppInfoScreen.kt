@@ -1,6 +1,8 @@
 package com.example.kpopdancepracticeai.ui
 
-import androidx.compose.foundation.BorderStroke
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -16,33 +18,49 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext // Context 획득을 위해 추가
-import androidx.compose.ui.res.painterResource // 이미지 리소스를 위해 추가
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.example.kpopdancepracticeai.R // 앱 리소스(R.mipmap.ic_launcher)를 위해 추가
+import com.example.kpopdancepracticeai.R
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
-import com.example.kpopdancepracticeai.util.sendSupportEmail // 확장 함수 임포트
+import com.example.kpopdancepracticeai.util.sendSupportEmail
 
-/**
- * 앱 정보 화면 (전체 화면)
- */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppInfoScreen(
     onBackClick: () -> Unit,
-    onNavigateToFaq: () -> Unit // [추가됨] FAQ 화면 이동을 위한 파라미터 추가
+    onNavigateToFaq: () -> Unit,
+    onNavigateToTerms: () -> Unit,
+    onNavigateToPrivacyPolicy: () -> Unit,
+    onNavigateToOpenSource: () -> Unit
 ) {
-    // Context 획득
     val context = LocalContext.current
+
+    val versionInfo = remember(context) {
+        try {
+            val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+            val versionName = packageInfo.versionName ?: "1.0.0"
+
+            // 안드로이드 버전에 따른 안전한 Version Code 가져오기
+            val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                packageInfo.longVersionCode.toString()
+            } else {
+                @Suppress("DEPRECATION")
+                packageInfo.versionCode.toString()
+            }
+
+            "$versionName (Build $versionCode) - 최신 버전입니다"
+        } catch (e: PackageManager.NameNotFoundException) {
+            "1.0.0 - 버전 정보를 불러올 수 없습니다"
+        }
+    }
 
     // 앱 전체의 그라데이션 배경
     val appGradient = Brush.verticalGradient(
@@ -59,16 +77,13 @@ fun AppInfoScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
                 contentPadding = innerPadding,
-                modifier = Modifier
-                    .fillMaxSize(),
-                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 패딩 제거 -> 내부 아이템에 적용
-                horizontalAlignment = Alignment.CenterHorizontally // 아이콘, 텍스트 중앙 정렬
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
+                // --- 0. 상단바 ---
                 item {
                     TopAppBar(
                         title = { Text("앱 정보", fontWeight = FontWeight.Bold) },
@@ -83,20 +98,18 @@ fun AppInfoScreen(
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = Color.Transparent
                         ),
-                        // Scaffold 내부 List에 있으므로 별도의 윈도우 인셋 처리 불필요 혹은 0으로 설정
                         windowInsets = WindowInsets(0.dp)
                     )
                 }
 
                 // --- 1. 앱 아이콘 및 이름 ---
                 item {
-                    // 중앙 정렬 및 여백 유지를 위한 Column
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(horizontal = 16.dp)
                     ) {
                         Spacer(modifier = Modifier.height(32.dp))
-                        AppIcon() // 앱 아이콘 Composable
+                        AppIcon() // 앱 아이콘
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
                             text = "Dance Practice App",
@@ -108,7 +121,7 @@ fun AppInfoScreen(
                     }
                 }
 
-                // --- 2. 지원 및 피드백 카드 ---
+                // --- 2. 지원 및 피드백 카드 (문의하기, FAQ) ---
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         SettingsCard(title = "지원 및 피드백") {
@@ -116,23 +129,20 @@ fun AppInfoScreen(
                                 title = "문의하기",
                                 description = "",
                                 icon = Icons.Outlined.ChatBubbleOutline,
-                                onClick = {
-                                    // 유틸리티 함수 호출로 이메일 발송 처리
-                                    context.sendSupportEmail()
-                                }
+                                onClick = { context.sendSupportEmail() }
                             )
                             SettingsDivider()
                             SettingsClickableItem(
                                 title = "FAQ",
                                 description = "",
                                 icon = Icons.Outlined.HelpOutline,
-                                onClick = onNavigateToFaq // FAQ 네비게이션 적용
+                                onClick = onNavigateToFaq
                             )
                         }
                     }
                 }
 
-                // --- 3. 법적 고지 카드 ---
+                // --- 3. 법적 고지 카드 (이용 약관, 처리 방침) ---
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Column {
@@ -142,31 +152,35 @@ fun AppInfoScreen(
                                     title = "서비스 이용 약관",
                                     description = "",
                                     icon = Icons.Outlined.Description,
-                                    onClick = { /* TODO: 서비스 이용 약관 화면 이동 */ }
+                                    onClick = onNavigateToTerms
                                 )
                                 SettingsDivider()
                                 SettingsClickableItem(
                                     title = "개인정보 처리 방침",
                                     description = "",
                                     icon = Icons.Outlined.Shield,
-                                    onClick = { /* TODO: 개인정보 처리 방침 화면 이동 */ }
+                                    onClick = onNavigateToPrivacyPolicy
                                 )
                             }
                         }
                     }
                 }
 
-                // --- 4. 앱 세부 정보 카드 ---
+                // --- 4. 앱 세부 정보 카드 (버전 정보, 라이선스) ---
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Column {
                             Spacer(modifier = Modifier.height(16.dp))
                             SettingsCard(title = "앱 세부 정보") {
+                                //  동적으로 생성한 versionInfo 변수 적용
                                 SettingsClickableItem(
                                     title = "버전 정보",
-                                    description = "1.0.0 (Build 100)",
+                                    description = versionInfo,
                                     icon = Icons.Outlined.Info,
-                                    onClick = { } // 버전 정보는 보통 클릭 안 됨
+                                    onClick = {
+                                        // 클릭 시 가벼운 알림(Toast) 메시지를 띄웁니다.
+                                        Toast.makeText(context, "현재 최신 버전을 사용 중입니다.", Toast.LENGTH_SHORT).show()
+                                    }
                                 )
                                 SettingsDivider()
                                 SettingsClickableItem(
@@ -205,14 +219,11 @@ fun AppInfoScreen(
     }
 }
 
-/**
- * 앱 정보 화면의 아이콘
- */
 @Composable
 fun AppIcon() {
     Surface(
         modifier = Modifier.size(80.dp),
-        shape = RoundedCornerShape(20.dp), // 부드러운 사각형
+        shape = RoundedCornerShape(20.dp),
         shadowElevation = 8.dp
     ) {
         Image(
@@ -229,7 +240,10 @@ fun AppInfoScreenPreview() {
     KpopDancePracticeAITheme {
         AppInfoScreen(
             onBackClick = {},
-            onNavigateToFaq = {} // 프리뷰 오류 방지를 위해 더미 연결
+            onNavigateToFaq = {},
+            onNavigateToTerms = {},
+            onNavigateToPrivacyPolicy = {},
+            onNavigateToOpenSource = {}
         )
     }
 }

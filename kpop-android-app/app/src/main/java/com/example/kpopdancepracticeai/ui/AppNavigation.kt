@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Code
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.ExitToApp
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
@@ -69,7 +71,6 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
-// --- 1. 내비게이션 경로(Route) 정의 ---
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Login : Screen("login", "로그인", Icons.Default.Home)
     object SignUp : Screen("signUp", "회원가입", Icons.Default.Person)
@@ -85,6 +86,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object PrivacySettings : Screen("privacySettings", "개인정보 보호 및 권한", Icons.Outlined.Shield)
     object AppInfo : Screen("appInfo", "앱 정보", Icons.Outlined.Info)
     object Withdrawal : Screen("withdrawal", "회원 탈퇴", Icons.Outlined.ExitToApp)
+
+    // ⭐️ [추가됨] 약관 화면 라우트 추가
+    object TermsOfService : Screen("termsOfService", "이용 약관", Icons.Outlined.Description)
+    object PrivacyPolicy : Screen("privacyPolicy", "개인정보 처리 방침", Icons.Outlined.Shield)
+    // ⭐️ [추가됨] 오픈소스 라이선스 화면 라우트 추가
+    object OpenSourceLicense : Screen("openSourceLicense", "오픈소스 라이선스", Icons.Outlined.Code)
 
     object SearchResults : Screen("searchResults/{query}", "검색 결과", Icons.Default.Search)
     object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
@@ -126,7 +133,6 @@ val bottomNavItems = listOf(
     Screen.Profile,
 )
 
-// --- 2. 앱의 메인 Composable ---
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation(
@@ -151,7 +157,6 @@ fun AppNavigation(
         }
     }
 
-    // 로그인 시 데이터 로드 트리거
     val currentUser = authRepository.getCurrentUser()
     if (currentUser != null) {
         androidx.compose.runtime.LaunchedEffect(currentUser.uid) {
@@ -159,7 +164,7 @@ fun AppNavigation(
         }
     }
 
-    // 상/하단 바 숨길 화면 목록
+    // ⭐️ [수정됨] 하단 바 숨길 화면 목록에 약관 화면 추가
     val screensToHideBars = listOf(
         Screen.Login.route,
         Screen.SignUp.route,
@@ -169,7 +174,10 @@ fun AppNavigation(
         Screen.NotificationSettings.route,
         Screen.PrivacySettings.route,
         Screen.AppInfo.route,
-        "faq", // ⭐️ [수정] FAQ 화면에서 하단 바 숨김 처리 추가
+        "faq",
+        Screen.TermsOfService.route,
+        Screen.PrivacyPolicy.route,
+        Screen.OpenSourceLicense.route, // ⭐️ [추가됨] 하단 바 숨김 목록에 추가
         Screen.Withdrawal.route,
         Screen.SongDetail.route,
         Screen.SongPartSelect.route,
@@ -377,7 +385,6 @@ fun AppNavHost(
             )
         }
 
-        // 홈 화면
         composable(Screen.Home.route) {
             HomeScreen(
                 viewModel = viewModel,
@@ -393,7 +400,6 @@ fun AppNavHost(
             )
         }
 
-        // 검색 화면
         composable(Screen.Search.route) {
             SearchScreen(
                 paddingValues = innerPadding,
@@ -401,7 +407,6 @@ fun AppNavHost(
             )
         }
 
-        // 분석 화면
         composable(Screen.Analysis.route) {
             AnalysisScreen(
                 paddingValues = innerPadding,
@@ -409,7 +414,6 @@ fun AppNavHost(
             )
         }
 
-        // 프로필 화면
         composable(Screen.Profile.route) {
             ProfileScreen(
                 paddingValues = innerPadding,
@@ -425,12 +429,10 @@ fun AppNavHost(
             )
         }
 
-        // 시스템 테스트
         composable(Screen.Test.route) {
             IntegrationTestScreen(navController)
         }
 
-        // 프로필 수정 화면
         composable(Screen.ProfileEdit.route) {
             ProfileEditScreen(
                 onBackClick = { navController.popBackStack() },
@@ -447,18 +449,44 @@ fun AppNavHost(
         composable(Screen.PrivacySettings.route) {
             PrivacySettingsScreen(onBackClick = { navController.popBackStack() })
         }
-        composable("appInfo") {
+
+        composable(Screen.AppInfo.route) {
             AppInfoScreen(
                 onBackClick = { navController.popBackStack() },
-                onNavigateToFaq = { navController.navigate("faq") }
+                onNavigateToFaq = { navController.navigate("faq") },
+                onNavigateToTerms = { navController.navigate(Screen.TermsOfService.route) },
+                onNavigateToPrivacyPolicy = { navController.navigate(Screen.PrivacyPolicy.route) },
+                onNavigateToOpenSource = { navController.navigate(Screen.OpenSourceLicense.route) }
             )
         }
-        // ⭐️ [수정] FAQ 화면 라우트 추가
+
         composable("faq") {
             FaqScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
+
+        // ⭐️ [추가됨] 약관 화면 라우트 추가
+        composable(Screen.TermsOfService.route) {
+            TermsOfServiceScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ⭐️ [추가됨] 개인정보 처리 방침 화면 라우트 추가
+        composable(Screen.PrivacyPolicy.route) {
+            PrivacyPolicyScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
+        // ⭐️ [추가됨] 오픈소스 라이선스 화면 등록
+        composable(Screen.OpenSourceLicense.route) {
+            OpenSourceLicenseScreen(
+                onBackClick = { navController.popBackStack() }
+            )
+        }
+
         composable(Screen.Withdrawal.route) {
             WithdrawalScreen(
                 onBackClick = { navController.popBackStack() },
