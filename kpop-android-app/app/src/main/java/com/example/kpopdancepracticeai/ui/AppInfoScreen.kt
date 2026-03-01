@@ -39,16 +39,16 @@ fun AppInfoScreen(
     onNavigateToFaq: () -> Unit,
     onNavigateToTerms: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
-    onNavigateToOpenSource: () -> Unit
+    onNavigateToOpenSource: () -> Unit // ⭐️ 이 부분이 추가되었습니다.
 ) {
     val context = LocalContext.current
 
+    // 기기에서 실제 앱 버전을 불러옵니다.
     val versionInfo = remember(context) {
         try {
             val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
             val versionName = packageInfo.versionName ?: "1.0.0"
 
-            // 안드로이드 버전에 따른 안전한 Version Code 가져오기
             val versionCode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
                 packageInfo.longVersionCode.toString()
             } else {
@@ -172,13 +172,11 @@ fun AppInfoScreen(
                         Column {
                             Spacer(modifier = Modifier.height(16.dp))
                             SettingsCard(title = "앱 세부 정보") {
-                                //  동적으로 생성한 versionInfo 변수 적용
                                 SettingsClickableItem(
                                     title = "버전 정보",
                                     description = versionInfo,
                                     icon = Icons.Outlined.Info,
                                     onClick = {
-                                        // 클릭 시 가벼운 알림(Toast) 메시지를 띄웁니다.
                                         Toast.makeText(context, "현재 최신 버전을 사용 중입니다.", Toast.LENGTH_SHORT).show()
                                     }
                                 )
@@ -187,7 +185,7 @@ fun AppInfoScreen(
                                     title = "오픈소스 라이선스",
                                     description = "",
                                     icon = Icons.Outlined.Code,
-                                    onClick = { /* TODO: 오픈소스 라이선스 화면 이동 */ }
+                                    onClick = onNavigateToOpenSource // ⭐️ 여기 연결이 누락되어 있었습니다! 이제 정상 작동합니다.
                                 )
                             }
                         }
