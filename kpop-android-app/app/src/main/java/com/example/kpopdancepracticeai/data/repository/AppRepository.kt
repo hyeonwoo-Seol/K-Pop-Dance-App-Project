@@ -16,7 +16,7 @@ class AppRepository(
     private val historyDao: HistoryDao,
     private val achievementDao: AchievementDao
 ) {
-    // [수정됨] 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
+    // 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
     private var sessionStartTime: Long = System.currentTimeMillis()
 
     private fun getCurrentTime(): String {
@@ -37,7 +37,7 @@ class AppRepository(
         val currentTime = System.currentTimeMillis()
         val durationMs = currentTime - sessionStartTime
 
-        // [수정됨] 1초라도 지났으면 과거의 총 시간(totalPlayTime)에 누적해서 더합니다.
+        // 1초라도 지났으면 과거의 총 시간(totalPlayTime)에 누적해서 더합니다.
         if (durationMs >= 1000) {
             val addedSeconds = durationMs / 1000
             val currentStats = userDao.getUserStatsOneShot(userId)
@@ -122,6 +122,25 @@ class AppRepository(
         }
     }
 
+    //  회원가입 정보 등록
+    suspend fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
+        // 기존 통계 초기화 등 기본 정보 세팅 (없을 경우 생성)
+        fetchInitialData(userId)
+
+        // 초기화된 프로필 정보를 가입 시 입력받은 정보로 덮어쓰기
+        val existingUser = userDao.getUserProfileOneShot(userId)
+        if (existingUser != null) {
+            val updatedUser = existingUser.copy(
+                email = email,
+                passwordHash = passwordHash,
+                name = name,
+                birthDate = birthDate,
+                loginId = if(email.isNotBlank()) email else existingUser.loginId
+            )
+            userDao.updateUser(updatedUser)
+        }
+    }
+
     // --- Achievements & Badges ---
     fun getUserAchievements(userId: String): Flow<List<UserAchievementProgress>> = achievementDao.getUserAchievementProgress(userId)
     fun getUserBadges(userId: String): Flow<List<Badge>> = achievementDao.getUserBadges(userId)
@@ -148,7 +167,6 @@ class AppRepository(
             val gainedExp = (result.totalScore / 10) + 50
             val newTotalScore = currentStats.achievementScore + gainedExp
 
-            // [수정됨] 연습 시간은 syncAppUsageTime 에서 전담하여 더하므로 여기서 중복으로 더하지 않도록 복사합니다.
             val updatedStats = currentStats.copy(
                 completedParts = newCompletedParts,
                 avgAccuracy = newAvgAccuracy,

@@ -51,7 +51,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
         if (stats == null) Pair(1, Pair(0L, 1000L))
         else {
-            // 레벨 계산 로직: (총점수 / 1000) + 1
             val score = stats.achievementScore.toLong()
             val level = (score / 1000).toInt() + 1
             val currentLevelExp = score % 1000
@@ -136,7 +135,21 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // [수정됨] profileImageUrl 파라미터 추가
+    // ⭐️ [새로 추가된 메서드] 회원가입을 통해 들어온 정보 DB에 저장
+    fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
+        viewModelScope.launch {
+            try {
+                _isSyncing.value = true
+                repository.registerUser(userId, email, passwordHash, name, birthDate)
+                loadInitialData(userId) // 변경된 프로필 정보 가져오기
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+
     fun updateUserProfile(name: String, email: String, passwordHash: String, birthDate: String, bio: String, danceSkill: String, favoriteGenres: List<String>, profileImageUrl: String?) {
         val currentUser = _currentUserProfile.value ?: return
         val updatedUser = currentUser.copy(

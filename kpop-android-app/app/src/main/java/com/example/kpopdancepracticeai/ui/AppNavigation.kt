@@ -87,10 +87,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object AppInfo : Screen("appInfo", "앱 정보", Icons.Outlined.Info)
     object Withdrawal : Screen("withdrawal", "회원 탈퇴", Icons.Outlined.ExitToApp)
 
-    // ⭐️ [추가됨] 약관 화면 라우트 추가
     object TermsOfService : Screen("termsOfService", "이용 약관", Icons.Outlined.Description)
     object PrivacyPolicy : Screen("privacyPolicy", "개인정보 처리 방침", Icons.Outlined.Shield)
-    // ⭐️ [추가됨] 오픈소스 라이선스 화면 라우트 추가
     object OpenSourceLicense : Screen("openSourceLicense", "오픈소스 라이선스", Icons.Outlined.Code)
 
     object SearchResults : Screen("searchResults/{query}", "검색 결과", Icons.Default.Search)
@@ -164,7 +162,6 @@ fun AppNavigation(
         }
     }
 
-    // ⭐️ [수정됨] 하단 바 숨길 화면 목록에 약관 화면 추가
     val screensToHideBars = listOf(
         Screen.Login.route,
         Screen.SignUp.route,
@@ -177,7 +174,7 @@ fun AppNavigation(
         "faq",
         Screen.TermsOfService.route,
         Screen.PrivacyPolicy.route,
-        Screen.OpenSourceLicense.route, // ⭐️ [추가됨] 하단 바 숨김 목록에 추가
+        Screen.OpenSourceLicense.route,
         Screen.Withdrawal.route,
         Screen.SongDetail.route,
         Screen.SongPartSelect.route,
@@ -240,7 +237,8 @@ fun AppNavigation(
                 navController = navController,
                 innerPadding = innerPadding,
                 viewModel = viewModel,
-                startDestination = startDestination
+                startDestination = startDestination,
+                authRepository = authRepository // ⭐️ 전달
             )
         }
     }
@@ -331,7 +329,8 @@ fun AppNavHost(
     modifier: Modifier = Modifier,
     innerPadding: PaddingValues,
     viewModel: MainViewModel,
-    startDestination: String
+    startDestination: String,
+    authRepository: AuthRepository // ⭐️ 파라미터 추가
 ) {
     NavHost(
         navController = navController,
@@ -377,7 +376,23 @@ fun AppNavHost(
             SignUpSecondScreen(
                 email = email,
                 password = password,
-                onSignUpComplete = { _, _ ->
+                onSignUpComplete = { nickname, birthdate ->
+                    // ⭐️ [가입 완료 콜백 처리] 회원가입 성공 시 뷰모델을 통해 데이터베이스에 저장
+                    val currentUser = authRepository.getCurrentUser()
+                    if (currentUser != null) {
+                        // 구글 로그인의 경우 이메일 정보를 Firebase Auth에서 직접 가져옵니다.
+                        val finalEmail = if (password == "GOOGLE_LOGIN") currentUser.email ?: "" else email
+                        val finalPassword = if (password == "GOOGLE_LOGIN") "" else password
+
+                        viewModel.registerUser(
+                            userId = currentUser.uid,
+                            email = finalEmail,
+                            passwordHash = finalPassword,
+                            name = nickname,
+                            birthDate = birthdate
+                        )
+                    }
+
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
@@ -466,21 +481,18 @@ fun AppNavHost(
             )
         }
 
-        // ⭐️ [추가됨] 약관 화면 라우트 추가
         composable(Screen.TermsOfService.route) {
             TermsOfServiceScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ⭐️ [추가됨] 개인정보 처리 방침 화면 라우트 추가
         composable(Screen.PrivacyPolicy.route) {
             PrivacyPolicyScreen(
                 onBackClick = { navController.popBackStack() }
             )
         }
 
-        // ⭐️ [추가됨] 오픈소스 라이선스 화면 등록
         composable(Screen.OpenSourceLicense.route) {
             OpenSourceLicenseScreen(
                 onBackClick = { navController.popBackStack() }
