@@ -1,11 +1,11 @@
-package com.example.kpopdancepracticeai.ui.test
+package com.example.kpopdancepracticeai.util
 
 import com.example.kpopdancepracticeai.data.dto.FrameData
 import com.example.kpopdancepracticeai.ui.BodyPart
 import com.example.kpopdancepracticeai.ui.KeyPoint
 
 /**
- * 테스트용 데이터 변환기
+ * 데이터 변환기
  * 역할: 서버 DTO(FrameData)를 UI용 데이터(KeyPoint)로 변환
  */
 object DataConverter {
@@ -13,7 +13,7 @@ object DataConverter {
     fun convertToKeyPoints(frameData: FrameData): List<KeyPoint> {
         val keyPoints = mutableListOf<KeyPoint>()
 
-        // BodyPart Enum 순서대로 매핑 (NOSE(0) ~ RIGHT_ANKLE(16))
+        // BodyPart Enum 순서대로 매핑 (NOSE(0) ~ NECK(17))
         val parts = BodyPart.values()
 
         frameData.keypoints.forEachIndexed { index, rawPoint ->
@@ -21,7 +21,7 @@ object DataConverter {
             if (index < parts.size) {
                 // rawPoint = [x, y, confidence] 형태라고 가정
                 if (rawPoint.size >= 2) {
-                    val x = rawPoint[0]
+                    val x = rawPoint[0] + 0.22f
                     val y = rawPoint[1]
                     // 신뢰도 값이 있으면 사용, 없으면 0f 처리
                     val conf = if (rawPoint.size > 2) rawPoint[2] else 0f

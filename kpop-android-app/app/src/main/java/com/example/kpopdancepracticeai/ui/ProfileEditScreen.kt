@@ -1,5 +1,9 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.content.Context
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,12 +30,38 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import java.io.File
+import java.io.FileOutputStream
+
+/**
+ * 갤러리에서 선택한 이미지를 앱 내부 저장소로 복사하여 저장하는 헬퍼 함수
+ */
+fun saveImageToInternalStorage(context: Context, uri: Uri): Uri? {
+    return try {
+        val inputStream = context.contentResolver.openInputStream(uri) ?: return null
+        val fileName = "profile_${System.currentTimeMillis()}.jpg"
+        val file = File(context.filesDir, fileName)
+        val outputStream = FileOutputStream(file)
+        inputStream.copyTo(outputStream)
+        inputStream.close()
+        outputStream.close()
+        Uri.fromFile(file)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
+    }
+}
 
 /**
  * 프로필 설정 전체 화면
@@ -39,22 +69,59 @@ import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileEditScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    viewModel: MainViewModel = viewModel()
 ) {
-    // 앱 전체의 그라데이션 배경
+    val context = LocalContext.current
+    val currentUser by viewModel.currentUserProfile.collectAsState()
+    val userStats by viewModel.userStats.collectAsState()
+
+    var name by remember { mutableStateOf("") }
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var birthdate by remember { mutableStateOf("") }
+    var bio by remember { mutableStateOf("") }
+    var danceSkill by remember { mutableStateOf("초급") }
+    var favoriteGenres by remember { mutableStateOf(setOf<String>()) }
+    var profileImageUrl by remember { mutableStateOf<String?>(null) } // [추가됨] 이미지 경로 관리
+
+    // 데이터가 로드되면 상태 업데이트
+    LaunchedEffect(currentUser) {
+        currentUser?.let { user ->
+            name = user.name
+            email = user.email
+            password = user.passwordHash.takeIf { it.isNotEmpty() } ?: "********"
+            birthdate = user.birthDate
+            bio = user.bio ?: ""
+            danceSkill = user.danceSkill
+            favoriteGenres = if (user.favoriteGenres.isNotBlank()) {
+                user.favoriteGenres.split(",").toSet()
+            } else {
+                emptySet()
+            }
+            profileImageUrl = user.profileImageUrl // 기존 이미지 불러오기
+        }
+    }
+
+    // [추가됨] 갤러리에서 이미지 가져오는 런처
+    val galleryLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        uri?.let {
+            // 내부 저장소에 안전하게 복사
+            val savedUri = saveImageToInternalStorage(context, it)
+            if (savedUri != null) {
+                profileImageUrl = savedUri.toString() // 새 이미지 경로 할당
+            }
+        }
+    }
+
     val appGradient = Brush.verticalGradient(
         colors = listOf(
-            Color(0xFFDDE3FF), // 상단 연한 파랑
-            Color(0xFFF0E8FF)  // 하단 연한 보라
+            Color(0xFFDDE3FF),
+            Color(0xFFF0E8FF)
         )
     )
-
-    // 상태 관리 (임시)
-    var name by remember { mutableStateOf("김다연") }
-    var email by remember { mutableStateOf("dayeon.kim@example.com") }
-    var password by remember { mutableStateOf("********") } // 전화번호 상태를 비밀번호로 변경
-    var birthdate by remember { mutableStateOf("") }
-    var bio by remember { mutableStateOf("자신을 소개해주세요") }
 
     Box(
         modifier = Modifier
@@ -63,9 +130,7 @@ fun ProfileEditScreen(
     ) {
         Scaffold(
             containerColor = Color.Transparent,
-            // topBar 제거: 스크롤 영역 내부로 이동
             bottomBar = {
-                // 하단 '취소' / '저장' 버튼
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
                     color = Color.White.copy(alpha = 0.8f),
@@ -84,7 +149,20 @@ fun ProfileEditScreen(
                             Text("취소")
                         }
                         Button(
-                            onClick = { /* TODO: 저장 로직 */ onBackClick() },
+                            onClick = {
+                                // [수정됨] 이미지 경로 포함하여 저장 로직 호출
+                                viewModel.updateUserProfile(
+                                    name = name,
+                                    email = email,
+                                    passwordHash = password,
+                                    birthDate = birthdate,
+                                    bio = bio,
+                                    danceSkill = danceSkill,
+                                    favoriteGenres = favoriteGenres.toList(),
+                                    profileImageUrl = profileImageUrl
+                                )
+                                onBackClick()
+                            },
                             modifier = Modifier.weight(1f)
                         ) {
                             Icon(Icons.Default.Save, contentDescription = null, modifier = Modifier.size(18.dp))
@@ -99,10 +177,8 @@ fun ProfileEditScreen(
                 contentPadding = innerPadding,
                 modifier = Modifier
                     .fillMaxSize(),
-                // .padding(horizontal = 16.dp), // TopAppBar의 전체 너비를 위해 여기 패딩 제거
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                // --- 0. 상단바 (스크롤 가능하도록 이곳으로 이동) ---
                 item {
                     TopAppBar(
                         title = { Text("프로필 설정", fontWeight = FontWeight.Bold) },
@@ -117,7 +193,6 @@ fun ProfileEditScreen(
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = Color.Transparent
                         ),
-                        // Scaffold의 innerPadding이 이미 상단 여백을 제공하므로, TopAppBar 자체의 시스템 창 인셋은 제거
                         windowInsets = WindowInsets(0.dp)
                     )
                 }
@@ -125,7 +200,10 @@ fun ProfileEditScreen(
                 // --- 1. 프로필 사진 변경 ---
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ProfileImageCard(onClick = { /* TODO: 이미지 선택 로직 */ })
+                        ProfileImageCard(
+                            profileImageUrl = profileImageUrl,
+                            onClick = { galleryLauncher.launch("image/*") } // 이미지 선택 트리거
+                        )
                     }
                 }
                 // --- 2. 기본 정보 ---
@@ -134,7 +212,7 @@ fun ProfileEditScreen(
                         BasicInfoCard(
                             name = name, onNameChange = { name = it },
                             email = email, onEmailChange = { email = it },
-                            password = password, onPasswordChange = { password = it }, // 매개변수 변경
+                            password = password, onPasswordChange = { password = it },
                             birthdate = birthdate, onBirthdateChange = { birthdate = it }
                         )
                     }
@@ -143,17 +221,25 @@ fun ProfileEditScreen(
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         DanceInfoCard(
-                            bio = bio, onBioChange = { bio = it }
+                            bio = bio,
+                            onBioChange = { bio = it },
+                            currentLevel = danceSkill,
+                            onLevelChange = { danceSkill = it },
+                            currentGenres = favoriteGenres,
+                            onGenresChange = { favoriteGenres = it }
                         )
                     }
                 }
                 // --- 4. 활동 통계 ---
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ActivityStatsCard()
+                        ActivityStatsCard(
+                            completedSongs = userStats?.completedParts?.toString() ?: "0",
+                            playTime = "${(userStats?.totalPlayTime ?: 0) / 60}",
+                            badgeCount = userStats?.badgeCount?.toString() ?: "0"
+                        )
                     }
                 }
-                // --- 하단 버튼 영역 확보용 Spacer ---
                 item {
                     Spacer(modifier = Modifier.height(16.dp))
                 }
@@ -163,10 +249,10 @@ fun ProfileEditScreen(
 }
 
 /**
- * 1. 프로필 사진 변경 카드
+ * 1. 프로필 사진 변경 카드 (이미지가 있으면 표시)
  */
 @Composable
-fun ProfileImageCard(onClick: () -> Unit) {
+fun ProfileImageCard(profileImageUrl: String?, onClick: () -> Unit) {
     Surface(
         onClick = onClick,
         modifier = Modifier.fillMaxWidth(),
@@ -182,15 +268,28 @@ fun ProfileImageCard(onClick: () -> Unit) {
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             Box {
-                Icon(
-                    imageVector = Icons.Default.AccountCircle,
-                    contentDescription = "프로필 이미지",
-                    modifier = Modifier
-                        .size(128.dp)
-                        .clip(CircleShape)
-                        .background(Color.LightGray),
-                    tint = Color.Gray
-                )
+                // 이미지가 등록되어있으면 표시, 없으면 기본 아이콘
+                if (!profileImageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = profileImageUrl,
+                        contentDescription = "프로필 이미지",
+                        modifier = Modifier
+                            .size(128.dp)
+                            .clip(CircleShape)
+                            .border(2.dp, Color.LightGray, CircleShape),
+                        contentScale = ContentScale.Crop
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.AccountCircle,
+                        contentDescription = "프로필 이미지",
+                        modifier = Modifier
+                            .size(128.dp)
+                            .clip(CircleShape)
+                            .background(Color.LightGray),
+                        tint = Color.Gray
+                    )
+                }
                 Icon(
                     imageVector = Icons.Default.CameraAlt,
                     contentDescription = "사진 변경",
@@ -213,13 +312,13 @@ fun ProfileImageCard(onClick: () -> Unit) {
 }
 
 /**
- * 2. 기본 정보 입력 카드
+ * 2. 기본 정보 입력 카드 (UI 유지)
  */
 @Composable
 fun BasicInfoCard(
     name: String, onNameChange: (String) -> Unit,
     email: String, onEmailChange: (String) -> Unit,
-    password: String, onPasswordChange: (String) -> Unit, // phone -> password 변경
+    password: String, onPasswordChange: (String) -> Unit,
     birthdate: String, onBirthdateChange: (String) -> Unit,
 ) {
     Surface(
@@ -245,12 +344,11 @@ fun BasicInfoCard(
                 onValueChange = onEmailChange,
                 leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) }
             )
-            // 전화번호 필드를 비밀번호 필드로 변경
             SettingsTextField(
                 label = "비밀번호",
                 value = password,
                 onValueChange = onPasswordChange,
-                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) }
+                leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
             )
             SettingsTextField(
                 label = "생년월일",
@@ -269,14 +367,13 @@ fun BasicInfoCard(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 fun DanceInfoCard(
-    bio: String, onBioChange: (String) -> Unit
+    bio: String, onBioChange: (String) -> Unit,
+    currentLevel: String, onLevelChange: (String) -> Unit,
+    currentGenres: Set<String>, onGenresChange: (Set<String>) -> Unit
 ) {
-    var danceLevel by remember { mutableStateOf("중급 - 기본기를 다지는 단계") }
-    val levels = listOf("초급", "중급 - 기본기를 다지는 단계", "고급")
     var expanded by remember { mutableStateOf(false) }
-
+    val levels = listOf("초급", "중급 - 기본기를 다지는 단계", "고급")
     val genres = listOf("K-POP", "힙합", "재즈", "발레", "현대무용", "비보잉", "하우스", "왁킹")
-    val selectedGenres by remember { mutableStateOf(setOf("K-POP", "힙합")) } // 임시
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -290,14 +387,13 @@ fun DanceInfoCard(
         ) {
             Text("댄스 정보", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
 
-            // 댄스 레벨 (Dropdown)
             ExposedDropdownMenuBox(
                 expanded = expanded,
                 onExpandedChange = { expanded = !expanded }
             ) {
                 SettingsTextField(
                     label = "댄스 레벨",
-                    value = danceLevel,
+                    value = currentLevel,
                     onValueChange = {},
                     readOnly = true,
                     modifier = Modifier.menuAnchor(),
@@ -311,7 +407,7 @@ fun DanceInfoCard(
                         DropdownMenuItem(
                             text = { Text(level) },
                             onClick = {
-                                danceLevel = level
+                                onLevelChange(level)
                                 expanded = false
                             }
                         )
@@ -319,7 +415,6 @@ fun DanceInfoCard(
                 }
             }
 
-            // 관심 장르
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("관심 장르", style = MaterialTheme.typography.labelLarge)
                 Text(
@@ -332,17 +427,23 @@ fun DanceInfoCard(
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     genres.forEach { genre ->
-                        val isSelected = genre in selectedGenres
+                        val isSelected = genre in currentGenres
                         FilterChip(
                             selected = isSelected,
-                            onClick = { /* TODO: 장르 선택 로직 */ },
+                            onClick = {
+                                val newGenres = if (isSelected) {
+                                    currentGenres - genre
+                                } else {
+                                    currentGenres + genre
+                                }
+                                onGenresChange(newGenres)
+                            },
                             label = { Text(genre) }
                         )
                     }
                 }
             }
 
-            // 자기소개
             SettingsTextField(
                 label = "자기소개",
                 value = bio,
@@ -366,7 +467,11 @@ fun DanceInfoCard(
  * 4. 활동 통계 카드
  */
 @Composable
-fun ActivityStatsCard() {
+fun ActivityStatsCard(
+    completedSongs: String = "0",
+    playTime: String = "0",
+    badgeCount: String = "0"
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
@@ -384,19 +489,19 @@ fun ActivityStatsCard() {
             ) {
                 SmallStatCard(
                     label = "완료한 곡",
-                    value = "42",
+                    value = completedSongs,
                     color = Color(0xfffaf5ff), // 보라
                     valueColor = Color(0xff9810fa)
                 )
                 SmallStatCard(
-                    label = "연습 시간",
-                    value = "156",
+                    label = "연습 시간(분)",
+                    value = playTime,
                     color = Color(0xfffdf2f8), // 핑크
                     valueColor = Color(0xffe60076)
                 )
                 SmallStatCard(
                     label = "획득 배지",
-                    value = "28",
+                    value = badgeCount,
                     color = Color(0xfffff7ed), // 주황
                     valueColor = Color(0xfff54900)
                 )
@@ -405,9 +510,6 @@ fun ActivityStatsCard() {
     }
 }
 
-/**
- * 재사용 가능한 텍스트 입력 필드
- */
 @Composable
 fun SettingsTextField(
     label: String,
@@ -444,9 +546,6 @@ fun SettingsTextField(
     }
 }
 
-/**
- * 활동 통계에 사용되는 작은 스탯 카드
- */
 @Composable
 fun SmallStatCard(
     label: String,
@@ -482,7 +581,6 @@ fun SmallStatCard(
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

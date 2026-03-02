@@ -1,6 +1,7 @@
 package com.example.kpopdancepracticeai.viewmodel
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.entity.UserStats
@@ -11,46 +12,68 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class ProfileViewModel(private val repository: AppRepository) : ViewModel() {
+class ProfileViewModel(
+    private val repository: AppRepository
+) : ViewModel() {
 
-    // 사용자 통계 상태
     private val _userStats = MutableStateFlow<UserStats?>(null)
     val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
 
-    // 최근 연습 기록 상태
     private val _recentHistory = MutableStateFlow<List<PracticeHistory>>(emptyList())
     val recentHistory: StateFlow<List<PracticeHistory>> = _recentHistory.asStateFlow()
 
-    // 현재 로드된 사용자 ID (중복 로드 방지용)
     private var currentUserId: String? = null
 
-    // ⭐️ [수정] 생성자가 아닌 이 함수를 통해 userId를 전달받아 데이터를 로드합니다.
+    // [수정] 화면 진입 시 호출되는 함수
     fun loadData(userId: String) {
         if (userId.isBlank()) return
 
-        // 이미 같은 ID로 데이터를 보고 있다면 중복 호출 방지
-        if (currentUserId == userId && _userStats.value != null) return
+        // 1. [핵심] 프로필 진입 시점까지의 사용 시간을 DB에 반영 (실시간 갱신 효과)
+        viewModelScope.launch {
+            try {
+                repository.syncAppUsageTime(userId)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+
+        // 이미 같은 ID로 데이터를 보고 있다면 중복 구독 방지
+        if (currentUserId == userId) return
         currentUserId = userId
 
         viewModelScope.launch {
-            // 1. 통계 데이터 실시간 구독
+            // 2. 통계 데이터(시간, 점수 등) 실시간 구독
+            // DB 값이 변경되면(위의 syncAppUsageTime 덕분에) 자동으로 새 값이 emit 됩니다.
             repository.getUserStats(userId).collectLatest { stats ->
                 _userStats.value = stats
             }
         }
 
         viewModelScope.launch {
-            // 2. 최근 기록 실시간 구독
+            // 3. 최근 기록 실시간 구독
             repository.getRecentHistory(userId).collectLatest { history ->
                 _recentHistory.value = history
             }
         }
     }
 
-    // 앱 접속 시간 갱신 (화면 진입 시 호출 등)
-    fun refreshAppUsageTime(userId: String) {
+    // 명시적으로 시간을 갱신하고 싶을 때 사용하는 함수 (예: 새로고침 버튼)
+    fun refreshAppUsageTime() {
+        val userId = currentUserId ?: return
         viewModelScope.launch {
             repository.syncAppUsageTime(userId)
+        }
+    }
+
+    companion object {
+        fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                if (modelClass.isAssignableFrom(ProfileViewModel::class.java)) {
+                    return ProfileViewModel(repository) as T
+                }
+                throw IllegalArgumentException("Unknown ViewModel class")
+            }
         }
     }
 }

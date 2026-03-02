@@ -2,11 +2,8 @@ package com.example.kpopdancepracticeai.ui
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -24,16 +21,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.kpopdancepracticeai.KpopApplication
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.*
+import com.example.kpopdancepracticeai.viewmodel.AnalysisViewModel
 
-// 히트맵 색상 (이 파일 전용)
+// 히트맵 색상
 private val HeatmapLevel0 = Color(0xfff1f5f9)
 private val HeatmapLevel1 = Color(0xffa4f4cf)
 private val HeatmapLevel2 = Color(0xff00d492)
@@ -45,6 +45,27 @@ fun AnalysisScreen(
     paddingValues: PaddingValues,
     onBackClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as KpopApplication
+    val repository = app.repository
+
+    // [추가] ViewModel 주입
+    val viewModel: AnalysisViewModel = viewModel(
+        factory = AnalysisViewModel.provideFactory(repository)
+    )
+
+    // [추가] 데이터 로드 (현재 로그인 유저 기준)
+    LaunchedEffect(Unit) {
+        val authRepo = AuthRepository(context)
+        val currentUser = authRepo.getCurrentUser()
+        if (currentUser != null) {
+            viewModel.loadStatistics(currentUser.uid)
+        }
+    }
+
+    // [추가] 상태 구독
+    val uiState by viewModel.uiState.collectAsState()
+
     val appGradient = Brush.verticalGradient(
         colors = listOf(
             Color(0xFFDDE3FF),
@@ -56,9 +77,7 @@ fun AnalysisScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(appGradient)
-            //  시스템 상태 표시줄과 겹치지 않게 패딩 추가
             .statusBarsPadding()
-            // 하단 네비게이션 바 높이만큼 패딩 처리
             .padding(bottom = paddingValues.calculateBottomPadding())
     ) {
         LazyColumn(
@@ -67,28 +86,25 @@ fun AnalysisScreen(
                 .padding(horizontal = 16.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            //  뒤로가기 버튼과 타이틀을 Box로 묶어서 배치 (타이틀 중앙 정렬, 버튼 좌측 정렬)
             item {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 16.dp, bottom = 8.dp) // 상단 여백
+                        .padding(top = 16.dp, bottom = 8.dp)
                 ) {
-                    // 뒤로가기 버튼 (좌측 정렬)
                     IconButton(
                         onClick = onBackClick,
                         modifier = Modifier
-                            .size(24.dp) // 버튼 크기 조절 (필요 시)
+                            .size(24.dp)
                             .align(Alignment.CenterStart)
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "뒤로가기",
-                            tint = TextDark // 아이콘 색상
+                            tint = TextDark
                         )
                     }
 
-                    // 타이틀 텍스트 (중앙 정렬)
                     Text(
                         text = "상세 통계",
                         style = TextStyle(
@@ -102,35 +118,37 @@ fun AnalysisScreen(
                 }
             }
 
-            item { StatisticsOverviewSection() }
-            item { GrowthGraphSection() }
+            // [수정] 실제 데이터 전달
+            item { StatisticsOverviewSection(uiState) }
+            item { GrowthGraphSection(uiState) }
         }
     }
 }
 
 @Composable
-fun StatisticsOverviewSection() {
+fun StatisticsOverviewSection(uiState: AnalysisViewModel.StatisticsUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionTitle(title = "종합 통계") // Components.kt의 SectionTitle 사용
+        SectionTitle(title = "종합 통계")
 
+        // [수정] ViewModel 데이터 바인딩
         StatInfoCard(
             icon = Icons.Default.AccessTime,
             label = "총 연습 시간",
-            value = "247시간 32분",
+            value = uiState.totalPlayTimeStr,
             iconBgColor = BgBlueLight,
             valueColor = PointBlue
         )
         StatInfoCard(
             icon = Icons.Default.MusicNote,
             label = "완료한 곡 / 파트",
-            value = "42곡 / 156파트",
+            value = uiState.completedCountsStr,
             iconBgColor = BgPurpleLight,
             valueColor = PointPurple
         )
         StatInfoCard(
             icon = Icons.Default.CheckCircle,
             label = "전체 평균 정확도",
-            value = "94.7%",
+            value = uiState.avgAccuracyStr,
             iconBgColor = BgGreenLight,
             valueColor = PointGreen
         )
@@ -196,39 +214,59 @@ fun StatInfoCard(
 }
 
 @Composable
-fun GrowthGraphSection() {
+fun GrowthGraphSection(uiState: AnalysisViewModel.StatisticsUiState) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        SectionTitle(title = "성장 그래프") // Components.kt의 SectionTitle 사용
-        HeatmapCard()
-        AccuracyTrendCard()
-        SongMasteryCard()
+        SectionTitle(title = "성장 그래프")
+        HeatmapCard(uiState.heatmapData)
+        AccuracyTrendCard(uiState.graphData, uiState.graphLabels)
+        // SongMasteryCard는 데이터가 있으면 표시
+        if (uiState.graphData.isNotEmpty()) {
+            SongMasteryCard(uiState.graphData, uiState.graphLabels)
+        }
     }
 }
 
 @Composable
-fun HeatmapCard() {
+fun HeatmapCard(heatmapData: List<Int>) {
     CardContainer {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("연습 시간 캘린더", style = TextStyle(fontWeight = FontWeight(400), fontSize = 16.sp), color = TextDark)
-            PracticeHeatmapGrid()
+            PracticeHeatmapGrid(heatmapData)
             HeatmapLegend()
         }
     }
 }
 
 @Composable
-fun PracticeHeatmapGrid() {
+fun PracticeHeatmapGrid(data: List<Int>) {
     val days = listOf("일", "월", "화", "수", "목", "금", "토")
     val weeks = 12
+
+    // 데이터 개수 안전 처리
+    val safeData = if (data.size >= 84) data else List(84) { 0 }
+
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        // 요일 라벨
         Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.height(136.dp)) {
             days.forEach { day -> Text(text = day, style = TextStyle(fontSize = 12.sp), color = TextLightGray) }
         }
+
+        // 그리드
         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-            repeat(weeks) {
+            repeat(weeks) { weekIndex ->
                 Column(verticalArrangement = Arrangement.SpaceBetween, modifier = Modifier.height(136.dp)) {
-                    repeat(7) {
-                        val color = when ((0..10).random()) { 0, 1, 2 -> HeatmapLevel0; 3, 4 -> HeatmapLevel1; 5, 6 -> HeatmapLevel2; 7, 8 -> HeatmapLevel3; else -> HeatmapLevel4 }
+                    repeat(7) { dayIndex ->
+                        // 인덱스 계산: 데이터를 순서대로 배치 (단순화)
+                        val dataIndex = weekIndex * 7 + dayIndex
+                        val level = safeData.getOrElse(dataIndex) { 0 }
+
+                        val color = when (level) {
+                            0 -> HeatmapLevel0
+                            1 -> HeatmapLevel1
+                            2 -> HeatmapLevel2
+                            3 -> HeatmapLevel3
+                            else -> HeatmapLevel4
+                        }
                         Box(modifier = Modifier.size(16.dp).background(color, RoundedCornerShape(4.dp)))
                     }
                 }
@@ -247,14 +285,18 @@ fun HeatmapLegend() {
 }
 
 @Composable
-fun AccuracyTrendCard() {
+fun AccuracyTrendCard(dataPoints: List<Float>, labels: List<String>) {
     CardContainer {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text("평균 정확도 추이", style = TextStyle(fontWeight = FontWeight(400), fontSize = 16.sp), color = TextDark)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ToggleButton("주간", true); ToggleButton("월간", false) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { ToggleButton("최근", true); ToggleButton("전체", false) }
             }
-            SimpleLineChart(listOf(0.92f, 0.93f, 0.91f, 0.94f, 0.95f, 0.94f, 0.96f), listOf("11/23", "11/24", "11/25", "11/26", "11/27", "11/28", "11/29"), PointBlue, 0.8f)
+            if (dataPoints.isNotEmpty()) {
+                SimpleLineChart(dataPoints, labels, PointBlue, 0.0f)
+            } else {
+                Text("아직 데이터가 충분하지 않습니다.", color = TextGray, fontSize = 12.sp)
+            }
         }
     }
 }
@@ -267,19 +309,17 @@ fun ToggleButton(text: String, isSelected: Boolean) {
 }
 
 @Composable
-fun SongMasteryCard() {
+fun SongMasteryCard(dataPoints: List<Float>, labels: List<String>) {
     CardContainer {
         Column(verticalArrangement = Arrangement.spacedBy(24.dp)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Text("곡별 마스터리", style = TextStyle(fontWeight = FontWeight(400), fontSize = 16.sp), color = TextDark)
-                Surface(shape = RoundedCornerShape(8.dp), border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xffcad5e2)), modifier = Modifier.width(140.dp)) {
-                    Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
-                        Column { Text("Spring Day", fontSize = 14.sp, fontWeight = FontWeight.Bold); Text("BTS", fontSize = 10.sp, color = TextLightGray) }
-                        Icon(Icons.Default.ArrowDropDown, null, tint = TextLightGray)
-                    }
-                }
+                Text("최근 연습 점수", style = TextStyle(fontWeight = FontWeight(400), fontSize = 16.sp), color = TextDark)
             }
-            SimpleLineChart(listOf(0.78f, 0.81f, 0.83f, 0.84f, 0.86f, 0.88f, 0.89f), listOf("10/15", "10/20", "10/25", "10/30", "11/04", "11/09", "11/14"), Color(0xff8b5cf6), 0.6f)
+            if (dataPoints.isNotEmpty()) {
+                SimpleLineChart(dataPoints, labels, Color(0xff8b5cf6), 0.0f)
+            } else {
+                Text("아직 데이터가 충분하지 않습니다.", color = TextGray, fontSize = 12.sp)
+            }
         }
     }
 }
@@ -289,10 +329,14 @@ fun SimpleLineChart(dataPoints: List<Float>, labels: List<String>, lineColor: Co
     Column {
         Box(modifier = Modifier.fillMaxWidth().height(200.dp)) {
             Canvas(modifier = Modifier.fillMaxSize()) {
-                val width = size.width; val height = size.height; val xStep = width / (dataPoints.size - 1); val yRange = maxY - minY
+                val width = size.width
+                val height = size.height
+                val xStep = if (dataPoints.size > 1) width / (dataPoints.size - 1) else width
+                val yRange = maxY - minY
+
+                // 가로선 그리기
                 for (i in 0..5) {
                     val y = height - ((i.toFloat() / 5) * height)
-                    // ⭐️ [오류 수정] drawLine의 매개변수 이름을 명시하여 전달합니다.
                     drawLine(
                         color = Color(0xffe5e7eb),
                         start = Offset(0f, y),
@@ -301,19 +345,28 @@ fun SimpleLineChart(dataPoints: List<Float>, labels: List<String>, lineColor: Co
                         pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                     )
                 }
+
                 val path = Path()
                 dataPoints.forEachIndexed { index, value ->
-                    val x = index * xStep; val y = height - (((value - minY) / yRange) * height)
+                    // 값이 범위 내에 있도록 클램핑
+                    val clampedValue = value.coerceIn(minY, maxY)
+                    val x = index * xStep
+                    val y = height - (((clampedValue - minY) / yRange) * height)
+
                     if (index == 0) path.moveTo(x, y) else path.lineTo(x, y)
                 }
                 drawPath(path, lineColor, style = Stroke(3.dp.toPx(), cap = StrokeCap.Round))
+
                 dataPoints.forEachIndexed { index, value ->
-                    val x = index * xStep; val y = height - (((value - minY) / yRange) * height)
-                    drawCircle(Color.White, 5.dp.toPx(), Offset(x, y)); drawCircle(lineColor, 5.dp.toPx(), Offset(x, y), style = Stroke(2.dp.toPx()))
+                    val clampedValue = value.coerceIn(minY, maxY)
+                    val x = index * xStep
+                    val y = height - (((clampedValue - minY) / yRange) * height)
+                    drawCircle(Color.White, 5.dp.toPx(), Offset(x, y))
+                    drawCircle(lineColor, 5.dp.toPx(), Offset(x, y), style = Stroke(2.dp.toPx()))
                 }
             }
             Column(modifier = Modifier.fillMaxHeight(), verticalArrangement = Arrangement.SpaceBetween) {
-                listOf("100%", "90%", "80%", "70%", "60%", "50%").forEach { Text(it, fontSize = 10.sp, color = TextLightGray) }
+                listOf("100%", "80%", "60%", "40%", "20%", "0%").forEach { Text(it, fontSize = 10.sp, color = TextLightGray) }
             }
         }
         Row(modifier = Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -321,7 +374,6 @@ fun SimpleLineChart(dataPoints: List<Float>, labels: List<String>, lineColor: Co
         }
     }
 }
-
 
 @Preview(showBackground = true)
 @Composable

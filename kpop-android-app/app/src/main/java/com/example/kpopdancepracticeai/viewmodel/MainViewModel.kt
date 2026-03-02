@@ -1,21 +1,27 @@
 package com.example.kpopdancepracticeai.viewmodel
 
+import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.kpopdancepracticeai.data.entity.PracticeHistory
-import com.example.kpopdancepracticeai.data.entity.Song
-import com.example.kpopdancepracticeai.data.entity.SongPart
-import com.example.kpopdancepracticeai.data.entity.User // [추가]
-import com.example.kpopdancepracticeai.data.entity.UserStats
+import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+
+// UI용 업적 데이터 클래스
+data class AchievementUiModel(
+    val title: String,
+    val description: String,
+    val progress: Float, // 0.0 ~ 1.0
+    val progressText: String
+)
+
+// UI용 배지 데이터 클래스
+data class BadgeUiModel(
+    val name: String,
+    val color: Color
+)
 
 // [추가] 로그인 상태 정의
 sealed interface LoginState {
@@ -28,13 +34,13 @@ sealed interface LoginState {
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
-    // UI 상태 관리
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
     private val _syncMessage = MutableStateFlow<String?>(null)
     val syncMessage: StateFlow<String?> = _syncMessage.asStateFlow()
 
+    // --- 기본 데이터 ---
     private val _songs = MutableStateFlow<List<Song>>(emptyList())
     val songs: StateFlow<List<Song>> = _songs.asStateFlow()
 
@@ -44,78 +50,87 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userStats = MutableStateFlow<UserStats?>(null)
     val userStats: StateFlow<UserStats?> = _userStats.asStateFlow()
 
-    // [추가] ProfileScreen 호환을 위한 더미 데이터
-    private val _achievements = MutableStateFlow<List<Any>>(emptyList())
-    val achievements: StateFlow<List<Any>> = _achievements.asStateFlow()
+    private val _currentUserProfile = MutableStateFlow<User?>(null)
+    val currentUserProfile: StateFlow<User?> = _currentUserProfile.asStateFlow()
 
-    // [추가] 로그인 상태 관리
-    private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
-    val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
+    private val _recentHistory = MutableStateFlow<List<PracticeHistory>>(emptyList())
+    val recentHistory: StateFlow<List<PracticeHistory>> = _recentHistory.asStateFlow()
 
-    // ----------------------------------------------------------------
-    // [추가] 로그인 및 회원가입 관련 로직
-    // ----------------------------------------------------------------
-
-    // 1. 로그인 시도 (Firebase UID로 DB 조회)
-    fun checkUserExists(uid: String) {
-        viewModelScope.launch {
-            _loginState.value = LoginState.Loading
-            try {
-                val user = repository.getUserByUuid(uid)
-                if (user != null) {
-                    // 유저 정보가 있음 -> 로그인 성공 및 초기 데이터 로드
-                    loadInitialData(uid)
-                    _loginState.value = LoginState.Success
-                } else {
-                    // 유저 정보가 없음 -> 프로필 입력 필요
-                    _loginState.value = LoginState.NeedProfile
-                }
-            } catch (e: Exception) {
-                _loginState.value = LoginState.Error("로그인 확인 중 오류: ${e.message}")
-            }
+    // --- 계산된 레벨 및 경험치 정보 ---
+    val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
+        if (stats == null) Pair(1, Pair(0L, 1000L))
+        else {
+            val score = stats.achievementScore.toLong()
+            val level = (score / 1000).toInt() + 1
+            val currentLevelExp = score % 1000
+            val nextLevelExp = 1000L
+            Pair(level, Pair(currentLevelExp, nextLevelExp))
         }
-    }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Pair(1, Pair(0L, 1000L)))
 
-    // 2. 회원가입 완료 (유저 정보 저장)
-    fun registerUser(user: User) {
-        viewModelScope.launch {
-            _loginState.value = LoginState.Loading
-            try {
-                repository.saveUser(user)
-                // 저장 후 초기 데이터(통계 등) 세팅
-                loadInitialData(user.userUuid)
-                _loginState.value = LoginState.Success
-            } catch (e: Exception) {
-                _loginState.value = LoginState.Error("회원가입 저장 실패: ${e.message}")
-            }
-        }
-    }
+    // --- 업적 및 배지 ---
+    private val _achievementProgress = MutableStateFlow<List<AchievementUiModel>>(emptyList())
+    val achievementProgress: StateFlow<List<AchievementUiModel>> = _achievementProgress.asStateFlow()
 
-    // 로그인 상태 초기화 (화면 이동 후 호출)
-    fun resetLoginState() {
-        _loginState.value = LoginState.Idle
-    }
+    private val _userBadges = MutableStateFlow<List<BadgeUiModel>>(emptyList())
+    val userBadges: StateFlow<List<BadgeUiModel>> = _userBadges.asStateFlow()
 
-    // ----------------------------------------------------------------
-    // 기존 기능 유지
-    // ----------------------------------------------------------------
+    // 업적 코드와 UI 텍스트 매핑
+    private val achievementMeta = mapOf(
+        "PERFECTIONIST" to ("완벽주의자" to "95% 이상의 정확도 5회 달성"),
+        "PRACTICE_BUG" to ("연습 벌레" to "총 연습 시간 100시간 달성"),
+        "BTS_MASTER" to ("BTS 마스터" to "BTS 챌린지 10개 완료"),
+        "CHALLENGE_HUNTER" to ("챌린지 헌터" to "모든 챌린지 1회 이상 완료"),
+        "NEW_DANCER" to ("신입 댄서" to "첫 연습 영상 업로드")
+    )
 
-    // 앱 시작 시 또는 로그인 후 호출
+    private var currentUserId: String? = null
+
     fun loadInitialData(userId: String) {
+        if (currentUserId == userId) return
+        currentUserId = userId
+
         viewModelScope.launch {
             _isSyncing.value = true
             try {
                 repository.fetchInitialData(userId)
 
+                // 구독 설정
+                launch { repository.getUserStats(userId).collect { _userStats.value = it } }
+                launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
+                launch { repository.allSongs.collect { _songs.value = it } }
+                launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
+
+                // 업적 구독 및 변환
                 launch {
-                    repository.getUserStats(userId).collect { stats ->
-                        _userStats.value = stats
+                    repository.getUserAchievements(userId).collect { list ->
+                        val uiModels = list.mapNotNull { item ->
+                            val meta = achievementMeta[item.achievementCode] ?: return@mapNotNull null
+                            val progress = if (item.goalStep > 0) item.currentStep.toFloat() / item.goalStep else 0f
+                            val progressText = "${(progress * 100).toInt()}%"
+                            AchievementUiModel(
+                                title = meta.first,
+                                description = meta.second,
+                                progress = progress.coerceIn(0f, 1f),
+                                progressText = progressText
+                            )
+                        }
+                        _achievementProgress.value = uiModels
                     }
                 }
 
+                // 배지 구독 및 변환
                 launch {
-                    repository.allSongs.collect { songList ->
-                        _songs.value = songList
+                    repository.getUserBadges(userId).collect { list ->
+                        _userBadges.value = list.map { badge ->
+                            val color = when {
+                                badge.name.contains("마스터") -> Color(0xFFEBEBFF)
+                                badge.name.contains("팬") -> Color(0xFFD6F5FF)
+                                badge.name.contains("전문가") -> Color(0xFFFFD6EB)
+                                else -> Color(0xFFD9FFE5)
+                            }
+                            BadgeUiModel(badge.name, color)
+                        }
                     }
                 }
 
@@ -129,69 +144,68 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun refreshData() {
-        val userId = _userStats.value?.userUuid
+    // ⭐️ [새로 추가된 메서드] 회원가입을 통해 들어온 정보 DB에 저장
+    fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
+        viewModelScope.launch {
+            try {
+                _isSyncing.value = true
+                repository.registerUser(userId, email, passwordHash, name, birthDate)
+                loadInitialData(userId) // 변경된 프로필 정보 가져오기
+            } catch (e: Exception) {
+                e.printStackTrace()
+            } finally {
+                _isSyncing.value = false
+            }
+        }
+    }
+
+    fun updateUserProfile(name: String, email: String, passwordHash: String, birthDate: String, bio: String, danceSkill: String, favoriteGenres: List<String>, profileImageUrl: String?) {
+        val currentUser = _currentUserProfile.value ?: return
+        val updatedUser = currentUser.copy(
+            name = name, email = email, passwordHash = passwordHash,
+            birthDate = birthDate, bio = bio, danceSkill = danceSkill,
+            favoriteGenres = favoriteGenres.joinToString(","),
+            profileImageUrl = profileImageUrl
+        )
+        viewModelScope.launch {
+            try {
+                repository.updateUserProfile(updatedUser)
+                _syncMessage.value = "프로필이 저장되었습니다."
+            } catch (e: Exception) {
+                _syncMessage.value = "저장 실패: ${e.message}"
+            }
+        }
+    }
+
+    fun updateUsageTime() {
+        val userId = _userStats.value?.userUuid ?: currentUserId
         if (userId != null) {
+            viewModelScope.launch { repository.syncAppUsageTime(userId) }
+        }
+    }
+
+    fun refreshData() {
+        val userId = currentUserId
+        if (userId != null) {
+            updateUsageTime()
             loadInitialData(userId)
         } else {
             _syncMessage.value = "로그인 정보가 없습니다."
         }
     }
 
-    // 노래 선택 시 파트 정보 로드
-    fun selectSong(songId: Long) {
-        viewModelScope.launch {
-            repository.getSongParts(songId).collect { parts ->
-                _currentSongParts.value = parts
-            }
-        }
-    }
-
-    // 연습 결과 저장 (기존 함수)
-    fun savePracticeResult(userId: String, songId: Long, partId: Long, score: Int, videoPath: String) {
-        viewModelScope.launch {
-            val history = PracticeHistory(
-                userUuid = userId,
-                songId = songId,
-                partNumber = partId.toInt(),
-                artistName = "Unknown",
-                totalScore = score,
-                grade = "PENDING",
-                partAccuracies = emptyMap(),
-                worstPoints = emptyList(),
-                durationSec = 0.0,
-                fps = 0.0,
-                videoWidth = 0,
-                videoHeight = 0,
-                totalFrames = 0,
-                createdAt = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(Date()),
-                fullJsonPath = "",
-                userVideoPath = videoPath
-            )
-            repository.savePracticeResult(history)
-        }
-    }
-
-    // [추가] 연습 결과 저장 (PracticeHistory 객체 직접 전달용 오버로딩)
+    fun selectSong(songId: Long) { /* 생략 */ }
+    fun searchSongs(query: String) = repository.searchSongs(query)
     fun savePracticeResult(history: PracticeHistory) {
-        viewModelScope.launch {
-            repository.savePracticeResult(history)
-        }
+        viewModelScope.launch { repository.savePracticeResult(history) }
     }
+    fun clearSyncMessage() { _syncMessage.value = null }
 
-    fun clearSyncMessage() {
-        _syncMessage.value = null
-    }
-
-    // ViewModel Factory 정의
     companion object {
         fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T {
-                if (modelClass.isAssignableFrom(MainViewModel::class.java)) {
-                    return MainViewModel(repository) as T
-                }
-                throw IllegalArgumentException("Unknown ViewModel class")
+                return MainViewModel(repository) as T
             }
         }
     }
