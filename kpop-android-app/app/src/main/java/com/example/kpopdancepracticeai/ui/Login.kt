@@ -33,26 +33,53 @@ import androidx.compose.ui.unit.sp
 import com.example.kpopdancepracticeai.R
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.LoginState
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.common.api.ApiException
 import kotlinx.coroutines.launch
 
 @Composable
 fun LoginScreen(
+    viewModel: MainViewModel, // [추가] ViewModel 주입
     onLoginSuccess: () -> Unit,
-    onNavigateToSignUp: () -> Unit, // [추가] 회원가입 화면 이동 콜백
-    onGoogleLoginSuccess: () -> Unit // [추가] 구글 로그인 성공 시 추가 정보 입력을 위한 콜백
+    onNavigateToSignUp: () -> Unit,
+    onGoogleLoginSuccess: () -> Unit // 추가 정보(프로필) 입력 화면으로 이동
 ) {
-    // 1. 상태 관리: 사용자의 입력을 기억하기 위한 변수
+    // 1. 상태 관리
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    // AuthRepository 초기화 (이전 단계에서 생성한 클래스 사용)
+    // AuthRepository는 ViewModel 내부에서도 쓰이지만, Firebase 직접 호출을 위해 여기서도 사용
     val authRepository = remember { AuthRepository(context) }
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var isPasswordVisible by remember { mutableStateOf(false) }
-    var errorMessage by remember { mutableStateOf<String?>(null) } // 에러 메시지용 상태
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+
+    // [추가] ViewModel의 로그인 상태 관찰
+    val loginState by viewModel.loginState.collectAsState()
+
+    // 상태 변경에 따른 처리
+    LaunchedEffect(loginState) {
+        when (loginState) {
+            is LoginState.Success -> {
+                Toast.makeText(context, "로그인 성공", Toast.LENGTH_SHORT).show()
+                viewModel.resetLoginState() // 상태 초기화
+                onLoginSuccess()
+            }
+            is LoginState.NeedProfile -> {
+                Toast.makeText(context, "추가 정보 입력이 필요합니다.", Toast.LENGTH_SHORT).show()
+                viewModel.resetLoginState()
+                onGoogleLoginSuccess() // 프로필 설정 화면으로 이동
+            }
+            is LoginState.Error -> {
+                errorMessage = (loginState as LoginState.Error).message
+                viewModel.resetLoginState()
+            }
+            else -> {}
+        }
+    }
 
     // --- 구글 로그인 런처 설정 ---
     val googleSignInLauncher = rememberLauncherForActivityResult(
@@ -68,9 +95,13 @@ fun LoginScreen(
                     scope.launch {
                         val authResult = authRepository.firebaseAuthWithGoogle(idToken)
                         if (authResult.isSuccess) {
-                            Toast.makeText(context, "구글 로그인 성공", Toast.LENGTH_SHORT).show()
-                            // 기존 onLoginSuccess() 대신 구글 로그인 전용 콜백 호출
-                            onGoogleLoginSuccess()
+                            // [수정] 로그인 성공 시 바로 이동하지 않고, DB 확인 요청
+                            val uid = authResult.getOrNull()?.uid
+                            if (uid != null) {
+                                viewModel.checkUserExists(uid)
+                            } else {
+                                errorMessage = "UID를 가져올 수 없습니다."
+                            }
                         } else {
                             errorMessage = "구글 로그인 실패: ${authResult.exceptionOrNull()?.message}"
                         }
@@ -117,11 +148,9 @@ fun LoginScreen(
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(30.dp), // 둥근 모서리
                 color = Color.White,
-                // ⭐️ [오류 1 수정] elevation -> shadowElevation
                 shadowElevation = 8.dp
             ) {
                 // 5. 카드 내부 로그인 폼
-                // (오류 2는 자동으로 해결됨)
                 Column(
                     modifier = Modifier.padding(all = 24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -162,8 +191,11 @@ fun LoginScreen(
                                 scope.launch {
                                     val result = authRepository.signInWithEmail(email, password)
                                     if (result.isSuccess) {
-                                        Toast.makeText(context, "로그인 성공", Toast.LENGTH_SHORT).show()
-                                        onLoginSuccess()
+                                        // [수정] 로그인 성공 시 DB 확인 요청
+                                        val uid = result.getOrNull()?.uid
+                                        if (uid != null) {
+                                            viewModel.checkUserExists(uid)
+                                        }
                                     } else {
                                         errorMessage = "로그인 실패. 아이디/비번을 확인하세요."
                                     }
@@ -181,7 +213,11 @@ fun LoginScreen(
                         ),
                         shape = RoundedCornerShape(8.dp)
                     ) {
-                        Text("로그인", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        if (loginState is LoginState.Loading) {
+                            CircularProgressIndicator(color = Color.White, modifier = Modifier.size(24.dp))
+                        } else {
+                            Text("로그인", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        }
                     }
 
                     // 에러 메시지 표시
@@ -220,14 +256,13 @@ fun LoginScreen(
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = Color.Black
                         ),
-                        // [오류 3 수정] ButtonDefaults.outlinedBorder -> BorderStroke(MaterialTheme)
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline)
                     ) {
-                        // TODO: 구글 아이콘 추가 (필요시 Icon 컴포넌트 추가)
+                        // TODO: 구글 아이콘 추가
                         Text("Google 계정으로 로그인", fontSize = 16.sp)
                     }
 
-                    // [수정됨] 카카오 로그인 버튼을 회원가입 버튼으로 교체
+                    // 회원가입 버튼
                     Button(
                         onClick = { onNavigateToSignUp() },
                         modifier = Modifier
@@ -295,21 +330,5 @@ private fun LoginTextField(
                 }
             }
         )
-    }
-}
-
-
-// Android Studio에서 미리보기를 위한 코드
-@Preview(showBackground = true)
-@Composable
-fun LoginScreenPreview() {
-    KpopDancePracticeAITheme {
-        Surface {
-            LoginScreen(
-                onLoginSuccess = {},
-                onNavigateToSignUp = {}, // 미리보기용 빈 람다
-                onGoogleLoginSuccess = {} // 미리보기용 빈 람다
-            )
-        }
     }
 }

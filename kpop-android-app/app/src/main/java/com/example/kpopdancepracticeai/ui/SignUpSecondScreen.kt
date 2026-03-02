@@ -19,14 +19,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.kpopdancepracticeai.data.entity.User
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
+import com.example.kpopdancepracticeai.viewmodel.LoginState
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 @Composable
 fun SignUpSecondScreen(
+    viewModel: MainViewModel, // [추가] ViewModel 주입
     email: String, // 이전 화면에서 전달받은 이메일
-    password: String, // 이전 화면에서 전달받은 비밀번호
-    onSignUpComplete: (String, String) -> Unit = { _, _ -> } // 닉네임, 생년월일 전달 콜백
+    password: String, // 이전 화면에서 전달받은 비밀번호 (또는 "GOOGLE_LOGIN" 식별자)
+    onSignUpComplete: (String, String) -> Unit = { _, _ -> } // 완료 후 메인 이동 콜백
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -38,21 +42,37 @@ fun SignUpSecondScreen(
     var birthdate by remember { mutableStateOf("") }
     var isSigningUp by remember { mutableStateOf(false) } // 로딩 상태 관리
 
+    // [추가] ViewModel 상태 관찰
+    val loginState by viewModel.loginState.collectAsState()
+
+    // 회원가입/DB저장 완료 처리
+    LaunchedEffect(loginState) {
+        if (loginState is LoginState.Success) {
+            Toast.makeText(context, "회원가입 및 로그인 완료", Toast.LENGTH_SHORT).show()
+            viewModel.resetLoginState()
+            onSignUpComplete(nickname, birthdate)
+        } else if (loginState is LoginState.Error) {
+            Toast.makeText(context, (loginState as LoginState.Error).message, Toast.LENGTH_SHORT).show()
+            viewModel.resetLoginState()
+            isSigningUp = false
+        }
+    }
+
     // 배경 (이미지의 그라데이션 느낌을 위한 연한 배경색 혹은 테마 배경색)
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFEBEBF0)), // 기본 배경색 (필요 시 그라데이션으로 변경 가능)
+            .background(Color(0xFFEBEBF0)), // 기본 배경색
         contentAlignment = Alignment.Center
     ) {
         // 메인 카드 (White Box)
         Column(
             modifier = Modifier
-                .width(355.dp) // 피그마 기준 너비 유지 혹은 fillMaxWidth(0.9f)
+                .width(355.dp)
                 .wrapContentHeight()
                 .background(Color(0xFFFFFFFF), RoundedCornerShape(14.dp))
-                .border(1.dp, Color(0x1A000000), RoundedCornerShape(14.dp)) // 테두리 미세 조정
-                .padding(horizontal = 24.dp, vertical = 40.dp), // 내부 여백
+                .border(1.dp, Color(0x1A000000), RoundedCornerShape(14.dp))
+                .padding(horizontal = 24.dp, vertical = 40.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(30.dp)
         ) {
@@ -86,7 +106,7 @@ fun SignUpSecondScreen(
                     label = "생년월일",
                     value = birthdate,
                     onValueChange = { birthdate = it },
-                    placeholder = "YYYY.MM.DD" // 플레이스홀더 예시 추가
+                    placeholder = "YYYY.MM.DD"
                 )
             }
 
@@ -96,25 +116,44 @@ fun SignUpSecondScreen(
                     // 입력값 유효성 확인
                     if (nickname.isNotBlank() && birthdate.isNotBlank()) {
                         if (!isSigningUp) {
-                            // [수정] 구글 로그인(password가 'GOOGLE_LOGIN' 등 식별자)인 경우 Firebase 회원가입 건너뛰기
-                            if (password == "GOOGLE_LOGIN") {
-                                // 구글 로그인 시에는 이미 인증이 완료되었으므로, 추가 정보 입력만 완료 처리
-                                Toast.makeText(context, "회원가입 완료", Toast.LENGTH_SHORT).show()
-                                onSignUpComplete(nickname, birthdate)
-                            } else {
-                                // 일반 이메일 가입 시에는 Firebase Auth 생성 진행
-                                isSigningUp = true
-                                scope.launch {
-                                    // Firebase Authentication에 등록
+                            isSigningUp = true
+                            scope.launch {
+                                var uid: String? = null
+                                var finalEmail = email
+
+                                // 1. 인증 처리 (구글 로그인 된 상태 vs 이메일 가입 필요)
+                                if (password == "GOOGLE_LOGIN") {
+                                    // 이미 Firebase 인증됨. 현재 유저 정보 가져오기
+                                    val currentUser = authRepository.getCurrentUser()
+                                    uid = currentUser?.uid
+                                    finalEmail = currentUser?.email ?: email
+                                } else {
+                                    // 이메일 신규 가입 시도
                                     val result = authRepository.signUpWithEmail(email, password)
                                     if (result.isSuccess) {
-                                        Toast.makeText(context, "회원가입 성공", Toast.LENGTH_SHORT).show()
-                                        // 가입 성공 시 콜백 호출 (닉네임, 생년월일 전달)
-                                        onSignUpComplete(nickname, birthdate)
+                                        uid = result.getOrNull()?.uid
                                     } else {
-                                        val errorMsg = result.exceptionOrNull()?.message ?: "알 수 없는 오류"
-                                        Toast.makeText(context, "회원가입 실패: $errorMsg", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(context, "회원가입 실패: ${result.exceptionOrNull()?.message}", Toast.LENGTH_SHORT).show()
+                                        isSigningUp = false
+                                        return@launch
                                     }
+                                }
+
+                                // 2. RoomDB에 User 정보 저장 요청
+                                if (uid != null) {
+                                    val newUser = User(
+                                        userUuid = uid,
+                                        loginId = finalEmail, // loginId를 이메일로 대체
+                                        email = finalEmail,
+                                        passwordHash = if (password == "GOOGLE_LOGIN") null else password, // 해시 처리 필요시 로직 추가
+                                        name = nickname,
+                                        birthDate = birthdate,
+                                        gender = "Unknown" // 성별 입력이 없으므로 기본값
+                                    )
+                                    // ViewModel에 저장 요청 -> 완료 시 LaunchedEffect(Success) 호출됨
+                                    viewModel.registerUser(newUser)
+                                } else {
+                                    Toast.makeText(context, "UID 생성 오류", Toast.LENGTH_SHORT).show()
                                     isSigningUp = false
                                 }
                             }
@@ -125,12 +164,12 @@ fun SignUpSecondScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp), // 터치 영역 확보를 위해 높이 약간 조정
+                    .height(48.dp),
                 shape = RoundedCornerShape(8.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color(0xFF030213)
                 ),
-                enabled = !isSigningUp // 로딩 중 버튼 비활성화
+                enabled = !isSigningUp
             ) {
                 if (isSigningUp) {
                     CircularProgressIndicator(
@@ -156,7 +195,6 @@ fun SignUpSecondScreen(
 
 /**
  * 재사용 가능한 커스텀 입력 필드
- * 피그마 디자인(회색 박스 형태)을 유지하며 TextField 기능을 구현
  */
 @Composable
 fun InputField(
@@ -193,7 +231,7 @@ fun InputField(
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(44.dp) // 입력하기 편한 높이로 조정 (피그마 36dp -> 44dp 권장)
+                        .height(44.dp)
                         .background(Color(0xFFF3F3F5), RoundedCornerShape(8.dp))
                         .padding(horizontal = 12.dp),
                     contentAlignment = Alignment.CenterStart
@@ -213,11 +251,4 @@ fun InputField(
             }
         )
     }
-}
-
-@Preview(showBackground = true)
-@Composable
-fun SignUpSecondScreenPreview() {
-    // 미리보기용 더미 데이터
-    SignUpSecondScreen(email = "test@example.com", password = "password123")
 }

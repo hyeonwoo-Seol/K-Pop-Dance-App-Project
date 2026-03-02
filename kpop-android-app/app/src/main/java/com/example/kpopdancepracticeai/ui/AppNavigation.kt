@@ -339,6 +339,7 @@ fun AppNavHost(
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
+                viewModel = viewModel, // [추가] ViewModel 전달
                 onLoginSuccess = {
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -374,6 +375,7 @@ fun AppNavHost(
             val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
 
             SignUpSecondScreen(
+                viewModel = viewModel, // [추가] ViewModel 전달
                 email = email,
                 password = password,
                 onSignUpComplete = { nickname, birthdate ->

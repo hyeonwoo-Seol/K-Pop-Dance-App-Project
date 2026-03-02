@@ -23,6 +23,15 @@ data class BadgeUiModel(
     val color: Color
 )
 
+// [추가] 로그인 상태 정의
+sealed interface LoginState {
+    object Idle : LoginState
+    object Loading : LoginState
+    object Success : LoginState // 기존 유저 -> 메인 화면 이동
+    object NeedProfile : LoginState // 신규 유저 -> 프로필 입력 화면 이동
+    data class Error(val message: String) : LoginState
+}
+
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     private val _isSyncing = MutableStateFlow(false)
