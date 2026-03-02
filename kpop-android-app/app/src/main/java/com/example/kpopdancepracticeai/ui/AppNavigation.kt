@@ -37,6 +37,7 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -77,6 +78,8 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object SignUpSecond : Screen("signUpSecond", "회원가입2", Icons.Default.Person)
 
     object Home : Screen("home", "홈", Icons.Default.Home)
+
+    object VideoDownload : Screen("videoDownload", "초기 설정", Icons.Default.CloudDownload)
     object Search : Screen("search", "검색", Icons.Default.Search)
     object Analysis : Screen("analysis", "분석", Icons.Default.Analytics)
     object Profile : Screen("profile", "프로필", Icons.Default.Person)
@@ -341,7 +344,7 @@ fun AppNavHost(
             LoginScreen(
                 viewModel = viewModel, // [추가] ViewModel 전달
                 onLoginSuccess = {
-                    navController.navigate(Screen.Home.route) {
+                    navController.navigate(Screen.VideoDownload.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -351,6 +354,16 @@ fun AppNavHost(
                 onGoogleLoginSuccess = {
                     val dummyArg = Screen.encodeArg("GOOGLE_LOGIN")
                     navController.navigate("${Screen.SignUpSecond.route}/$dummyArg/$dummyArg")
+                }
+            )
+        }
+        composable(Screen.VideoDownload.route) {
+            VideoDownloadScreen(
+                onDownloadComplete = {
+                    // 다운로드가 완료(또는 이미 완료됨)되면 Home으로 이동
+                    navController.navigate(Screen.Home.route) {
+                        popUpTo(Screen.VideoDownload.route) { inclusive = true }
+                    }
                 }
             )
         }
