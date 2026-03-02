@@ -102,6 +102,7 @@ fun PrivacyPolicyScreen(
 제3조 (개인정보의 수집 및 이용목적)
 회사는 수집한 개인정보를 다음의 목적을 위해 활용합니다.
 1. 서비스 제공에 관한 계약 이행 및 서비스 제공에 따른 콘텐츠 제공
+
 2. 회원 관리 : 회원제 서비스 이용에 따른 본인확인, 개인 식별, 불량회원의 부정 이용 방지와 비인가 사용 방지, 가입 의사 확인
 
 제4조 (개인정보의 보유 및 이용기간)
@@ -110,7 +111,7 @@ fun PrivacyPolicyScreen(
 [부칙]
 본 방침은 2026년 1월 1일부터 시행됩니다.
                                 """.trimIndent(),
-                                fontSize = 14.sp,
+                                fontSize = 12.sp,
                                 color = Color(0xFF475569),
                                 lineHeight = 24.sp,
                                 textAlign = TextAlign.Start,
