@@ -57,6 +57,7 @@ class AppRepository(
     // --- User Statistics & Profile ---
     fun getUserStats(userId: String): Flow<UserStats?> = userDao.getUserStats(userId)
     fun getUserProfile(userId: String): Flow<User?> = userDao.getUserProfile(userId)
+    suspend fun getUserProfileOneShot(userId: String): User? = userDao.getUserProfileOneShot(userId)
 
     suspend fun updateUserProfile(user: User) {
         userDao.updateUser(user)

@@ -19,7 +19,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.kpopdancepracticeai.data.entity.User
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.viewmodel.LoginState
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
@@ -141,17 +140,13 @@ fun SignUpSecondScreen(
 
                                 // 2. RoomDB에 User 정보 저장 요청
                                 if (uid != null) {
-                                    val newUser = User(
-                                        userUuid = uid,
-                                        loginId = finalEmail, // loginId를 이메일로 대체
+                                    viewModel.registerUser(
+                                        userId = uid,
                                         email = finalEmail,
-                                        passwordHash = if (password == "GOOGLE_LOGIN") null else password, // 해시 처리 필요시 로직 추가
+                                        passwordHash = if (password == "GOOGLE_LOGIN") "" else password,
                                         name = nickname,
-                                        birthDate = birthdate,
-                                        gender = "Unknown" // 성별 입력이 없으므로 기본값
+                                        birthDate = birthdate
                                     )
-                                    // ViewModel에 저장 요청 -> 완료 시 LaunchedEffect(Success) 호출됨
-                                    viewModel.registerUser(newUser)
                                 } else {
                                     Toast.makeText(context, "UID 생성 오류", Toast.LENGTH_SHORT).show()
                                     isSigningUp = false
