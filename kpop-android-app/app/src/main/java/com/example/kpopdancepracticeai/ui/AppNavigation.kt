@@ -391,23 +391,7 @@ fun AppNavHost(
                 viewModel = viewModel, // [추가] ViewModel 전달
                 email = email,
                 password = password,
-                onSignUpComplete = { nickname, birthdate ->
-                    // ⭐️ [가입 완료 콜백 처리] 회원가입 성공 시 뷰모델을 통해 데이터베이스에 저장
-                    val currentUser = authRepository.getCurrentUser()
-                    if (currentUser != null) {
-                        // 구글 로그인의 경우 이메일 정보를 Firebase Auth에서 직접 가져옵니다.
-                        val finalEmail = if (password == "GOOGLE_LOGIN") currentUser.email ?: "" else email
-                        val finalPassword = if (password == "GOOGLE_LOGIN") "" else password
-
-                        viewModel.registerUser(
-                            userId = currentUser.uid,
-                            email = finalEmail,
-                            passwordHash = finalPassword,
-                            name = nickname,
-                            birthDate = birthdate
-                        )
-                    }
-
+                onSignUpComplete = { _, _ ->
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }

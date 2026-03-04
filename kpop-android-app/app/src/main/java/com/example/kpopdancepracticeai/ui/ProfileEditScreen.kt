@@ -90,7 +90,7 @@ fun ProfileEditScreen(
         currentUser?.let { user ->
             name = user.name
             email = user.email
-            password = user.passwordHash.takeIf { it.isNotEmpty() } ?: "********"
+            password = user.passwordHash?.takeIf { it.isNotEmpty() } ?: "********"
             birthdate = user.birthDate
             bio = user.bio ?: ""
             danceSkill = user.danceSkill

@@ -34,6 +34,9 @@ sealed interface LoginState {
 
 class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
+    private val _loginState = MutableStateFlow<LoginState>(LoginState.Idle)
+    val loginState: StateFlow<LoginState> = _loginState.asStateFlow()
+
     private val _isSyncing = MutableStateFlow(false)
     val isSyncing: StateFlow<Boolean> = _isSyncing.asStateFlow()
 
@@ -85,6 +88,28 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     )
 
     private var currentUserId: String? = null
+
+    fun checkUserExists(userId: String) {
+        viewModelScope.launch {
+            _loginState.value = LoginState.Loading
+            try {
+                val existingUser = repository.getUserProfileOneShot(userId)
+                if (existingUser != null) {
+                    loadInitialData(userId)
+                    _loginState.value = LoginState.Success
+                } else {
+                    _loginState.value = LoginState.NeedProfile
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+                _loginState.value = LoginState.Error(e.message ?: "사용자 정보를 확인할 수 없습니다.")
+            }
+        }
+    }
+
+    fun resetLoginState() {
+        _loginState.value = LoginState.Idle
+    }
 
     fun loadInitialData(userId: String) {
         if (currentUserId == userId) return
@@ -148,11 +173,14 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
         viewModelScope.launch {
             try {
+                _loginState.value = LoginState.Loading
                 _isSyncing.value = true
                 repository.registerUser(userId, email, passwordHash, name, birthDate)
                 loadInitialData(userId) // 변경된 프로필 정보 가져오기
+                _loginState.value = LoginState.Success
             } catch (e: Exception) {
                 e.printStackTrace()
+                _loginState.value = LoginState.Error(e.message ?: "회원 정보를 저장하지 못했습니다.")
             } finally {
                 _isSyncing.value = false
             }
