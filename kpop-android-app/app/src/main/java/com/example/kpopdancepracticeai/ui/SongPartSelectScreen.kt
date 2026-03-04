@@ -54,7 +54,7 @@ fun SongPartSelectScreen(
         val part = selectedPartForUpload
         if (uri != null && part != null && currentSong != null) {
             // [RecordScreenMobile.kt 파일 이름 형식 준수]
-            val userId = userProfile?.userUuid ?: "xooyong"
+            val userId = userProfile?.userUuid ?: "none"
             val songIdClean = currentSong.titleKr.replace(" ", "").replace("_", "")
             val partNum = part.partNumber.toString()
             val partNameClean = part.partName.replace(" ", "").replace("_", "")
