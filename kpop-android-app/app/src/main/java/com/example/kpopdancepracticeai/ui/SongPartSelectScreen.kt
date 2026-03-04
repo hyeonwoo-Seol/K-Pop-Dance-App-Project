@@ -10,11 +10,14 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.kpopdancepracticeai.data.entity.Song
+import com.example.kpopdancepracticeai.data.entity.SongPart
+import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SongPartSelectScreen(
     songId: String,
@@ -28,6 +31,22 @@ fun SongPartSelectScreen(
     val songs by viewModel.songs.collectAsState()
     val currentSong = songs.find { it.songId.toString() == songId }
 
+    SongPartSelectContent(
+        currentSong = currentSong,
+        dbParts = dbParts,
+        onBackClick = onBackClick,
+        onNavigateToPractice = onNavigateToPractice
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SongPartSelectContent(
+    currentSong: Song?,
+    dbParts: List<SongPart>,
+    onBackClick: () -> Unit,
+    onNavigateToPractice: (String, String, String, String) -> Unit
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -97,5 +116,36 @@ fun PartCard(title: String, time: String, onPracticeClick: () -> Unit) {
                 Text("연습")
             }
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun SongPartSelectScreenPreview() {
+    val sampleSong = Song(
+        songId = 1L,
+        titleKr = "Super Shy",
+        titleEn = "Super Shy",
+        artistKr = "뉴진스",
+        artistEn = "NewJeans",
+        artistGender = "Female",
+        genre = "Dance",
+        tempo = "Fast",
+        difficulty = "Normal",
+        coverUrl = null,
+        releaseDate = "2023-07-07"
+    )
+    val sampleParts = listOf(
+        SongPart(1L, 1L, 1, "Intro", 15, null, null, 0L, 15000L),
+        SongPart(2L, 1L, 2, "Chorus 1", 20, null, null, 15000L, 35000L)
+    )
+
+    KpopDancePracticeAITheme {
+        SongPartSelectContent(
+            currentSong = sampleSong,
+            dbParts = sampleParts,
+            onBackClick = {},
+            onNavigateToPractice = { _, _, _, _ -> }
+        )
     }
 }
