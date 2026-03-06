@@ -105,4 +105,11 @@ dependencies {
     implementation("com.google.firebase:firebase-auth")
     implementation("com.google.android.gms:play-services-auth:21.0.0")
 
+    // Retrofit2 (API 통신 라이브러리)
+    implementation("com.squareup.retrofit2:retrofit:2.9.0")
+    // Gson Converter (JSON 파싱 라이브러리)
+    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    //Retrofit을 추가할 때 기본적으로 OkHttp 라이브러리가 함께 프로젝트에 포함되지만, 만약 클래스를 찾지 못하는 컴파일 에러가 발생한다면 아래 주석 해제하기
+    //implementation("com.squareup.okhttp3:okhttp:4.11.0")
+
 }
