@@ -24,7 +24,7 @@ data class BadgeUiModel(
     val color: Color
 )
 
-// [추가] 로그인 상태 정의
+// 로그인 상태 정의
 sealed interface LoginState {
     object Idle : LoginState
     object Loading : LoginState
@@ -119,7 +119,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                // 💡 [추가된 부분] DB에 저장된 곡 목록을 확인하고 비어있으면 RealDataSource 삽입
+                // DB 초기 세팅 (데이터 비어있을 시)
                 val currentSongsList = repository.getAllSongsSync()
                 if (currentSongsList.isEmpty()) {
                     repository.insertSongs(RealDataSource.getRealSongs)
@@ -177,14 +177,13 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    // ⭐️ [새로 추가된 메서드] 회원가입을 통해 들어온 정보 DB에 저장
     fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
         viewModelScope.launch {
             try {
                 _loginState.value = LoginState.Loading
                 _isSyncing.value = true
                 repository.registerUser(userId, email, passwordHash, name, birthDate)
-                loadInitialData(userId) // 변경된 프로필 정보 가져오기
+                loadInitialData(userId)
                 _loginState.value = LoginState.Success
             } catch (e: Exception) {
                 e.printStackTrace()
@@ -226,14 +225,11 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             updateUsageTime()
             loadInitialData(userId)
         } else {
-            // [추가된 부분] 로그인 없이 홈 화면(HomeScreen)만 테스트할 때 호출될 수 있으므로,
-            // 여기서도 DB 체크 로직을 넣어줍니다.
             viewModelScope.launch {
                 val currentSongsList = repository.getAllSongsSync()
                 if (currentSongsList.isEmpty()) {
                     repository.insertSongs(RealDataSource.getRealSongs)
                     repository.insertSongParts(RealDataSource.getRealSongParts)
-                    // 데이터 삽입 후 리스트 갱신 (Flow 구독이 없을 경우를 대비)
                     _songs.value = repository.getAllSongsSync()
                 }
             }
@@ -241,11 +237,21 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         }
     }
 
-    fun selectSong(songId: Long) { /* 생략 */ }
+    // 💡 [핵심 수정됨] 비어있던 selectSong을 구현하여 DB에서 파트 목록 4개를 가져옵니다!
+    fun selectSong(songId: Long) {
+        viewModelScope.launch {
+            repository.getSongParts(songId).collect { parts ->
+                _currentSongParts.value = parts
+            }
+        }
+    }
+
     fun searchSongs(query: String) = repository.searchSongs(query)
+
     fun savePracticeResult(history: PracticeHistory) {
         viewModelScope.launch { repository.savePracticeResult(history) }
     }
+
     fun clearSyncMessage() { _syncMessage.value = null }
 
     companion object {

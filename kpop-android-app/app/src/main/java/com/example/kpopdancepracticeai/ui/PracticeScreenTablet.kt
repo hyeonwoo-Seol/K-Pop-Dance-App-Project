@@ -341,11 +341,11 @@ fun PracticeScreenTablet(
             ) {
                 SongInfoBar(title = songTitle, artistPart = artistPart, difficulty = difficulty)
                 
-                PlaybackSlider(
-                    currentPosition = currentPosition,
-                    totalTime = length,
-                    onPositionChange = { currentPosition = it }
-                )
+//                PlaybackSlider(
+//                    currentPosition = currentPosition,
+//                    totalTime = length,
+//                    //onPositionChange = { currentPosition = it }
+//                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),

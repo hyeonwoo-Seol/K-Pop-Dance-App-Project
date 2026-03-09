@@ -101,13 +101,14 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Test : Screen("test", "시스템 테스트", Icons.Default.Build)
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
 
+    // 💡 [수정] URL을 전달받기 위해 경로 끝에 /{videoUrl} 추가
     object DancePractice : Screen(
-        "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}",
+        "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}/{videoUrl}",
         "댄스 연습",
         Icons.Default.MusicNote
     )
     object Record : Screen(
-        "record/{songTitle}/{artistPart}/{difficulty}",
+        "record/{songTitle}/{artistPart}/{difficulty}/{videoUrl}",
         "녹화",
         Icons.Default.CameraAlt
     )
@@ -156,11 +157,8 @@ fun AppNavigation(
 
     val startDestination = remember {
         if (authRepository.getCurrentUser() != null) {
-            // 로그인 O, 다운로드 O -> 홈 화면
-            // 로그인 O, 다운로드 X -> 비디오 다운로드 화면
             if (isVideoDownloaded) Screen.Home.route else Screen.VideoDownload.route
         } else {
-            // 로그인 X -> 로그인 화면
             Screen.Login.route
         }
     }
@@ -248,7 +246,7 @@ fun AppNavigation(
                 innerPadding = innerPadding,
                 viewModel = viewModel,
                 startDestination = startDestination,
-                authRepository = authRepository // ⭐️ 전달
+                authRepository = authRepository
             )
         }
     }
@@ -340,7 +338,7 @@ fun AppNavHost(
     innerPadding: PaddingValues,
     viewModel: MainViewModel,
     startDestination: String,
-    authRepository: AuthRepository // ⭐️ 파라미터 추가
+    authRepository: AuthRepository
 ) {
     NavHost(
         navController = navController,
@@ -349,7 +347,7 @@ fun AppNavHost(
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
-                viewModel = viewModel, // [추가] ViewModel 전달
+                viewModel = viewModel,
                 onLoginSuccess = {
                     navController.navigate(Screen.VideoDownload.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -367,7 +365,6 @@ fun AppNavHost(
         composable(Screen.VideoDownload.route) {
             VideoDownloadScreen(
                 onDownloadComplete = {
-                    // 다운로드가 완료(또는 이미 완료됨)되면 Home으로 이동
                     navController.navigate(Screen.Home.route) {
                         popUpTo(Screen.VideoDownload.route) { inclusive = true }
                     }
@@ -395,11 +392,10 @@ fun AppNavHost(
             val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
 
             SignUpSecondScreen(
-                viewModel = viewModel, // [추가] ViewModel 전달
+                viewModel = viewModel,
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->
-                    // 변경됨: Screen.Home.route 대신 Screen.VideoDownload.route로 이동
                     navController.navigate(Screen.VideoDownload.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
@@ -551,12 +547,14 @@ fun AppNavHost(
                 songId = songId,
                 viewModel = viewModel,
                 onBackClick = { navController.popBackStack() },
-                onNavigateToPractice = { songTitle, artistPart, difficulty, length ->
+                // 💡 [수정] 5번째 인자인 URL(videoUrl)도 함께 인코딩해서 라우터로 넘겨줍니다.
+                onNavigateToPractice = { songTitle, artistPart, difficulty, length, videoUrl ->
                     val encodedTitle = Screen.encodeArg(songTitle)
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
                     val encodedLength = Screen.encodeArg(length)
-                    navController.navigate("dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength")
+                    val encodedUrl = Screen.encodeArg(videoUrl)
+                    navController.navigate("dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength/$encodedUrl")
                 }
             )
         }
@@ -566,13 +564,16 @@ fun AppNavHost(
                 navArgument("songTitle") { type = NavType.StringType },
                 navArgument("artistPart") { type = NavType.StringType },
                 navArgument("difficulty") { type = NavType.StringType },
-                navArgument("length") { type = NavType.StringType }
+                navArgument("length") { type = NavType.StringType },
+                // 💡 URL을 위한 argument 추가
+                navArgument("videoUrl") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
             val length = backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) } ?: ""
+            val videoUrl = backStackEntry.arguments?.getString("videoUrl")?.let { Screen.decodeArg(it) } ?: ""
 
             PracticeScreenMobile(
                 songTitle = songTitle,
@@ -584,7 +585,8 @@ fun AppNavHost(
                     val encodedTitle = Screen.encodeArg(songTitle)
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
-                    navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty")
+                    val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
+                    navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl")
                 },
                 onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
             )
@@ -624,12 +626,16 @@ fun AppNavHost(
             arguments = listOf(
                 navArgument("songTitle") { type = NavType.StringType },
                 navArgument("artistPart") { type = NavType.StringType },
-                navArgument("difficulty") { type = NavType.StringType }
+                navArgument("difficulty") { type = NavType.StringType },
+                // 💡 최종 목적지! URL argument 추가
+                navArgument("videoUrl") { type = NavType.StringType }
             )
         ) { backStackEntry ->
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
+            val videoUrl = backStackEntry.arguments?.getString("videoUrl")?.let { Screen.decodeArg(it) } ?: "" // 꺼내기 완료!
+
             val parts = artistPart.split("·").map { it.trim() }
             val artistName = parts.getOrNull(0) ?: "Unknown"
             val partName = parts.getOrNull(1) ?: artistPart
@@ -639,6 +645,7 @@ fun AppNavHost(
                 difficulty = difficulty,
                 artist = artistName,
                 part = partName,
+                expertVideoUrl = videoUrl,
                 onBack = { navController.popBackStack() },
                 onRecordingComplete = { resultString ->
                     val dataParts = resultString.split("|")
