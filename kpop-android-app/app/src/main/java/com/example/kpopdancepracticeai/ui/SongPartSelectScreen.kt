@@ -31,13 +31,12 @@ fun SongPartSelectScreen(
     songId: String,
     viewModel: MainViewModel = viewModel(),
     onBackClick: () -> Unit,
-    onNavigateToPractice: (String, String, String, String) -> Unit
+    onNavigateToPractice: (String, String, String, String, String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uploader = remember { PresignedUrlUploader(context) }
-    
-    // 업로드할 파트를 기억하기 위한 상태
+
     var selectedPartForUpload by remember { mutableStateOf<SongPart?>(null) }
 
     LaunchedEffect(songId) { viewModel.selectSong(songId.toLongOrNull() ?: 0L) }
@@ -47,13 +46,11 @@ fun SongPartSelectScreen(
     val userProfile by viewModel.currentUserProfile.collectAsState()
     val currentSong = songs.find { it.songId.toString() == songId }
 
-    // 갤러리 비디오 선택 런처
     val videoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri: Uri? ->
         val part = selectedPartForUpload
         if (uri != null && part != null && currentSong != null) {
-            // [RecordScreenMobile.kt 파일 이름 형식 준수]
             val userId = userProfile?.userUuid ?: "none"
             val songIdClean = currentSong.titleKr.replace(" ", "").replace("_", "")
             val partNum = part.partNumber.toString()
@@ -98,7 +95,7 @@ fun SongPartSelectContent(
     currentSong: Song?,
     dbParts: List<SongPart>,
     onBackClick: () -> Unit,
-    onNavigateToPractice: (String, String, String, String) -> Unit,
+    onNavigateToPractice: (String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
     Scaffold(
@@ -119,7 +116,6 @@ fun SongPartSelectContent(
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        // [오류 해결] Song 엔티티 필드명 수정
                         Text(currentSong.titleKr, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         Text(currentSong.artistKr, style = MaterialTheme.typography.bodyMedium)
                     }
@@ -132,7 +128,6 @@ fun SongPartSelectContent(
                 } else {
                     items(dbParts) { part ->
                         PartCard(
-                            // [오류 해결] SongPart 엔티티 필드명 수정 (partName)
                             title = part.partName,
                             time = "${part.startTimeMs/1000}초 - ${part.endTimeMs/1000}초",
                             onPracticeClick = {
@@ -140,7 +135,8 @@ fun SongPartSelectContent(
                                     currentSong?.titleKr ?: "",
                                     "${currentSong?.artistKr} · ${part.partName}",
                                     "Normal",
-                                    "${(part.endTimeMs - part.startTimeMs)/1000}s"
+                                    "${(part.endTimeMs - part.startTimeMs)/1000}s",
+                                    part.videoUrl ?: "" // 💡 [오류 해결] 값이 비어있을 경우 안전하게 넘기도록 처리
                                 )
                             },
                             onUploadClick = { onUploadClick(part) }
@@ -154,8 +150,8 @@ fun SongPartSelectContent(
 
 @Composable
 fun PartCard(
-    title: String, 
-    time: String, 
+    title: String,
+    time: String,
     onPracticeClick: () -> Unit,
     onUploadClick: () -> Unit
 ) {
@@ -210,7 +206,7 @@ fun SongPartSelectScreenPreview() {
             currentSong = sampleSong,
             dbParts = sampleParts,
             onBackClick = {},
-            onNavigateToPractice = { _, _, _, _ -> },
+            onNavigateToPractice = { _, _, _, _, _ -> },
             onUploadClick = {}
         )
     }
