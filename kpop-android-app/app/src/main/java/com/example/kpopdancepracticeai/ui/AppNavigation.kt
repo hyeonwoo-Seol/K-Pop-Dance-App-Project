@@ -580,6 +580,7 @@ fun AppNavHost(
                 artistPart = artistPart,
                 difficulty = difficulty,
                 length = length,
+                videoUrl = videoUrl,
                 onBackClick = { navController.popBackStack() },
                 onRecordClick = {
                     val encodedTitle = Screen.encodeArg(songTitle)
