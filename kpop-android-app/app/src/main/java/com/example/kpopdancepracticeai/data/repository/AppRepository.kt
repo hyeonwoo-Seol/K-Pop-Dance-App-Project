@@ -151,6 +151,15 @@ class AppRepository(
     fun getSongParts(songId: Long): Flow<List<SongPart>> = songDao.getPartsBySongId(songId)
     fun searchSongs(query: String): Flow<List<Song>> = songDao.searchSongs(query)
 
+    // 💡 [문제 해결 부분!] ViewModel이 호출할 수 있도록 Dao와 연결해주는 다리 역할을 합니다.
+    suspend fun insertSongs(songs: List<Song>) {
+        songDao.insertSongs(songs)
+    }
+
+    suspend fun insertSongParts(parts: List<SongPart>) {
+        songDao.insertSongParts(parts)
+    }
+
     // --- History & Stats Update ---
     suspend fun savePracticeResult(result: PracticeHistory) {
         historyDao.insertHistory(result)
@@ -180,4 +189,9 @@ class AppRepository(
 
     fun getRecentHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getRecentHistory(userId)
     fun getAllHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getAllHistory(userId)
+
+    // 💡 [추가됨] DB에서 전체 곡 데이터를 한 번만 읽어오는 동기식 메서드
+    suspend fun getAllSongsSync(): List<Song> {
+        return songDao.getAllSongsSync()
+    }
 }

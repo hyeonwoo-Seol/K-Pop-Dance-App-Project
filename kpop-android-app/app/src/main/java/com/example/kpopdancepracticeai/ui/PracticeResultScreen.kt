@@ -75,7 +75,7 @@ fun PracticeResultScreen(
     var accuracyGrade by remember { mutableStateOf(if (isPreview) "B" else "-") }
     var worstJoints by remember { mutableStateOf<List<String>>(if (isPreview) listOf("왼쪽 어깨", "오른쪽 팔꿈치", "왼쪽 무릎") else emptyList()) }
 
-    // ⭐️ 신체 부위별 점수 (순서: 0.몸통, 1.오른팔, 2.오른다리, 3.왼다리, 4.왼팔)
+    // 신체 부위별 점수 (순서: 0.몸통, 1.오른팔, 2.오른다리, 3.왼다리, 4.왼팔)
     var partScores by remember { mutableStateOf(if (isPreview) listOf(90f, 85f, 75f, 88f, 82f) else listOf(0f, 0f, 0f, 0f, 0f)) }
 
     var currentKeyPoints by remember { mutableStateOf<List<KeyPoint>>(emptyList()) }
@@ -102,7 +102,7 @@ fun PracticeResultScreen(
         onDispose { exoPlayer?.release() }
     }
 
-    // ⭐️ JSON 파싱 및 신체 부위 점수(part_accuracies) 완벽 연동
+    // JSON 파싱 및 신체 부위 점수(part_accuracies) 연동
     LaunchedEffect(jsonFileName) {
         if (jsonFileName.isNotBlank()) {
             try {
@@ -113,7 +113,6 @@ fun PracticeResultScreen(
                     accuracyGrade = result.summary.accuracyGrade
 
                     // JSON의 part_accuracies 데이터를 안전하게 가져옵니다.
-                    // (주의: DTO에 partAccuracies: Map<String, Double> 선언이 필수입니다)
                     val pAcc = result.summary.partAccuracies
                     val base = totalScore.toFloat() // 데이터 누락 시 기본값 방어
 
@@ -125,7 +124,7 @@ fun PracticeResultScreen(
 
                     // 오각형을 그릴 순서: 위(몸통) -> 우상(오른팔) -> 우하(오른다리) -> 좌하(왼다리) -> 좌상(왼팔)
                     partScores = listOf(torso, rightArm, rightLeg, leftLeg, leftArm)
-                        .map { it.coerceIn(0f, 100f) } // 0~100점 사이 보정
+                        .map { it.coerceIn(0f, 100f) }
 
                     val joints = analyzeTop3WorstJoints(allFrames)
                     if (joints.isNotEmpty()) worstJoints = joints
@@ -194,7 +193,7 @@ fun PracticeResultScreen(
             floatingActionButton = {
                 ExtendedFloatingActionButton(
                     onClick = {
-                        if (exoPlayer != null) {
+                        if (!isPreview) {
                             showOverlay = true
                             exoPlayer?.seekTo(0)
                             exoPlayer?.play()
@@ -206,7 +205,8 @@ fun PracticeResultScreen(
                     contentColor = Color.White
                 )
             },
-            containerColor = Color(0xFFFAFAFA)
+            // ⭐️ 다른 UI와 통일성을 맞추기 위해 MaterialTheme의 background 속성을 사용합니다.
+            containerColor = MaterialTheme.colorScheme.background
         ) { innerPadding ->
             Column(
                 modifier = Modifier
@@ -223,13 +223,17 @@ fun PracticeResultScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     IconButton(onClick = onBackClick) {
-                        Icon(Icons.Default.ArrowBack, contentDescription = "뒤로 가기", tint = Color.Black)
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "뒤로 가기",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
                     }
                     Text(
                         text = "연습 결과",
                         modifier = Modifier.weight(1f),
                         style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp),
-                        color = Color.Black,
+                        color = MaterialTheme.colorScheme.onBackground,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.size(48.dp))
@@ -255,12 +259,12 @@ fun PracticeResultScreen(
                     }
                 }
 
-                // ⭐️ 종합 통계 (AWS JSON 부위별 데이터 연동)
+                // 종합 통계
                 ResultCard(borderColor = Color.LightGray) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("📊", fontSize = 18.sp)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("종합 통계", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp))
+                        Text("종합 통계", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black))
                     }
                     Spacer(modifier = Modifier.height(32.dp))
 
@@ -269,7 +273,6 @@ fun PracticeResultScreen(
                     }
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // ⭐️ 부위별 이름 및 점수 매핑 표시
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -294,12 +297,12 @@ fun PracticeResultScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("⚠️", fontSize = 18.sp)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("많이 틀린 관절 TOP 3", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp))
+                        Text("많이 틀린 관절 TOP 3", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black))
                     }
                     Spacer(modifier = Modifier.height(20.dp))
 
                     val colors = listOf(Color(0xfffb2c36), Color(0xffff6900), Color(0xfff0b100))
-                    val dJoints = if (worstJoints.isEmpty()) listOf("왼쪽 어깨", "오른쪽 팔꿈치", "왼쪽 무릎") else worstJoints
+                    val dJoints = if (worstJoints.isEmpty()) listOf("데이터 없음", "데이터 없음", "데이터 없음") else worstJoints
 
                     for (i in 0..2) {
                         TopErrorJointItem(i + 1, dJoints.getOrNull(i) ?: "데이터 없음", colors[i])
@@ -312,7 +315,7 @@ fun PracticeResultScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text("🏆", fontSize = 18.sp)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("업적 진행도", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp))
+                        Text("업적 진행도", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 18.sp, color = Color.Black))
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
@@ -373,9 +376,6 @@ fun PracticeResultScreen(
     }
 }
 
-// ====================================================================
-// 헬퍼 컴포저블
-// ====================================================================
 
 @Composable
 fun ResultCard(

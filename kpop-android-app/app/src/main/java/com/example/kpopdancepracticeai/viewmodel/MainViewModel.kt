@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
 import kotlinx.coroutines.flow.*
@@ -118,6 +119,13 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
+                // 💡 [추가된 부분] DB에 저장된 곡 목록을 확인하고 비어있으면 RealDataSource 삽입
+                val currentSongsList = repository.getAllSongsSync()
+                if (currentSongsList.isEmpty()) {
+                    repository.insertSongs(RealDataSource.getRealSongs)
+                    repository.insertSongParts(RealDataSource.getRealSongParts)
+                }
+
                 repository.fetchInitialData(userId)
 
                 // 구독 설정
@@ -218,6 +226,17 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             updateUsageTime()
             loadInitialData(userId)
         } else {
+            // [추가된 부분] 로그인 없이 홈 화면(HomeScreen)만 테스트할 때 호출될 수 있으므로,
+            // 여기서도 DB 체크 로직을 넣어줍니다.
+            viewModelScope.launch {
+                val currentSongsList = repository.getAllSongsSync()
+                if (currentSongsList.isEmpty()) {
+                    repository.insertSongs(RealDataSource.getRealSongs)
+                    repository.insertSongParts(RealDataSource.getRealSongParts)
+                    // 데이터 삽입 후 리스트 갱신 (Flow 구독이 없을 경우를 대비)
+                    _songs.value = repository.getAllSongsSync()
+                }
+            }
             _syncMessage.value = "로그인 정보가 없습니다."
         }
     }
