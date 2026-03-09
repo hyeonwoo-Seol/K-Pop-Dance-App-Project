@@ -183,18 +183,18 @@ fun VideoDownloadScreen(
                             Text("다운로드 시작", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                         }
 
-                        // 앱 종료 버튼 (다운로드 거부 시)
+                        // 다운로드 건너뛰기 버튼 (테스트 및 나중에 받기)
                         OutlinedButton(
                             onClick = {
-                                // 현재 액티비티(앱)를 완전히 종료합니다.
-                                (context as? Activity)?.finishAffinity()
+                                // Activity를 종료하지 않고, NavController를 통해 홈 화면으로 이동시킵니다.
+                                onDownloadComplete()
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .height(50.dp),
                             shape = RoundedCornerShape(12.dp)
                         ) {
-                            Text("앱 종료 (나중에 받기)", color = Color.Gray, fontSize = 16.sp)
+                            Text("나중에 받기 (홈으로 이동)", color = Color.Gray, fontSize = 16.sp)
                         }
                     }
                 }
