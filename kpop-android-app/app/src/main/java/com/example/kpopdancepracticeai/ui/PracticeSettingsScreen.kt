@@ -27,7 +27,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 
 /**
  * 연습 화면 설정 (전체 화면)
@@ -35,7 +38,8 @@ import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PracticeSettingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     // 앱 전체의 그라데이션 배경
     val appGradient = Brush.verticalGradient(
@@ -45,12 +49,16 @@ fun PracticeSettingsScreen(
         )
     )
 
-    // 설정 값 상태 관리 (임시)
-    var isMirrorMode by remember { mutableStateOf(false) }
-    var isFrontCamera by remember { mutableStateOf(true) }
-    var countdownTime by remember { mutableStateOf("3초") }
-    var isAutoUpload by remember { mutableStateOf(true) }
-    var isWifiOnly by remember { mutableStateOf(true) }
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    val countdownOptions = listOf(0, 3, 5)
+    var isCountdownMenuExpanded by remember { mutableStateOf(false) }
+
+    // 설정 값 상태 관리
+    val isMirrorMode = settings.isMirrorMode
+    val isFrontCamera = settings.isFrontCamera
+    val countdownTime = "${settings.countdownSeconds}초"
+    val isAutoUpload = settings.isAutoUpload
+    val isWifiOnly = settings.isWifiOnlyUpload
     var cacheSize by remember { mutableStateOf("약 256 MB") }
 
     Box(
@@ -97,7 +105,7 @@ fun PracticeSettingsScreen(
                                 title = "카메라 좌우 반전",
                                 icon = Icons.Outlined.FlipCameraAndroid,
                                 checked = isMirrorMode,
-                                onCheckedChange = { isMirrorMode = it }
+                                onCheckedChange = settingsViewModel::setMirrorMode
                             )
                             SettingsDivider()
                             SettingsToggleItem(
@@ -105,15 +113,31 @@ fun PracticeSettingsScreen(
                                 description = if (isFrontCamera) "전면 카메라" else "후면 카메라",
                                 icon = Icons.Outlined.Videocam,
                                 checked = isFrontCamera,
-                                onCheckedChange = { isFrontCamera = it }
+                                onCheckedChange = settingsViewModel::setFrontCamera
                             )
                             SettingsDivider()
-                            SettingsClickableItem(
-                                title = "카운트다운 타이머",
-                                description = countdownTime,
-                                icon = Icons.Outlined.Timer,
-                                onClick = { /* TODO: 타이머 선택 다이얼로그 표시 */ }
-                            )
+                            Box {
+                                SettingsClickableItem(
+                                    title = "카운트다운 타이머",
+                                    description = countdownTime,
+                                    icon = Icons.Outlined.Timer,
+                                    onClick = { isCountdownMenuExpanded = true }
+                                )
+                                DropdownMenu(
+                                    expanded = isCountdownMenuExpanded,
+                                    onDismissRequest = { isCountdownMenuExpanded = false }
+                                ) {
+                                    countdownOptions.forEach { sec ->
+                                        DropdownMenuItem(
+                                            text = { Text("${sec}초") },
+                                            onClick = {
+                                                settingsViewModel.setCountdownSeconds(sec)
+                                                isCountdownMenuExpanded = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -126,14 +150,14 @@ fun PracticeSettingsScreen(
                                 title = "연습 영상 자동 전송",
                                 icon = Icons.Outlined.UploadFile,
                                 checked = isAutoUpload,
-                                onCheckedChange = { isAutoUpload = it }
+                                onCheckedChange = settingsViewModel::setAutoUpload
                             )
                             SettingsDivider()
                             SettingsToggleItem(
                                 title = "WIFI에만 업로드",
                                 icon = Icons.Outlined.Wifi,
                                 checked = isWifiOnly,
-                                onCheckedChange = { isWifiOnly = it }
+                                onCheckedChange = settingsViewModel::setWifiOnlyUpload
                             )
                         }
                     }

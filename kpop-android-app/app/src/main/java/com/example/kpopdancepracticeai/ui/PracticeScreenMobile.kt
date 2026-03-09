@@ -41,12 +41,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 import kotlinx.coroutines.delay
 
 private val ColorVideoOverlay = Color(0x4D000000)
@@ -68,10 +71,16 @@ fun PracticeScreenMobile(
     onBackClick: () -> Unit = {},
     onRecordClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
+    settingsViewModel: SettingsViewModel = viewModel(),
 ) {
     val context = LocalContext.current
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
     var isPlaying by remember { mutableStateOf(false) }
     var selectedSpeed by remember { mutableStateOf(1.0f) }
+
+    LaunchedEffect(settings) {
+        selectedSpeed = 1.0f
+    }
     var areControlsVisible by remember { mutableStateOf(true) }
 
     var currentPositionMs by remember { mutableLongStateOf(0L) }

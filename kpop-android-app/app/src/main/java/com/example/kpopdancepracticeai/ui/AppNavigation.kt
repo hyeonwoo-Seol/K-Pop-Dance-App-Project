@@ -656,6 +656,7 @@ fun AppNavHost(
                 part = partName,
                 expertVideoUrl = videoUrl,
                 onBack = { navController.popBackStack() },
+                onNavigateHome = { navController.popBackStack(Screen.Home.route, false) },
                 onRecordingComplete = { resultString ->
                     val dataParts = resultString.split("|")
                     val rawPath = dataParts[0]

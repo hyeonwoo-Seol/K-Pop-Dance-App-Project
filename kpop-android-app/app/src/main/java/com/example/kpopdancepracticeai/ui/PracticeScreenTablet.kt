@@ -49,8 +49,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -62,9 +65,11 @@ fun PracticeScreenTablet(
     length: String = "2:15",
     onBackClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
-    onRecordingComplete: (String) -> Unit = {}
+    onRecordingComplete: (String) -> Unit = {},
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val isPreview = LocalInspectionMode.current
@@ -96,6 +101,10 @@ fun PracticeScreenTablet(
     var isRecording by remember { mutableStateOf(false) }
     var recordingTime by remember { mutableIntStateOf(0) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
+
+    LaunchedEffect(settings.isFrontCamera) {
+        lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
+    }
 
     // UI 상태
     var currentPosition by remember { mutableStateOf(0.1f) }

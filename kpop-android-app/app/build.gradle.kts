@@ -63,6 +63,8 @@ dependencies {
     debugImplementation(libs.androidx.compose.ui.test.manifest)
     implementation("androidx.navigation:navigation-compose:2.9.6")
     implementation("androidx.compose.material:material-icons-extended-android")
+    implementation("androidx.datastore:datastore-preferences:1.1.1")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
 
     // CameraX (16KB 호환성을 위해 1.4.1 버전으로 업데이트)
     val cameraVersion = "1.4.1"
