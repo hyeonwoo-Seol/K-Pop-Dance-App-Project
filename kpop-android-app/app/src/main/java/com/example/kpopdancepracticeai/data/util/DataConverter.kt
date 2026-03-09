@@ -21,7 +21,9 @@ object DataConverter {
             if (index < parts.size) {
                 // rawPoint = [x, y, confidence] 형태라고 가정
                 if (rawPoint.size >= 2) {
-                    val x = rawPoint[0] + 0.22f
+                    // 서버 JSON의 keypoint는 이미 정규화된 좌표이므로,
+                    // 임의 오프셋 없이 그대로 사용해야 오버레이가 맞습니다.
+                    val x = rawPoint[0]
                     val y = rawPoint[1]
                     // 신뢰도 값이 있으면 사용, 없으면 0f 처리
                     val conf = if (rawPoint.size > 2) rawPoint[2] else 0f
