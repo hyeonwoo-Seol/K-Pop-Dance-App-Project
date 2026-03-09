@@ -4,6 +4,7 @@ import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
+import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
@@ -193,5 +194,11 @@ class AppRepository(
     // 💡 [추가됨] DB에서 전체 곡 데이터를 한 번만 읽어오는 동기식 메서드
     suspend fun getAllSongsSync(): List<Song> {
         return songDao.getAllSongsSync()
+    }
+
+    suspend fun prePopulateSongsIfNeeded() {
+        if (songDao.getSongCount() > 0) return
+        songDao.insertSongs(RealDataSource.getRealSongs)
+        songDao.insertSongParts(RealDataSource.getRealSongParts)
     }
 }

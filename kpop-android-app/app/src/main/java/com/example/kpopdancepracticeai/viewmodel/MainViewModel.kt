@@ -4,7 +4,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
 import kotlinx.coroutines.flow.*
@@ -119,13 +118,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                // 로컬 곡 데이터 동기화 (최신 RealDataSource 기준)
-                val currentSongsList = repository.getAllSongsSync()
-                val shouldSeedSongs = currentSongsList.size < RealDataSource.getRealSongs.size
-                if (shouldSeedSongs) {
-                    repository.insertSongs(RealDataSource.getRealSongs)
-                    repository.insertSongParts(RealDataSource.getRealSongParts)
-                }
+                repository.prePopulateSongsIfNeeded()
 
                 repository.fetchInitialData(userId)
 
@@ -227,13 +220,8 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             loadInitialData(userId)
         } else {
             viewModelScope.launch {
-                val currentSongsList = repository.getAllSongsSync()
-                val shouldSeedSongs = currentSongsList.size < RealDataSource.getRealSongs.size
-                if (shouldSeedSongs) {
-                    repository.insertSongs(RealDataSource.getRealSongs)
-                    repository.insertSongParts(RealDataSource.getRealSongParts)
-                    _songs.value = repository.getAllSongsSync()
-                }
+                repository.prePopulateSongsIfNeeded()
+                _songs.value = repository.getAllSongsSync()
             }
             _syncMessage.value = "로그인 정보가 없습니다."
         }

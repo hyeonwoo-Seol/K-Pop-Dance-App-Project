@@ -1,7 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -122,12 +121,8 @@ fun SearchScreen(
         item {
             Button(
                 onClick = {
-                    // ⭐️ [수정] 검색 결과 화면으로 이동
-                    // (searchText, selectedDifficulty, selectedArtist, ...)
-                    // TODO: 필터 값들도 함께 전달하거나, query만 전달 후 결과 화면에서 필터링
-                    // 여기서는 계획.md에 따라 searchText (query)만 전달합니다.
                     if (searchText.isNotBlank()) {
-                        navController.navigate("searchResults/$searchText")
+                        navController.navigate("searchResults/${Screen.encodeArg(searchText.trim())}")
                     }
                 },
                 modifier = Modifier

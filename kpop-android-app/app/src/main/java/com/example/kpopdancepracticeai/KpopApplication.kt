@@ -3,8 +3,14 @@ package com.example.kpopdancepracticeai
 import android.app.Application
 import com.example.kpopdancepracticeai.data.database.AppDatabase
 import com.example.kpopdancepracticeai.data.repository.AppRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class KpopApplication : Application() {
+
+    private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     val database by lazy {
         AppDatabase.getDatabase(this)
@@ -18,5 +24,12 @@ class KpopApplication : Application() {
             historyDao = database.historyDao(),
             achievementDao = database.achievementDao()
         )
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        applicationScope.launch {
+            repository.prePopulateSongsIfNeeded()
+        }
     }
 }
