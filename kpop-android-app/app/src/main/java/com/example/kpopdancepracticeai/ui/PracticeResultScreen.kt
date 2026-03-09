@@ -69,6 +69,8 @@ fun PracticeResultScreen(
     // --- 1. 상태 선언 ---
     var showOverlay by remember { mutableStateOf(false) }
     var allFrames by remember { mutableStateOf<List<FrameData>>(emptyList()) }
+    var videoWidth by remember { mutableIntStateOf(1) }
+    var videoHeight by remember { mutableIntStateOf(1) }
 
     // UI 데이터 상태
     var totalScore by remember { mutableIntStateOf(if (isPreview) 87 else score) }
@@ -109,6 +111,8 @@ fun PracticeResultScreen(
                 val result = JsonResultLoader.loadAnalysisResult(context, jsonFileName)
                 if (result != null) {
                     allFrames = result.frames.sortedBy { it.timestamp }
+                    videoWidth = result.metadata.videoWidth.coerceAtLeast(1)
+                    videoHeight = result.metadata.videoHeight.coerceAtLeast(1)
                     totalScore = result.summary.totalScore
                     accuracyGrade = result.summary.accuracyGrade
 
@@ -178,7 +182,13 @@ fun PracticeResultScreen(
                 modifier = Modifier.fillMaxSize()
             )
             if (currentKeyPoints.isNotEmpty()) {
-                SkeletonOverlay(keyPoints = currentKeyPoints, errors = currentErrors, modifier = Modifier.fillMaxSize())
+                SkeletonOverlay(
+                    keyPoints = currentKeyPoints,
+                    errors = currentErrors,
+                    videoWidth = videoWidth,
+                    videoHeight = videoHeight,
+                    modifier = Modifier.fillMaxSize()
+                )
             }
             IconButton(
                 onClick = { showOverlay = false; exoPlayer?.pause() },

@@ -21,7 +21,7 @@ object DataConverter {
             if (index < parts.size) {
                 // rawPoint = [x, y, confidence] 형태라고 가정
                 if (rawPoint.size >= 2) {
-                    val x = rawPoint[0] + 0.22f
+                    val x = rawPoint[0]
                     val y = rawPoint[1]
                     // 신뢰도 값이 있으면 사용, 없으면 0f 처리
                     val conf = if (rawPoint.size > 2) rawPoint[2] else 0f

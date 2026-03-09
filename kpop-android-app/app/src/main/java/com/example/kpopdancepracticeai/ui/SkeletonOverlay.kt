@@ -21,6 +21,8 @@ private val ColorNormal = PointGreen
 fun SkeletonOverlay(
     keyPoints: List<KeyPoint>,
     errors: List<Int>? = null, // 관절별 에러 정보 (0: 정상, 1: 오류)
+    videoWidth: Int,
+    videoHeight: Int,
     modifier: Modifier = Modifier,
     lineColor: Color = Color.White, // 뼈대 색상
     jointRadius: Float = 12f,
@@ -34,19 +36,23 @@ fun SkeletonOverlay(
         val canvasWidth = size.width
         val canvasHeight = size.height
 
-        // 1. 좌표 복원 (Denormalization)
-        // 가이드에 따라 max(width, height)를 기준으로 정규화 해제
-        val maxDim = max(canvasWidth, canvasHeight)
+        // 1) 모델 입력 정규화 역변환: 원본 영상 기준 픽셀 좌표 복원
+        val modelMaxDim = max(videoWidth, videoHeight).toFloat()
+        val originalOffsetX = (modelMaxDim - videoWidth) / 2f
+        val originalOffsetY = (modelMaxDim - videoHeight) / 2f
 
-        // 화면 비율에 따른 오프셋 계산 (Letterbox 처리)
-        // 영상이 화면 중앙에 위치한다고 가정 (Center Crop 방식 대응)
-        val offsetX = (canvasWidth - maxDim) / 2
-        val offsetY = (canvasHeight - maxDim) / 2
+        // 2) 원본 영상 -> 현재 캔버스 렌더링 비율(S)
+        val renderScale = minOf(canvasWidth / videoWidth, canvasHeight / videoHeight)
+        val renderOffsetX = (canvasWidth - videoWidth * renderScale) / 2f
+        val renderOffsetY = (canvasHeight - videoHeight * renderScale) / 2f
 
         val pointMap = keyPoints.associate { point ->
-            val px = point.x * maxDim + offsetX
-            val py = point.y * maxDim + offsetY
-            point.type to Offset(px, py)
+            val restoredX = point.x * modelMaxDim - originalOffsetX
+            val restoredY = point.y * modelMaxDim - originalOffsetY
+
+            val px = restoredX * renderScale + renderOffsetX
+            val py = restoredY * renderScale + renderOffsetY
+            point.type to Offset(px.coerceIn(0f, canvasWidth), py.coerceIn(0f, canvasHeight))
         }
 
         // 2. 뼈대 그리기 (선)
@@ -114,6 +120,8 @@ fun SkeletonOverlayPreview() {
 
     SkeletonOverlay(
         keyPoints = narrowDummyData,
-        errors = dummyErrors
+        errors = dummyErrors,
+        videoWidth = 1080,
+        videoHeight = 1920
     )
 }
