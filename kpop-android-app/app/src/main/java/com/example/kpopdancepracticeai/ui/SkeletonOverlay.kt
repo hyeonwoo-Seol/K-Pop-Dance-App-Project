@@ -38,16 +38,12 @@ fun SkeletonOverlay(
         // 가이드에 따라 max(width, height)를 기준으로 정규화 해제
         val maxDim = max(canvasWidth, canvasHeight)
 
-        // 화면 비율에 따른 오프셋 계산 (Letterbox 처리)
-        // 영상이 화면 중앙에 위치한다고 가정 (Center Crop 방식 대응)
-        val offsetX = (canvasWidth - maxDim) / 2
-        val offsetY = (canvasHeight - maxDim) / 2
-
         val pointMap = keyPoints.associate { point ->
-            val px = point.x * maxDim + offsetX
-            val py = point.y * maxDim + offsetY
+            val px = point.x * maxDim
+            val py = point.y * maxDim
             point.type to Offset(px, py)
         }
+        val confidenceMap = keyPoints.associate { it.type to it.confidence }
 
         // 2. 뼈대 그리기 (선)
         bodyConnections.forEach { (startPart, endPart) ->
@@ -56,7 +52,10 @@ fun SkeletonOverlay(
             val start = pointMap[startPart]
             val end = pointMap[endPart]
 
-            if (start != null && end != null) {
+            val startConfidence = confidenceMap[startPart] ?: 0f
+            val endConfidence = confidenceMap[endPart] ?: 0f
+
+            if (start != null && end != null && startConfidence > 0f && endConfidence > 0f) {
                 drawLine(
                     color = lineColor,
                     start = start,
@@ -71,6 +70,7 @@ fun SkeletonOverlay(
         keyPoints.forEach { point ->
             // [수정] NECK(목) 부위는 오버레이에 표시하지 않음
             if (point.type == BodyPart.NECK) return@forEach
+            if (point.confidence <= 0f) return@forEach
 
             val offset = pointMap[point.type] ?: return@forEach
 
