@@ -38,8 +38,6 @@ fun SkeletonOverlay(
 
         // 1) 모델 입력 정규화 역변환: 원본 영상 기준 픽셀 좌표 복원
         val modelMaxDim = max(videoWidth, videoHeight).toFloat()
-        val originalOffsetX = (modelMaxDim - videoWidth) / 2f
-        val originalOffsetY = (modelMaxDim - videoHeight) / 2f
 
         // 2) 원본 영상 -> 현재 캔버스 렌더링 비율(S)
         val renderScale = minOf(canvasWidth / videoWidth, canvasHeight / videoHeight)
@@ -47,8 +45,10 @@ fun SkeletonOverlay(
         val renderOffsetY = (canvasHeight - videoHeight * renderScale) / 2f
 
         val pointMap = keyPoints.associate { point ->
-            val restoredX = point.x * modelMaxDim - originalOffsetX
-            val restoredY = point.y * modelMaxDim - originalOffsetY
+            // pose_estimation.py에서 x,y를 "원본 픽셀 / max_dim"으로 정규화하므로
+            // 역변환은 단순히 max_dim을 곱해 원본 픽셀을 복원하면 됩니다.
+            val restoredX = point.x * modelMaxDim
+            val restoredY = point.y * modelMaxDim
 
             val px = restoredX * renderScale + renderOffsetX
             val py = restoredY * renderScale + renderOffsetY
