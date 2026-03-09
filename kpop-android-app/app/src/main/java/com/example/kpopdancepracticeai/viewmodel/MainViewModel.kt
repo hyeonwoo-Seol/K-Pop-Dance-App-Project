@@ -119,9 +119,10 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch {
             _isSyncing.value = true
             try {
-                // DB 초기 세팅 (데이터 비어있을 시)
+                // 로컬 곡 데이터 동기화 (최신 RealDataSource 기준)
                 val currentSongsList = repository.getAllSongsSync()
-                if (currentSongsList.isEmpty()) {
+                val shouldSeedSongs = currentSongsList.size < RealDataSource.getRealSongs.size
+                if (shouldSeedSongs) {
                     repository.insertSongs(RealDataSource.getRealSongs)
                     repository.insertSongParts(RealDataSource.getRealSongParts)
                 }
@@ -227,7 +228,8 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         } else {
             viewModelScope.launch {
                 val currentSongsList = repository.getAllSongsSync()
-                if (currentSongsList.isEmpty()) {
+                val shouldSeedSongs = currentSongsList.size < RealDataSource.getRealSongs.size
+                if (shouldSeedSongs) {
                     repository.insertSongs(RealDataSource.getRealSongs)
                     repository.insertSongParts(RealDataSource.getRealSongParts)
                     _songs.value = repository.getAllSongsSync()
