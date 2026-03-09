@@ -1,5 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -150,10 +151,16 @@ fun AppNavigation(
     )
     val authRepository = remember { AuthRepository(context) }
 
+    val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
+    val isVideoDownloaded = remember { prefs.getBoolean("is_expert_video_downloaded", false) }
+
     val startDestination = remember {
         if (authRepository.getCurrentUser() != null) {
-            Screen.Home.route
+            // 로그인 O, 다운로드 O -> 홈 화면
+            // 로그인 O, 다운로드 X -> 비디오 다운로드 화면
+            if (isVideoDownloaded) Screen.Home.route else Screen.VideoDownload.route
         } else {
+            // 로그인 X -> 로그인 화면
             Screen.Login.route
         }
     }
@@ -392,7 +399,8 @@ fun AppNavHost(
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->
-                    navController.navigate(Screen.Home.route) {
+                    // 변경됨: Screen.Home.route 대신 Screen.VideoDownload.route로 이동
+                    navController.navigate(Screen.VideoDownload.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
