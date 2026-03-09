@@ -36,4 +36,8 @@ interface SongDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSongParts(parts: List<SongPart>)
+
+    // 💡 [추가됨] Flow를 사용하지 않고 한 번만 곡 목록을 반환하는 쿼리
+    @Query("SELECT * FROM songs")
+    suspend fun getAllSongsSync(): List<Song>
 }
