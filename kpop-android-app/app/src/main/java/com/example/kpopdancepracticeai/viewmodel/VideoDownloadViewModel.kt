@@ -19,13 +19,14 @@ import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 
-// 서버 API에 요청할 파라미터를 담기 위한 데이터 클래스
 data class VideoRequestInfo(
     val classId: Int,
     val filename: String
-)
+) {
+    val s3Key: String
+        get() = "expert_videos/$classId/$filename"
+}
 
-// UI에 전달할 다운로드 상태 데이터 클래스
 data class DownloadUiState(
     val isDownloading: Boolean = false,
     val currentProgress: Int = 0,
@@ -35,10 +36,6 @@ data class DownloadUiState(
     val errorMessage: String? = null
 )
 
-/**
- * 앱 초기 실행 시 전문가 댄스 영상을 다운로드하는 ViewModel
- * API Gateway를 통해 Presigned URL을 발급받아 OkHttp 스트림으로 다운로드합니다.
- */
 class VideoDownloadViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _uiState = MutableStateFlow(DownloadUiState())
@@ -46,8 +43,6 @@ class VideoDownloadViewModel(application: Application) : AndroidViewModel(applic
 
     private val prefs = application.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
     private val targetDirectory = File(application.filesDir, "expert_videos")
-
-    // 대용량 파일 다운로드를 위해 재사용할 OkHttp 클라이언트 인스턴스
     private val okHttpClient = OkHttpClient()
 
     private val videosToDownload = listOf(
@@ -78,6 +73,7 @@ class VideoDownloadViewModel(application: Application) : AndroidViewModel(applic
                 isDownloading = true,
                 totalVideos = videosToDownload.size,
                 currentVideoIndex = 0,
+                currentProgress = 0,
                 errorMessage = null
             )
         }
@@ -87,11 +83,15 @@ class VideoDownloadViewModel(application: Application) : AndroidViewModel(applic
 
     private fun downloadNext(index: Int) {
         if (index >= videosToDownload.size) {
-            Log.d("VideoDownloadVM", "모든 영상 다운로드 완료!")
+            Log.d("VideoDownloadVM", "모든 영상 다운로드 완료")
             prefs.edit().putBoolean("is_expert_video_downloaded", true).apply()
 
             _uiState.update {
-                it.copy(isDownloading = false, isFinished = true, currentProgress = 100)
+                it.copy(
+                    isDownloading = false,
+                    isFinished = true,
+                    currentProgress = 100
+                )
             }
             return
         }
@@ -100,32 +100,40 @@ class VideoDownloadViewModel(application: Application) : AndroidViewModel(applic
         val localFile = File(targetDirectory, videoInfo.filename)
 
         if (localFile.exists() && localFile.length() > 0L) {
-            _uiState.update { it.copy(currentVideoIndex = index + 1) }
+            _uiState.update { it.copy(currentVideoIndex = index + 1, currentProgress = 0) }
             downloadNext(index + 1)
             return
         }
 
         viewModelScope.launch(Dispatchers.IO) {
             try {
-                // 1. API 서버에 classId와 filename을 보내어 Presigned URL 획득 (Step 3 연동)
-                val downloadUrl = fetchPresignedUrlFromApi(videoInfo.classId, videoInfo.filename)
+                Log.d("VideoDownloadVM", "Presigned URL 요청 key=${videoInfo.s3Key}")
 
-                // 2. 발급받은 URL로 실제 파일 스트림 다운로드 (Step 4 연동)
+                val downloadUrl = fetchPresignedUrlFromApi(videoInfo.s3Key)
+
+                Log.d("VideoDownloadVM", "Presigned URL 발급 성공: $downloadUrl")
+
                 downloadFileFromUrl(downloadUrl, localFile) { percent ->
                     _uiState.update { it.copy(currentProgress = percent) }
                 }
 
-                // 3. 완료 후 메인 스레드로 돌아와 다음 파일 진행
                 withContext(Dispatchers.Main) {
-                    _uiState.update { it.copy(currentVideoIndex = index + 1, currentProgress = 0) }
+                    _uiState.update {
+                        it.copy(
+                            currentVideoIndex = index + 1,
+                            currentProgress = 0
+                        )
+                    }
                     downloadNext(index + 1)
                 }
 
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) {
                     Log.e("VideoDownloadVM", "다운로드 실패", e)
-                    // 예외 발생 시 불완전하게 다운로드된 파일이 있다면 삭제하여 데이터 오염을 방지합니다.
-                    if (localFile.exists()) localFile.delete()
+
+                    if (localFile.exists()) {
+                        localFile.delete()
+                    }
 
                     _uiState.update {
                         it.copy(
@@ -139,67 +147,73 @@ class VideoDownloadViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun retryDownload() {
+        _uiState.update {
+            it.copy(
+                isDownloading = false,
+                isFinished = false,
+                currentProgress = 0,
+                currentVideoIndex = 0,
+                errorMessage = null
+            )
+        }
         startDownload()
     }
 
-    /**
-     * API Gateway를 호출하여 실제 다운로드 가능한 임시 URL을 받아오는 함수입니다.
-     */
-    private suspend fun fetchPresignedUrlFromApi(classId: Int, filename: String): String {
-        val response = ApiClient.downloadService.getPresignedUrl(
-            classId = classId,
-            filename = filename
+    private suspend fun fetchPresignedUrlFromApi(s3Key: String): String {
+        val response = ApiClient.downloadService.getPresignedUrl(s3Key)
+
+        Log.d(
+            "VideoDownloadVM",
+            "Presign API 응답: key=${response.key}, expiresIn=${response.expiresIn}"
         )
-        return response.download_url
+
+        return response.url
     }
 
-    /**
-     * OkHttp를 이용하여 URL로부터 대용량 파일을 안전하게 스트리밍 다운로드하는 함수입니다.
-     */
-    private suspend fun downloadFileFromUrl(url: String, targetFile: File, onProgress: (Int) -> Unit) {
-        // 네트워크 및 디스크 I/O 작업이므로 명시적으로 Dispatchers.IO를 보장합니다.
+    private suspend fun downloadFileFromUrl(
+        url: String,
+        targetFile: File,
+        onProgress: (Int) -> Unit
+    ) {
         withContext(Dispatchers.IO) {
-            val request = Request.Builder().url(url).build()
+            val request = Request.Builder()
+                .url(url)
+                .get()
+                .build()
 
-            // OkHttp 클라이언트를 통해 요청 실행
-            val response = okHttpClient.newCall(request).execute()
+            okHttpClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) {
+                    throw IOException("서버 응답 실패: HTTP ${response.code}")
+                }
 
-            if (!response.isSuccessful) {
-                throw IOException("서버 응답 실패: HTTP 상태 코드 ${response.code}")
-            }
+                val body = response.body ?: throw IOException("응답 본문이 비어 있습니다.")
+                val contentLength = body.contentLength()
 
-            // 본문(Body) 추출
-            val body = response.body ?: throw IOException("응답 본문이 비어 있습니다.")
-            val contentLength = body.contentLength()
+                var bytesCopied = 0L
+                var lastProgress = 0
 
-            var bytesCopied = 0L
-            var lastProgress = 0
+                body.byteStream().use { inputStream ->
+                    FileOutputStream(targetFile).use { outputStream ->
+                        val buffer = ByteArray(8 * 1024)
+                        var bytes = inputStream.read(buffer)
 
-            // 스트림 읽기/쓰기 시작. use 블록을 사용하여 작업 완료 시 안전하게 스트림을 닫아줍니다(메모리 누수 방지).
-            body.byteStream().use { inputStream ->
-                FileOutputStream(targetFile).use { outputStream ->
-                    val buffer = ByteArray(8 * 1024) // 8KB(8192 바이트) 버퍼 지정
-                    var bytes = inputStream.read(buffer)
+                        while (bytes >= 0) {
+                            outputStream.write(buffer, 0, bytes)
+                            bytesCopied += bytes
 
-                    while (bytes >= 0) {
-                        outputStream.write(buffer, 0, bytes)
-                        bytesCopied += bytes
-
-                        // 전체 파일 크기를 알 수 있는 경우 진행률 계산
-                        if (contentLength > 0) {
-                            val currentProgress = ((bytesCopied * 100) / contentLength).toInt()
-
-                            // 1% 단위로 변경되었을 때만 UI 업데이트를 호출하여 부하(Overhead)를 줄입니다.
-                            if (currentProgress != lastProgress) {
-                                lastProgress = currentProgress
-                                onProgress(currentProgress)
+                            if (contentLength > 0) {
+                                val currentProgress = ((bytesCopied * 100) / contentLength).toInt()
+                                if (currentProgress != lastProgress) {
+                                    lastProgress = currentProgress
+                                    onProgress(currentProgress)
+                                }
                             }
+
+                            bytes = inputStream.read(buffer)
                         }
 
-                        // 다음 버퍼 읽기
-                        bytes = inputStream.read(buffer)
+                        outputStream.flush()
                     }
-                    outputStream.flush()
                 }
             }
         }
