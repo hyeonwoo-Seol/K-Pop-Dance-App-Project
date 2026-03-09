@@ -9,22 +9,53 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.camera.core.*
+import androidx.camera.core.CameraSelector
+import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
-import androidx.camera.video.*
+import androidx.camera.video.FallbackStrategy
+import androidx.camera.video.MediaStoreOutputOptions
+import androidx.camera.video.Quality
+import androidx.camera.video.QualitySelector
+import androidx.camera.video.Recorder
+import androidx.camera.video.Recording
+import androidx.camera.video.VideoCapture
+import androidx.camera.video.VideoRecordEvent
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -38,11 +69,16 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
+import com.example.kpopdancepracticeai.util.NetworkUtils
+import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
@@ -53,12 +89,15 @@ fun RecordScreen(
     part: String = "1절 코러스",
     expertVideoUrl: String = "asset:///540_원영_1.mp4",
     onBack: () -> Unit = {},
-    onRecordingComplete: (String) -> Unit = {}
+    onNavigateHome: () -> Unit = onBack,
+    onRecordingComplete: (String) -> Unit = {},
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
     val isTablet = remember(configuration) { configuration.screenWidthDp >= 600 }
 
     val uploader = remember { PresignedUrlUploader(context) }
@@ -66,7 +105,7 @@ fun RecordScreen(
     var hasPermissions by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         )
     }
 
@@ -87,24 +126,23 @@ fun RecordScreen(
     var isRecording by remember { mutableStateOf(false) }
     var recordingTime by remember { mutableIntStateOf(0) }
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
+    var countdownNumber by remember { mutableIntStateOf(0) }
+    var isCountdownVisible by remember { mutableStateOf(false) }
 
-    // 💡 [핵심 수정 1] ExoPlayer 껍데기만 먼저 만듭니다. (remember의 버그를 피하기 위함)
-    val exoPlayer = remember {
-        ExoPlayer.Builder(context).build()
+    LaunchedEffect(settings.isFrontCamera) {
+        lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
     }
+
+    val exoPlayer = remember { ExoPlayer.Builder(context).build() }
 
     DisposableEffect(Unit) {
-        onDispose {
-            exoPlayer.release()
-        }
+        onDispose { exoPlayer.release() }
     }
 
-    // 💡 [핵심 수정 2] 네비게이션을 통해 expertVideoUrl 값이 도착하면, 그때 비로소 영상을 플레이어에 넣고 재생합니다!
     LaunchedEffect(expertVideoUrl) {
         if (expertVideoUrl.isNotBlank()) {
             try {
-                val mediaItem = MediaItem.fromUri(Uri.parse(expertVideoUrl))
-                exoPlayer.setMediaItem(mediaItem)
+                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(expertVideoUrl)))
                 exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
@@ -117,7 +155,7 @@ fun RecordScreen(
     LaunchedEffect(isRecording) {
         if (isRecording) {
             while (isRecording) {
-                kotlinx.coroutines.delay(1000)
+                delay(1000)
                 recordingTime++
             }
         } else {
@@ -125,82 +163,145 @@ fun RecordScreen(
         }
     }
 
+    fun handleRecordingFinalize(recordEvent: VideoRecordEvent.Finalize) {
+        if (recordEvent.hasError()) {
+            recordingState.value?.close()
+            isRecording = false
+            return
+        }
+
+        val uri = recordEvent.outputResults.outputUri
+        val userId = "xooyong"
+        val songIdClean = songTitle.replace(" ", "").replace("_", "")
+        val partNum = part.filter { it.isDigit() }.ifEmpty { "0" }
+        val partName = part.split(":").lastOrNull()?.replace(" ", "")?.replace("_", "") ?: "None"
+        val timestamp = System.currentTimeMillis()
+        val filename = "${userId}_${songIdClean}_${partNum}_${partName}_${timestamp}.mp4"
+
+        scope.launch {
+            if (!settings.isAutoUpload) {
+                Toast.makeText(context, "자동 전송이 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                onNavigateHome()
+                return@launch
+            }
+
+            if (settings.isWifiOnlyUpload && !NetworkUtils.isWifiConnected(context)) {
+                Toast.makeText(context, "WIFI 전용 업로드 설정으로 로컬 저장 후 홈으로 이동합니다.", Toast.LENGTH_SHORT).show()
+                onNavigateHome()
+                return@launch
+            }
+
+            Toast.makeText(context, "녹화 완료. 업로드 시작...", Toast.LENGTH_SHORT).show()
+            uploader.uploadVideo(
+                fileUri = uri,
+                filename = filename,
+                onComplete = {
+                    Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
+                    scope.launch {
+                        uploader.pollAnalysisResult(
+                            userId = userId,
+                            timestamp = timestamp,
+                            onProgress = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() },
+                            onComplete = { resultS3Key ->
+                                Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
+                                onRecordingComplete(resultS3Key)
+                            },
+                            onError = { e ->
+                                Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                            }
+                        )
+                    }
+                },
+                onError = { e ->
+                    Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                }
+            )
+        }
+    }
+
+    fun startRecordingWithCountdown() {
+        val videoCapture = videoCaptureState.value ?: return
+        if (isRecording || isCountdownVisible) return
+
+        scope.launch {
+            val startCount = settings.countdownSeconds
+            if (startCount > 0) {
+                countdownNumber = startCount
+                isCountdownVisible = true
+                while (countdownNumber > 0) {
+                    delay(1000)
+                    countdownNumber--
+                }
+                isCountdownVisible = false
+            }
+
+            exoPlayer.seekTo(0)
+            exoPlayer.play()
+
+            isRecording = true
+            val name = "Kpop_${System.currentTimeMillis()}.mp4"
+            val contentValues = ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
+                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/KpopDancePractice")
+            }
+            val mediaStoreOutputOptions = MediaStoreOutputOptions
+                .Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
+                .setContentValues(contentValues)
+                .build()
+
+            recordingState.value = videoCapture.output
+                .prepareRecording(context, mediaStoreOutputOptions)
+                .apply { if (hasPermissions) withAudioEnabled() }
+                .start(ContextCompat.getMainExecutor(context)) { event ->
+                    if (event is VideoRecordEvent.Finalize) {
+                        handleRecordingFinalize(event)
+                    }
+                }
+        }
+    }
+
     if (!hasPermissions) {
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-            IconButton(
-                onClick = onBack,
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(16.dp)
-            ) {
+            IconButton(onClick = onBack, modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(16.dp)) {
                 Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
             }
-            Column(
-                modifier = Modifier.align(Alignment.Center),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
+            Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Text("카메라 및 오디오 권한이 필요합니다.", color = Color.White)
-                Button(onClick = { launcher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)) }) {
-                    Text("권한 허용하기")
-                }
+                Button(onClick = { launcher.launch(arrayOf(Manifest.permission.CAMERA, Manifest.permission.RECORD_AUDIO)) }) { Text("권한 허용하기") }
             }
         }
         return
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-
-        // --- 1. 배경: 전문가 영상 (전체 화면) ---
         AndroidView(
-            factory = { ctx ->
-                PlayerView(ctx).apply {
-                    player = exoPlayer
-                    useController = false
-                }
-            },
+            factory = { PlayerView(it).apply { player = exoPlayer; useController = false } },
             modifier = Modifier.fillMaxSize(),
-            update = { playerView ->
-                // 화면이 업데이트 될 때 플레이어가 풀리지 않도록 단단히 고정
-                if (playerView.player != exoPlayer) {
-                    playerView.player = exoPlayer
-                }
-            }
+            update = { if (it.player != exoPlayer) it.player = exoPlayer }
         )
 
-        // --- 2. 내 카메라 (녹화 중일 때만 우측 하단에 작게 표시) ---
         val cameraModifier = if (isRecording) {
-            Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 140.dp, end = 20.dp)
-                .size(120.dp, 180.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .border(2.dp, Color.White, RoundedCornerShape(12.dp))
+            Modifier.align(Alignment.BottomEnd).padding(bottom = 140.dp, end = 20.dp).size(120.dp, 180.dp).clip(RoundedCornerShape(12.dp)).border(2.dp, Color.White, RoundedCornerShape(12.dp))
         } else {
-            Modifier
-                .align(Alignment.BottomEnd)
-                .size(1.dp)
-                .alpha(0f)
+            Modifier.align(Alignment.BottomEnd).size(1.dp).alpha(0f)
         }
 
         Box(modifier = cameraModifier) {
             AndroidView(
-                factory = { ctx ->
-                    PreviewView(ctx).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE }
-                },
+                factory = { PreviewView(it).apply { implementationMode = PreviewView.ImplementationMode.COMPATIBLE } },
                 modifier = Modifier.fillMaxSize(),
                 update = { previewView ->
-                    val currentLensFacing = lensFacing
                     val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                     cameraProviderFuture.addListener({
                         val cameraProvider = cameraProviderFuture.get()
-                        val preview = Preview.Builder().build().also {
-                            it.setSurfaceProvider(previewView.surfaceProvider)
-                        }
+                        val preview = Preview.Builder().build().also { it.setSurfaceProvider(previewView.surfaceProvider) }
                         val targetQuality = if (isTablet) Quality.FHD else Quality.HD
                         val qualitySelector = QualitySelector.from(targetQuality, FallbackStrategy.lowerQualityOrHigherThan(targetQuality))
                         val recorder = Recorder.Builder().setQualitySelector(qualitySelector).build()
                         val videoCapture = VideoCapture.withOutput(recorder)
                         videoCaptureState.value = videoCapture
-                        val cameraSelector = CameraSelector.Builder().requireLensFacing(currentLensFacing).build()
+                        val cameraSelector = CameraSelector.Builder().requireLensFacing(lensFacing).build()
                         try {
                             cameraProvider.unbindAll()
                             cameraProvider.bindToLifecycle(lifecycleOwner, cameraSelector, preview, videoCapture)
@@ -212,23 +313,15 @@ fun RecordScreen(
             )
         }
 
-        // --- 3. 상단 헤더 UI ---
         Column(modifier = Modifier.fillMaxWidth().padding(16.dp).statusBarsPadding().align(Alignment.TopStart)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) {
-                    Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
+                IconButton(onClick = onBack) { Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Color.White) }
+                Spacer(modifier = Modifier.size(8.dp))
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(songTitle, color = Color.White, fontSize = 20.sp)
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .background(Color(0x33F0B100), RoundedCornerShape(8.dp))
-                                .border(1.dp, Color(0x80F0B100), RoundedCornerShape(8.dp))
-                                .padding(horizontal = 8.dp, vertical = 2.dp)
-                        ) {
+                        Spacer(modifier = Modifier.size(12.dp))
+                        Box(modifier = Modifier.background(Color(0x33F0B100), RoundedCornerShape(8.dp)).border(1.dp, Color(0x80F0B100), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
                             Text(difficulty, color = Color(0xFFFFDF20), fontSize = 12.sp)
                         }
                     }
@@ -237,34 +330,33 @@ fun RecordScreen(
             }
         }
 
-        // --- 4. 녹화 시간 표시 ---
+        if (isCountdownVisible) {
+            Text(
+                text = countdownNumber.toString(),
+                color = Color.White,
+                fontSize = 96.sp,
+                fontWeight = FontWeight.ExtraBold,
+                modifier = Modifier.align(Alignment.Center)
+            )
+        }
+
         if (isRecording) {
-            Row(
-                modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Row(modifier = Modifier.align(Alignment.TopCenter).padding(top = 80.dp), verticalAlignment = Alignment.CenterVertically) {
                 Box(modifier = Modifier.size(12.dp).clip(CircleShape).background(Color.Red))
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.size(8.dp))
                 Text(String.format("%02d:%02d", recordingTime / 60, recordingTime % 60), color = Color.White)
             }
         }
 
-        // --- 5. 하단 컨트롤러 ("따라하기" 버튼 및 녹화 정지 버튼) ---
         Box(modifier = Modifier.fillMaxWidth().align(Alignment.BottomCenter).padding(bottom = 32.dp)) {
             if (isRecording) {
+                val buttonPadding by animateDpAsState(24.dp, label = "")
                 Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .align(Alignment.Center)
-                        .border(4.dp, Color.White, CircleShape)
-                        .padding(24.dp)
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color.Red)
-                        .clickable {
-                            recordingState.value?.stop()
-                            recordingState.value = null
-                            isRecording = false
-                        }
+                    modifier = Modifier.size(80.dp).align(Alignment.Center).border(4.dp, Color.White, CircleShape).padding(buttonPadding).clip(RoundedCornerShape(12.dp)).background(Color.Red).clickable {
+                        recordingState.value?.stop()
+                        recordingState.value = null
+                        isRecording = false
+                    }
                 )
 
                 IconButton(
@@ -275,69 +367,7 @@ fun RecordScreen(
                 }
             } else {
                 Button(
-                    onClick = {
-                        val videoCapture = videoCaptureState.value
-                        if (videoCapture != null) {
-                            exoPlayer.seekTo(0)
-                            exoPlayer.play()
-
-                            isRecording = true
-                            val name = "Kpop_${System.currentTimeMillis()}.mp4"
-                            val contentValues = ContentValues().apply {
-                                put(MediaStore.MediaColumns.DISPLAY_NAME, name)
-                                put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                                put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/KpopDancePractice")
-                            }
-                            val mediaStoreOutputOptions = MediaStoreOutputOptions
-                                .Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
-                                .setContentValues(contentValues)
-                                .build()
-
-                            recordingState.value = videoCapture.output
-                                .prepareRecording(context, mediaStoreOutputOptions)
-                                .apply { if (hasPermissions) withAudioEnabled() }
-                                .start(ContextCompat.getMainExecutor(context)) { recordEvent ->
-                                    if (recordEvent is VideoRecordEvent.Finalize) {
-                                        if (!recordEvent.hasError()) {
-                                            val uri = recordEvent.outputResults.outputUri
-                                            Toast.makeText(context, "녹화 완료. 업로드 시작...", Toast.LENGTH_SHORT).show()
-                                            val userId = "xooyong"
-                                            val songIdClean = songTitle.replace(" ", "").replace("_", "")
-                                            val partNum = part.filter { it.isDigit() }.ifEmpty { "0" }
-                                            val partName = part.split(":").lastOrNull()?.replace(" ", "")?.replace("_", "") ?: "None"
-                                            val timestamp = System.currentTimeMillis()
-                                            val filename = "${userId}_${songIdClean}_${partNum}_${partName}_${timestamp}.mp4"
-
-                                            scope.launch {
-                                                uploader.uploadVideo(
-                                                    fileUri = uri,
-                                                    filename = filename,
-                                                    onComplete = { s3Key ->
-                                                        Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
-                                                        scope.launch {
-                                                            uploader.pollAnalysisResult(
-                                                                userId = userId,
-                                                                timestamp = timestamp,
-                                                                onProgress = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() },
-                                                                onComplete = { resultS3Key ->
-                                                                    Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
-                                                                    onRecordingComplete(resultS3Key)
-                                                                },
-                                                                onError = { e -> Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show() }
-                                                            )
-                                                        }
-                                                    },
-                                                    onError = { e -> Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show() }
-                                                )
-                                            }
-                                        } else {
-                                            recordingState.value?.close()
-                                            isRecording = false
-                                        }
-                                    }
-                                }
-                        }
-                    },
+                    onClick = { startRecordingWithCountdown() },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFB2C36)),
                     contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
                     modifier = Modifier.align(Alignment.Center)
