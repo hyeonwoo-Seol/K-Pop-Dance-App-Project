@@ -11,6 +11,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface SongDao {
 
+    @Query("SELECT COUNT(*) FROM songs")
+    suspend fun getSongCount(): Int
+
     // 정렬 기준 명시 (title_kr 기준 오름차순 예시)
     @Query("SELECT * FROM songs ORDER BY title_kr ASC")
     fun getAllSongs(): Flow<List<Song>>

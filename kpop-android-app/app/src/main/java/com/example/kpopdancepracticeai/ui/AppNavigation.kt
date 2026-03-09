@@ -67,8 +67,10 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kpopdancepracticeai.KpopApplication
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
+import com.example.kpopdancepracticeai.data.repository.RoomSongDataRepository
 import com.example.kpopdancepracticeai.ui.test.IntegrationTestScreen
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -408,7 +410,7 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onSearch = { query ->
                     if (query.isNotBlank()) {
-                        navController.navigate("searchResults/$query")
+                        navController.navigate("searchResults/${Screen.encodeArg(query.trim())}")
                     }
                 },
                 onSongClick = { songId ->
@@ -519,11 +521,17 @@ fun AppNavHost(
             route = Screen.SearchResults.route,
             arguments = listOf(navArgument("query") { type = NavType.StringType })
         ) { backStackEntry ->
-            val query = backStackEntry.arguments?.getString("query") ?: ""
+            val query = backStackEntry.arguments?.getString("query")?.let { Screen.decodeArg(it) } ?: ""
+            val searchViewModel: SearchViewModel = viewModel(
+                factory = SearchViewModel.provideFactory(
+                    RoomSongDataRepository((LocalContext.current.applicationContext as KpopApplication).database.songDao())
+                )
+            )
             SearchResultsScreen(
                 query = query,
                 navController = navController,
-                paddingValues = innerPadding
+                paddingValues = innerPadding,
+                viewModel = searchViewModel
             )
         }
         composable(
