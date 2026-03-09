@@ -48,6 +48,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import kotlinx.coroutines.delay
+import java.io.IOException
 
 private val ColorVideoOverlay = Color(0x4D000000)
 private val ColorControlInactive = Color(0x1AFFFFFF)
@@ -93,13 +94,51 @@ fun PracticeScreenMobile(
         onDispose { exoPlayer.release() }
     }
 
+    fun assetExists(assetFileName: String): Boolean {
+        return try {
+            context.assets.open(assetFileName).close()
+            true
+        } catch (_: IOException) {
+            false
+        }
+    }
+
+    fun resolveVideoUrl(originalUrl: String, artistPartText: String): String {
+        if (originalUrl.isBlank()) return ""
+
+        if (originalUrl.startsWith("asset:///")) return originalUrl
+        if (originalUrl.startsWith("file:///android_asset/")) {
+            return originalUrl.replace("file:///android_asset/", "asset:///")
+        }
+
+        if (originalUrl.contains("/expert_videos/")) {
+            val fileName = originalUrl.substringAfterLast("/")
+            val candidates = buildList {
+                add(fileName)
+                if (!fileName.startsWith("kim889_")) add("kim889_$fileName")
+            }
+
+            candidates.firstOrNull { assetExists(it) }?.let { return "asset:///$it" }
+        }
+
+        val partNumber = "(\\d)절".toRegex().find(artistPartText)?.groupValues?.getOrNull(1)?.toIntOrNull()
+            ?: if (artistPartText.contains("프리코러스")) 2
+            else if (artistPartText.contains("댄스 브레이크")) 4
+            else null
+
+        if (partNumber != null) {
+            val fallback = "kim889_540_원영_${partNumber}.mp4"
+            if (assetExists(fallback)) return "asset:///$fallback"
+        }
+
+        return originalUrl
+    }
+
     // 💡 [핵심 수정] URL이 변경될 때마다 플레이어 재설정 (Toast 디버깅 포함)
     LaunchedEffect(videoUrl) {
         if (videoUrl.isNotBlank()) {
             // "asset:///" 경로 보장
-            val finalUrl = if (!videoUrl.startsWith("asset:///")) {
-                videoUrl.replace("file:///android_asset/", "asset:///")
-            } else videoUrl
+            val finalUrl = resolveVideoUrl(videoUrl, artistPart)
 
             Toast.makeText(context, "재생 시도: $finalUrl", Toast.LENGTH_SHORT).show()
 
