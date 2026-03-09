@@ -117,11 +117,11 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (permissionsGranted) {
-                        // KpopDancePracticeApp은 메인 네비게이션을 담고 있는 Composable이라고 가정
-                        KpopDancePracticeApp()
-                    }
+                    // 💡 핵심: 권한 허용 여부와 상관없이 앱 전체 네비게이션 구조는 항상 먼저 렌더링합니다.
+                    // 이렇게 하면 NavHost가 생명주기 시작점을 놓치지 않습니다.
+                    KpopDancePracticeApp()
 
+                    // 권한이 없어서 다이얼로그를 띄워야 할 경우만 앱 뷰 위에 오버레이로 띄웁니다.
                     if (showPermissionDeniedDialog) {
                         AlertDialog(
                             onDismissRequest = { finish() },
