@@ -12,10 +12,19 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.kpopdancepracticeai.ui.theme.PointGreen
 import kotlin.math.max
+import kotlin.math.min
 
 // 에러 표시 색상 정의
 private val ColorError = Color.Red
 private val ColorNormal = PointGreen
+private val HiddenOverlayParts = setOf(
+    BodyPart.NOSE,
+    BodyPart.LEFT_EYE,
+    BodyPart.RIGHT_EYE,
+    BodyPart.LEFT_EAR,
+    BodyPart.RIGHT_EAR,
+    BodyPart.NECK
+)
 
 @Composable
 fun SkeletonOverlay(
@@ -24,7 +33,9 @@ fun SkeletonOverlay(
     modifier: Modifier = Modifier,
     lineColor: Color = Color.White, // 뼈대 색상
     jointRadius: Float = 12f,
-    lineWidth: Float = 8f
+    lineWidth: Float = 8f,
+    sourceVideoWidth: Int? = null,
+    sourceVideoHeight: Int? = null
 ) {
     // 에러 발생 시 깜빡이는 효과 (Pulse Animation) 설정
     val infiniteTransition = rememberInfiniteTransition(label = "ErrorPulse")
@@ -35,19 +46,27 @@ fun SkeletonOverlay(
         val canvasHeight = size.height
 
         // 1. 좌표 복원 (Denormalization)
-        // 가이드에 따라 max(width, height)를 기준으로 정규화 해제
-        val maxDim = max(canvasWidth, canvasHeight)
+        // 서버는 max(videoWidth, videoHeight) 기준으로 정규화하므로,
+        // 복원 시에도 원본 영상 해상도를 기준으로 픽셀 좌표를 복원한다.
+        val videoWidth = (sourceVideoWidth ?: 0).toFloat().takeIf { it > 0f } ?: canvasWidth
+        val videoHeight = (sourceVideoHeight ?: 0).toFloat().takeIf { it > 0f } ?: canvasHeight
+        val sourceMaxDim = max(videoWidth, videoHeight)
 
-        // 화면 비율에 따른 오프셋 계산 (Letterbox 처리)
-        // 영상이 화면 중앙에 위치한다고 가정 (Center Crop 방식 대응)
-        val offsetX = (canvasWidth - maxDim) / 2
-        val offsetY = (canvasHeight - maxDim) / 2
+        // PlayerView의 FIT(레터박스) 표시 영역에 맞춰 오버레이를 동일하게 매핑
+        val scale = min(canvasWidth / videoWidth, canvasHeight / videoHeight)
+        val displayWidth = videoWidth * scale
+        val displayHeight = videoHeight * scale
+        val offsetX = (canvasWidth - displayWidth) / 2f
+        val offsetY = (canvasHeight - displayHeight) / 2f
 
         val pointMap = keyPoints.associate { point ->
-            val px = point.x * maxDim + offsetX
-            val py = point.y * maxDim + offsetY
+            val sourceX = point.x * sourceMaxDim
+            val sourceY = point.y * sourceMaxDim
+            val px = sourceX * scale + offsetX
+            val py = sourceY * scale + offsetY
             point.type to Offset(px, py)
         }
+        val confidenceMap = keyPoints.associate { it.type to it.confidence }
 
         // 2. 뼈대 그리기 (선)
         bodyConnections.forEach { (startPart, endPart) ->
@@ -56,7 +75,17 @@ fun SkeletonOverlay(
             val start = pointMap[startPart]
             val end = pointMap[endPart]
 
-            if (start != null && end != null) {
+            val startConfidence = confidenceMap[startPart] ?: 0f
+            val endConfidence = confidenceMap[endPart] ?: 0f
+
+            if (
+                start != null &&
+                end != null &&
+                startPart !in HiddenOverlayParts &&
+                endPart !in HiddenOverlayParts &&
+                startConfidence > 0f &&
+                endConfidence > 0f
+            ) {
                 drawLine(
                     color = lineColor,
                     start = start,
@@ -69,8 +98,9 @@ fun SkeletonOverlay(
 
         // 3. 관절 그리기 (점) 및 에러 시각화
         keyPoints.forEach { point ->
-            // [수정] NECK(목) 부위는 오버레이에 표시하지 않음
-            if (point.type == BodyPart.NECK) return@forEach
+            // 얼굴/목 부위는 오버레이에서 제외
+            if (point.type in HiddenOverlayParts) return@forEach
+            if (point.confidence <= 0f) return@forEach
 
             val offset = pointMap[point.type] ?: return@forEach
 
