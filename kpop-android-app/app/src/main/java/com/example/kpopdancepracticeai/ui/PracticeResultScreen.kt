@@ -39,6 +39,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.data.dto.FrameData
 import com.example.kpopdancepracticeai.util.DataConverter
@@ -81,6 +82,8 @@ fun PracticeResultScreen(
     var currentKeyPoints by remember { mutableStateOf<List<KeyPoint>>(emptyList()) }
     var currentErrors by remember { mutableStateOf<List<Int>>(emptyList()) }
     var isPlaying by remember { mutableStateOf(false) }
+    var sourceVideoWidth by remember { mutableIntStateOf(0) }
+    var sourceVideoHeight by remember { mutableIntStateOf(0) }
 
     // --- 2. 플레이어 및 데이터 로드 ---
     var exoPlayer: ExoPlayer? by remember { mutableStateOf(null) }
@@ -109,6 +112,8 @@ fun PracticeResultScreen(
                 val result = JsonResultLoader.loadAnalysisResult(context, jsonFileName)
                 if (result != null) {
                     allFrames = result.frames.sortedBy { it.timestamp }
+                    sourceVideoWidth = result.metadata.videoWidth
+                    sourceVideoHeight = result.metadata.videoHeight
                     totalScore = result.summary.totalScore
                     accuracyGrade = result.summary.accuracyGrade
 
@@ -174,11 +179,23 @@ fun PracticeResultScreen(
         // [오버레이 영상 렌더링 화면]
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
             AndroidView(
-                factory = { ctx -> PlayerView(ctx).apply { player = exoPlayer; useController = true } },
+                factory = { ctx ->
+                    PlayerView(ctx).apply {
+                        player = exoPlayer
+                        useController = true
+                        resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+                    }
+                },
                 modifier = Modifier.fillMaxSize()
             )
             if (currentKeyPoints.isNotEmpty()) {
-                SkeletonOverlay(keyPoints = currentKeyPoints, errors = currentErrors, modifier = Modifier.fillMaxSize())
+                SkeletonOverlay(
+                    keyPoints = currentKeyPoints,
+                    errors = currentErrors,
+                    modifier = Modifier.fillMaxSize(),
+                    sourceVideoWidth = sourceVideoWidth,
+                    sourceVideoHeight = sourceVideoHeight
+                )
             }
             IconButton(
                 onClick = { showOverlay = false; exoPlayer?.pause() },
