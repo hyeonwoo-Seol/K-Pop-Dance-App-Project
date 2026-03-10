@@ -31,6 +31,7 @@ import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import java.io.File
+import java.net.URLDecoder
 
 @Composable
 fun SongPartSelectScreen(
@@ -61,12 +62,10 @@ fun SongPartSelectScreen(
         val part = selectedPartForUpload
         if (uri != null && part != null && currentSong != null) {
             val userId = userProfile?.userUuid ?: authUserId ?: "none"
-            val songIdClean = currentSong.titleKr.replace(" ", "").replace("_", "")
-            val partNum = part.partNumber.toString()
-            val partNameClean = part.partName.replace(" ", "").replace("_", "")
+            val expertIdentifier = buildExpertIdentifierForUpload(currentSong, part)
             val timestamp = System.currentTimeMillis()
 
-            val filename = "${userId}_${songIdClean}_${partNum}_${partNameClean}_${timestamp}.mp4"
+            val filename = "${userId}_${expertIdentifier}_${timestamp}.mp4"
 
             scope.launch {
                 Toast.makeText(context, "동영상 업로드 시작...", Toast.LENGTH_SHORT).show()
@@ -167,6 +166,29 @@ fun SongPartSelectScreen(
             }
         )
     }
+}
+
+private fun buildExpertIdentifierForUpload(song: Song, part: SongPart): String {
+    val fromVideoUrl = part.videoUrl
+        ?.substringBefore("?")
+        ?.let { raw ->
+            val parsed = Uri.parse(raw).lastPathSegment ?: raw.substringAfterLast("/")
+            runCatching { URLDecoder.decode(parsed, "UTF-8") }.getOrDefault(parsed)
+        }
+        ?.substringBeforeLast(".")
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+
+    if (fromVideoUrl != null) return fromVideoUrl
+
+    val artistToken = song.artistKr
+        .substringAfter("(")
+        .substringBefore(")")
+        .ifBlank { song.artistKr }
+        .replace(" ", "")
+        .replace("_", "")
+
+    return "${song.songId}_${artistToken}_${part.partNumber}"
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

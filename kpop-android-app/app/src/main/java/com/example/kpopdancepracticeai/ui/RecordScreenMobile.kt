@@ -87,6 +87,36 @@ import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
+import java.net.URLDecoder
+
+private fun extractExpertIdentifier(
+    expertVideoUrl: String,
+    songTitle: String,
+    artist: String,
+    part: String
+): String {
+    val fromUrl = expertVideoUrl
+        .substringBefore("?")
+        .let { raw ->
+            val parsed = Uri.parse(raw).lastPathSegment ?: raw.substringAfterLast("/")
+            runCatching { URLDecoder.decode(parsed, "UTF-8") }.getOrDefault(parsed)
+        }
+        .substringBeforeLast(".")
+        .trim()
+        .takeIf { it.isNotBlank() }
+
+    if (fromUrl != null) return fromUrl
+
+    val songToken = songTitle.replace(" ", "").replace("_", "")
+    val artistToken = artist
+        .substringAfter("(")
+        .substringBefore(")")
+        .ifBlank { artist }
+        .replace(" ", "")
+        .replace("_", "")
+    val partToken = part.filter { it.isDigit() }.ifEmpty { "0" }
+    return "${songToken}_${artistToken}_${partToken}"
+}
 
 @Composable
 fun RecordScreen(
@@ -183,13 +213,11 @@ fun RecordScreen(
 
         val uri = recordEvent.outputResults.outputUri
         val userId = userProfile?.userUuid ?: authUserId ?: "none"
-        val songIdClean = songTitle.replace(" ", "").replace("_", "")
-        val partNum = part.filter { it.isDigit() }.ifEmpty { "0" }
-        val partName = part.split(":").lastOrNull()?.replace(" ", "")?.replace("_", "") ?: "None"
+        val expertIdentifier = extractExpertIdentifier(expertVideoUrl, songTitle, artist, part)
+        val partNum = expertIdentifier.substringAfterLast("_", "0").ifBlank { "0" }
         val timestamp = System.currentTimeMillis()
-        val filename = "${userId}_${songIdClean}_${partNum}_${partName}_${timestamp}.mp4"
-        val songIdForDb = expertVideoUrl
-            .substringAfterLast("/")
+        val filename = "${userId}_${expertIdentifier}_${timestamp}.mp4"
+        val songIdForDb = expertIdentifier
             .substringBefore("_")
             .toLongOrNull()
             ?.toString() ?: "0"
