@@ -88,7 +88,7 @@ class Scoring:
         # Auto-Sync 수행
         print("[Scoring] Auto-Sync 수행 중...")
         synced_user_feat, synced_expert_feat, offset, sync_start_idx = self._auto_sync_sequences(
-            user_features, expert_features, search_range=90
+            user_features, expert_features, search_range=200
         )
         
         # Keypoint 데이터도 Sync에 맞춰 자름 (Worst Index 및 Errors 계산용)
