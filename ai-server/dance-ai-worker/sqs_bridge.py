@@ -7,6 +7,7 @@
 import boto3
 import json
 import time
+import os
 from celery import chain
 from config import Config
 from tasks import download_video_task, pose_estimation_task
@@ -23,6 +24,28 @@ def get_sqs_client():
         # AWS 없이 테스트할 때는 클라이언트 생성을 건너뜁니다.
         return None
 
+# >> 파일명에서 최소 메타데이터를 추출
+def _parse_filename_metadata(file_key):
+    try:
+        filename = os.path.basename(file_key)
+        name_without_ext = filename.rsplit('.', 1)[0]
+        parts = name_without_ext.split('_')
+
+        # 예상: user_song_part_partName_timestamp (partName은 언더스코어 제거되어 들어오는 전제)
+        if len(parts) < 5:
+            return None
+
+        user_id = parts[0]
+        timestamp = int(parts[-1])
+        song_id = "_".join(parts[1:-1])  # fallback용 song_id
+        return {
+            "user_id": user_id,
+            "song_id": song_id,
+            "timestamp": timestamp
+        }
+    except Exception:
+        return None
+
 # >> 규격서에 따른 메시지 파싱
 def parse_analysis_request(body_json):
     """
@@ -36,12 +59,57 @@ def parse_analysis_request(body_json):
     """
     try:
         data = json.loads(body_json)
-        # >> 필수 필드 확인 (video_id 제거됨, timestamp 추가됨)
-        required_keys = ['bucket_name', 'file_key', 'song_id', 'user_id', 'timestamp']
-        if all(key in data for key in required_keys):
-            return data
     except Exception:
-        pass
+        return None
+
+    # SNS -> SQS 형태 지원 (Message 내부에 JSON 문자열)
+    if isinstance(data, dict) and isinstance(data.get("Message"), str):
+        try:
+            data = json.loads(data["Message"])
+        except Exception:
+            return None
+
+    # S3 이벤트 원문이 그대로 들어온 경우 지원
+    if isinstance(data, dict) and "Records" in data and isinstance(data["Records"], list) and data["Records"]:
+        first = data["Records"][0]
+        s3 = first.get("s3", {}) if isinstance(first, dict) else {}
+        bucket = s3.get("bucket", {}).get("name")
+        file_key = s3.get("object", {}).get("key")
+        if bucket and file_key:
+            data = {
+                "bucket_name": bucket,
+                "file_key": file_key
+            }
+
+    if not isinstance(data, dict):
+        return None
+
+    # Lambda 메시지 키 별칭 지원
+    normalized = {
+        "bucket_name": data.get("bucket_name") or data.get("bucket"),
+        "file_key": data.get("file_key") or data.get("s3_key"),
+        "song_id": data.get("song_id"),
+        "user_id": data.get("user_id"),
+        "timestamp": data.get("timestamp")
+    }
+
+    # 필수값 누락 시 파일명 기반 fallback 시도
+    if normalized["file_key"]:
+        parsed = _parse_filename_metadata(normalized["file_key"])
+        if parsed:
+            normalized["song_id"] = normalized["song_id"] or parsed["song_id"]
+            normalized["user_id"] = normalized["user_id"] or parsed["user_id"]
+            normalized["timestamp"] = normalized["timestamp"] or parsed["timestamp"]
+
+    try:
+        normalized["timestamp"] = int(normalized["timestamp"])
+    except Exception:
+        return None
+
+    required_keys = ['bucket_name', 'file_key', 'song_id', 'user_id', 'timestamp']
+    if all(normalized.get(key) is not None for key in required_keys):
+        return normalized
+
     return None
 
 def run_bridge():
@@ -119,7 +187,8 @@ def run_bridge():
                         # >> 메시지 삭제 (작업 큐에서 제거)
                         sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message['ReceiptHandle'])
                     else:
-                        print(f"유효하지 않은 메시지 형식입니다. 삭제 처리합니다.")
+                        raw_preview = message.get('Body', '')[:500]
+                        print(f"유효하지 않은 메시지 형식입니다. 삭제 처리합니다. body={raw_preview}")
                         sqs.delete_message(QueueUrl=queue_url, ReceiptHandle=message['ReceiptHandle'])
                         
         except Exception as e:

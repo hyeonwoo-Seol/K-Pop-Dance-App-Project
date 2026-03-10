@@ -18,8 +18,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FileNotFoundException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
 import java.util.zip.GZIPInputStream
 
 /**
@@ -182,14 +184,14 @@ class PresignedUrlUploader(private val context: Context) {
      */
     suspend fun downloadResultJson(resultS3Key: String): String {
         return withContext(Dispatchers.IO) {
-            val url = "https://kpop-dance-app-data.s3.ap-northeast-1.amazonaws.com/${resultS3Key}"
+            val url = resolveResultJsonUrl(resultS3Key)
             val connection = URL(url).openConnection() as HttpURLConnection
             try {
                 // [Step 1] S3 URL로부터 JSON 텍스트 데이터 읽기
                 val jsonString = readMaybeGzipped(connection)
 
                 // [Step 2] S3 경로에서 순수 파일명만 추출
-                val fileName = resultS3Key.split("/").last()
+                val fileName = extractResultFileName(resultS3Key)
 
                 // [Step 3] 추출된 파일명을 사용하여 핸드폰 내부 저장소에 파일 쓰기
                 saveJsonToInternalStorage(fileName, jsonString)
@@ -198,6 +200,23 @@ class PresignedUrlUploader(private val context: Context) {
             } finally {
                 connection.disconnect()
             }
+        }
+    }
+
+    /**
+     * result_s3_key 값(키/URL 혼용 가능)에서 파일명만 안전하게 추출
+     */
+    fun extractResultFileName(resultS3Key: String): String {
+        val cleaned = resultS3Key
+            .trim()
+            .substringBefore("?")
+            .trimEnd('/')
+        val rawFileName = cleaned.substringAfterLast('/')
+        if (rawFileName.isBlank()) return "analysis_${System.currentTimeMillis()}.json"
+        return try {
+            URLDecoder.decode(rawFileName, "UTF-8")
+        } catch (_: Exception) {
+            rawFileName
         }
     }
 
@@ -227,6 +246,15 @@ class PresignedUrlUploader(private val context: Context) {
 
     // json Gzip 압축 해제
     private fun readMaybeGzipped(connection: HttpURLConnection): String {
+        val statusCode = connection.responseCode
+        if (statusCode !in 200..299) {
+            val errorBody = try {
+                connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            } catch (_: Exception) {
+                ""
+            }
+            throw FileNotFoundException("HTTP $statusCode while downloading result JSON. $errorBody")
+        }
         val encoding = connection.contentEncoding?.lowercase()
         val rawBytes = connection.inputStream.use { it.readBytes() }
         val isGzipMagic = rawBytes.size >= 2 &&
@@ -238,5 +266,15 @@ class PresignedUrlUploader(private val context: Context) {
             ByteArrayInputStream(rawBytes)
         }
         return inputStream.bufferedReader().use { it.readText() }
+    }
+
+    private fun resolveResultJsonUrl(resultS3Key: String): String {
+        val trimmed = resultS3Key.trim()
+        return if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) {
+            trimmed
+        } else {
+            val normalizedKey = trimmed.trimStart('/')
+            "https://kpop-dance-app-data.s3.ap-northeast-1.amazonaws.com/$normalizedKey"
+        }
     }
 }

@@ -20,22 +20,30 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
+import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
 import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.data.entity.SongPart
+import com.example.kpopdancepracticeai.data.mapper.AnalysisMapper
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.util.FilenameParser
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.google.gson.Gson
 import kotlinx.coroutines.launch
+import java.io.File
 
 @Composable
 fun SongPartSelectScreen(
     songId: String,
     viewModel: MainViewModel = viewModel(),
     onBackClick: () -> Unit,
-    onNavigateToPractice: (String, String, String, String, String) -> Unit
+    onNavigateToPractice: (String, String, String, String, String) -> Unit,
+    onNavigateToResult: (String, String) -> Unit
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val uploader = remember { PresignedUrlUploader(context) }
+    var showAnalysisLoading by remember { mutableStateOf(false) }
 
     var selectedPartForUpload by remember { mutableStateOf<SongPart?>(null) }
 
@@ -44,6 +52,7 @@ fun SongPartSelectScreen(
     val dbParts by viewModel.currentSongParts.collectAsState()
     val songs by viewModel.songs.collectAsState()
     val userProfile by viewModel.currentUserProfile.collectAsState()
+    val authUserId = remember { AuthRepository(context).getCurrentUser()?.uid }
     val currentSong = songs.find { it.songId.toString() == songId }
 
     val videoPickerLauncher = rememberLauncherForActivityResult(
@@ -51,7 +60,7 @@ fun SongPartSelectScreen(
     ) { uri: Uri? ->
         val part = selectedPartForUpload
         if (uri != null && part != null && currentSong != null) {
-            val userId = userProfile?.userUuid ?: "none"
+            val userId = userProfile?.userUuid ?: authUserId ?: "none"
             val songIdClean = currentSong.titleKr.replace(" ", "").replace("_", "")
             val partNum = part.partNumber.toString()
             val partNameClean = part.partName.replace(" ", "").replace("_", "")
@@ -61,14 +70,79 @@ fun SongPartSelectScreen(
 
             scope.launch {
                 Toast.makeText(context, "동영상 업로드 시작...", Toast.LENGTH_SHORT).show()
+                showAnalysisLoading = true
                 uploader.uploadVideo(
                     fileUri = uri,
                     filename = filename,
                     onComplete = { s3Key ->
-                        Toast.makeText(context, "업로드 완료!", Toast.LENGTH_SHORT).show()
                         Log.d("SongPartSelect", "Upload Success Key: $s3Key")
+                        Toast.makeText(context, "업로드 완료! 분석을 기다립니다...", Toast.LENGTH_SHORT).show()
+
+                        scope.launch {
+                            uploader.pollAnalysisResult(
+                                userId = userId,
+                                timestamp = timestamp,
+                                onProgress = { msg ->
+                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                },
+                                onComplete = { resultS3Key ->
+                                    scope.launch {
+                                        try {
+                                            val jsonString = uploader.downloadResultJson(resultS3Key)
+                                            val jsonFileName = uploader.extractResultFileName(resultS3Key)
+
+                                            val response = Gson().fromJson(
+                                                jsonString,
+                                                AnalysisResultResponse::class.java
+                                            )
+
+                                            val metadata = FilenameParser.ParsedMetadata(
+                                                userId = userId,
+                                                songId = currentSong.songId.toString(),
+                                                artist = currentSong.artistKr,
+                                                partNumber = part.partNumber.toString()
+                                            )
+
+                                            val jsonPath = File(
+                                                File(context.filesDir, "analysis_results"),
+                                                jsonFileName
+                                            ).absolutePath
+
+                                            val historyEntity = AnalysisMapper.mapToPracticeHistory(
+                                                analysisResult = response,
+                                                metadata = metadata,
+                                                videoPath = uri.toString(),
+                                                fullJsonPath = jsonPath
+                                            )
+                                            viewModel.savePracticeResult(historyEntity)
+
+                                            showAnalysisLoading = false
+                                            Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
+                                            onNavigateToResult(jsonFileName, uri.toString())
+                                        } catch (e: Exception) {
+                                            showAnalysisLoading = false
+                                            Log.e("SongPartSelect", "분석 결과 처리 실패", e)
+                                            Toast.makeText(
+                                                context,
+                                                "결과 처리 실패: ${e.message}",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                                },
+                                onError = { e ->
+                                    showAnalysisLoading = false
+                                    Toast.makeText(
+                                        context,
+                                        "분석 실패: ${e.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            )
+                        }
                     },
                     onError = { e ->
+                        showAnalysisLoading = false
                         Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
                     }
                 )
@@ -77,16 +151,22 @@ fun SongPartSelectScreen(
         selectedPartForUpload = null
     }
 
-    SongPartSelectContent(
-        currentSong = currentSong,
-        dbParts = dbParts,
-        onBackClick = onBackClick,
-        onNavigateToPractice = onNavigateToPractice,
-        onUploadClick = { part ->
-            selectedPartForUpload = part
-            videoPickerLauncher.launch("video/*")
-        }
-    )
+    if (showAnalysisLoading) {
+        AnalysisWaitingScreen(
+            onAnalysisComplete = { }
+        )
+    } else {
+        SongPartSelectContent(
+            currentSong = currentSong,
+            dbParts = dbParts,
+            onBackClick = onBackClick,
+            onNavigateToPractice = onNavigateToPractice,
+            onUploadClick = { part ->
+                selectedPartForUpload = part
+                videoPickerLauncher.launch("video/*")
+            }
+        )
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

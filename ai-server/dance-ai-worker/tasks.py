@@ -12,6 +12,7 @@ import gzip
 import shutil
 import logging
 from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.config import Config as AwsClientConfig
 from celery.signals import worker_process_init
 from celery_app import app
 from config import Config
@@ -79,7 +80,12 @@ class S3Manager:
                     's3',
                     aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
-                    region_name=Config.AWS_REGION
+                    region_name=Config.AWS_REGION,
+                    endpoint_url=f"https://s3.{Config.AWS_REGION}.amazonaws.com",
+                    config=AwsClientConfig(
+                        signature_version='s3v4',
+                        s3={'addressing_style': 'virtual'}
+                    )
                 )
             except Exception as e:
                 logger.error(f"[S3] 클라이언트 초기화 실패: {e}")
@@ -125,11 +131,19 @@ class S3Manager:
                 }
             )
             
-            # S3 URL 생성
-            s3_url = f"https://{bucket}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_key}"
-            logger.info(f"[S3] 업로드 완료: {s3_url}")
+            # 3. 앱에서 바로 읽을 수 있도록 Presigned GET URL 생성
+            # 버킷이 private인 경우에도 다운로드 가능하게 한다.
+            presigned_url = self.client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': s3_key
+                },
+                ExpiresIn=3600
+            )
+            logger.info(f"[S3] 업로드 완료 및 Presigned URL 발급: {s3_key}")
             
-            return s3_url
+            return presigned_url
             
         except Exception as e:
             logger.error(f"[S3] 업로드 실패: {e}")

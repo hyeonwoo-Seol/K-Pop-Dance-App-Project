@@ -76,10 +76,17 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
+import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
+import com.example.kpopdancepracticeai.data.mapper.AnalysisMapper
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
+import com.example.kpopdancepracticeai.util.FilenameParser
 import com.example.kpopdancepracticeai.util.NetworkUtils
+import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
+import com.google.gson.Gson
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.io.File
 
 @Composable
 fun RecordScreen(
@@ -91,6 +98,7 @@ fun RecordScreen(
     onBack: () -> Unit = {},
     onNavigateHome: () -> Unit = onBack,
     onRecordingComplete: (String) -> Unit = {},
+    mainViewModel: MainViewModel,
     settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
@@ -98,6 +106,8 @@ fun RecordScreen(
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
     val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    val userProfile by mainViewModel.currentUserProfile.collectAsStateWithLifecycle()
+    val authUserId = remember { AuthRepository(context).getCurrentUser()?.uid }
     val isTablet = remember(configuration) { configuration.screenWidthDp >= 600 }
 
     val uploader = remember { PresignedUrlUploader(context) }
@@ -128,6 +138,7 @@ fun RecordScreen(
     var lensFacing by remember { mutableIntStateOf(CameraSelector.LENS_FACING_FRONT) }
     var countdownNumber by remember { mutableIntStateOf(0) }
     var isCountdownVisible by remember { mutableStateOf(false) }
+    var showAnalysisLoading by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
         lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
@@ -171,12 +182,17 @@ fun RecordScreen(
         }
 
         val uri = recordEvent.outputResults.outputUri
-        val userId = "xooyong"
+        val userId = userProfile?.userUuid ?: authUserId ?: "none"
         val songIdClean = songTitle.replace(" ", "").replace("_", "")
         val partNum = part.filter { it.isDigit() }.ifEmpty { "0" }
         val partName = part.split(":").lastOrNull()?.replace(" ", "")?.replace("_", "") ?: "None"
         val timestamp = System.currentTimeMillis()
         val filename = "${userId}_${songIdClean}_${partNum}_${partName}_${timestamp}.mp4"
+        val songIdForDb = expertVideoUrl
+            .substringAfterLast("/")
+            .substringBefore("_")
+            .toLongOrNull()
+            ?.toString() ?: "0"
 
         scope.launch {
             if (!settings.isServerUploadEnabled) {
@@ -198,6 +214,7 @@ fun RecordScreen(
             }
 
             Toast.makeText(context, "녹화 완료. 업로드 시작...", Toast.LENGTH_SHORT).show()
+            showAnalysisLoading = true
             uploader.uploadVideo(
                 fileUri = uri,
                 filename = filename,
@@ -209,16 +226,54 @@ fun RecordScreen(
                             timestamp = timestamp,
                             onProgress = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() },
                             onComplete = { resultS3Key ->
-                                Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
-                                onRecordingComplete(resultS3Key)
+                                scope.launch {
+                                    try {
+                                        val jsonString = uploader.downloadResultJson(resultS3Key)
+                                        val jsonFileName = uploader.extractResultFileName(resultS3Key)
+                                        val response = Gson().fromJson(
+                                            jsonString,
+                                            AnalysisResultResponse::class.java
+                                        )
+
+                                        val metadata = FilenameParser.ParsedMetadata(
+                                            userId = userId,
+                                            songId = songIdForDb,
+                                            artist = artist,
+                                            partNumber = partNum
+                                        )
+
+                                        val jsonPath = File(
+                                            File(context.filesDir, "analysis_results"),
+                                            jsonFileName
+                                        ).absolutePath
+
+                                        val historyEntity = AnalysisMapper.mapToPracticeHistory(
+                                            analysisResult = response,
+                                            metadata = metadata,
+                                            videoPath = uri.toString(),
+                                            fullJsonPath = jsonPath
+                                        )
+                                        mainViewModel.savePracticeResult(historyEntity)
+
+                                        showAnalysisLoading = false
+                                        Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
+                                        onRecordingComplete("$jsonFileName|${uri}")
+                                    } catch (e: Exception) {
+                                        showAnalysisLoading = false
+                                        Toast.makeText(context, "결과 처리 실패: ${e.message}", Toast.LENGTH_LONG).show()
+                                        Log.e("RecordScreen", "결과 처리 실패", e)
+                                    }
+                                }
                             },
                             onError = { e ->
+                                showAnalysisLoading = false
                                 Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show()
                             }
                         )
                     }
                 },
                 onError = { e ->
+                    showAnalysisLoading = false
                     Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
                 }
             )
@@ -265,6 +320,13 @@ fun RecordScreen(
                     }
                 }
         }
+    }
+
+    if (showAnalysisLoading) {
+        AnalysisWaitingScreen(
+            onAnalysisComplete = { }
+        )
+        return
     }
 
     if (!hasPermissions) {
