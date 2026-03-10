@@ -563,6 +563,11 @@ fun AppNavHost(
                     val encodedLength = Screen.encodeArg(length)
                     val encodedUrl = Screen.encodeArg(videoUrl)
                     navController.navigate("dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength/$encodedUrl")
+                },
+                onNavigateToResult = { jsonFileName, videoPath ->
+                    val encodedJson = Screen.encodeArg(jsonFileName)
+                    val encodedVideo = Screen.encodeArg(videoPath)
+                    navController.navigate("practiceResult/$encodedJson/$encodedVideo")
                 }
             )
         }
@@ -657,6 +662,7 @@ fun AppNavHost(
                 expertVideoUrl = videoUrl,
                 onBack = { navController.popBackStack() },
                 onNavigateHome = { navController.popBackStack(Screen.Home.route, false) },
+                mainViewModel = viewModel,
                 onRecordingComplete = { resultString ->
                     val dataParts = resultString.split("|")
                     val rawPath = dataParts[0]
