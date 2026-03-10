@@ -18,8 +18,10 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.FileOutputStream
+import java.io.FileNotFoundException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLDecoder
 import java.util.zip.GZIPInputStream
 
 /**
@@ -209,8 +211,13 @@ class PresignedUrlUploader(private val context: Context) {
             .trim()
             .substringBefore("?")
             .trimEnd('/')
-        val fileName = cleaned.substringAfterLast('/')
-        return if (fileName.isNotBlank()) fileName else "analysis_${System.currentTimeMillis()}.json"
+        val rawFileName = cleaned.substringAfterLast('/')
+        if (rawFileName.isBlank()) return "analysis_${System.currentTimeMillis()}.json"
+        return try {
+            URLDecoder.decode(rawFileName, "UTF-8")
+        } catch (_: Exception) {
+            rawFileName
+        }
     }
 
     /**
@@ -239,6 +246,15 @@ class PresignedUrlUploader(private val context: Context) {
 
     // json Gzip 압축 해제
     private fun readMaybeGzipped(connection: HttpURLConnection): String {
+        val statusCode = connection.responseCode
+        if (statusCode !in 200..299) {
+            val errorBody = try {
+                connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            } catch (_: Exception) {
+                ""
+            }
+            throw FileNotFoundException("HTTP $statusCode while downloading result JSON. $errorBody")
+        }
         val encoding = connection.contentEncoding?.lowercase()
         val rawBytes = connection.inputStream.use { it.readBytes() }
         val isGzipMagic = rawBytes.size >= 2 &&

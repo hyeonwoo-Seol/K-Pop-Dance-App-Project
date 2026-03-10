@@ -5,6 +5,8 @@ import android.util.Log
 import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
 import com.google.gson.Gson
 import java.io.File
+import java.net.URLDecoder
+import java.net.URLEncoder
 
 /**
  * JSON 결과 파일 로더
@@ -16,7 +18,7 @@ object JsonResultLoader {
         return try {
             // 1. 파일 경로 설정 (PresignedUrlUploader.saveJsonToInternalStorage와 경로 일치)
             val directory = File(context.filesDir, "analysis_results")
-            val file = File(directory, jsonFileName)
+            val file = resolveExistingFile(directory, jsonFileName)
 
             if (!file.exists()) {
                 Log.e("JsonLoader", "파일이 존재하지 않습니다: ${file.absolutePath}")
@@ -30,5 +32,24 @@ object JsonResultLoader {
             Log.e("JsonLoader", "JSON 파싱 실패", e)
             null
         }
+    }
+
+    private fun resolveExistingFile(directory: File, originalName: String): File {
+        val candidates = linkedSetOf<String>()
+        candidates.add(originalName)
+
+        try {
+            candidates.add(URLDecoder.decode(originalName, "UTF-8"))
+        } catch (_: Exception) {}
+
+        try {
+            candidates.add(URLEncoder.encode(originalName, "UTF-8").replace("+", "%20"))
+        } catch (_: Exception) {}
+
+        val found = candidates
+            .map { File(directory, it) }
+            .firstOrNull { it.exists() }
+
+        return found ?: File(directory, originalName)
     }
 }
