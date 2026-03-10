@@ -35,10 +35,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
+import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 
 /**
  * 개인정보 보호 및 권한 화면 (전체 화면)
@@ -46,7 +49,8 @@ import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PrivacySettingsScreen(
-    onBackClick: () -> Unit
+    onBackClick: () -> Unit,
+    settingsViewModel: SettingsViewModel = viewModel()
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -59,8 +63,9 @@ fun PrivacySettingsScreen(
         )
     )
 
-    // 설정 값 상태 관리 (임시)
-    var isServerUploadEnabled by remember { mutableStateOf(false) }
+    // 설정 값 상태 관리
+    val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
+    val isServerUploadEnabled = settings.isServerUploadEnabled
     var isAnalyticsEnabled by remember { mutableStateOf(false) }
 
     // 권한 상태 갱신을 위한 키 (앱 설정에서 돌아왔을 때 갱신)
@@ -142,7 +147,7 @@ fun PrivacySettingsScreen(
                                 description = "댄스 영상을 GPU로 처리하기 위해 서버로 전송하는 것에 동의합니다. 전송된 영상은 분석 완료 후 자동으로 삭제됩니다.",
                                 icon = Icons.Outlined.CloudUpload,
                                 checked = isServerUploadEnabled,
-                                onCheckedChange = { isServerUploadEnabled = it }
+                                onCheckedChange = settingsViewModel::setServerUploadEnabled
                             )
                             SettingsDivider()
                             SettingsToggleItem(

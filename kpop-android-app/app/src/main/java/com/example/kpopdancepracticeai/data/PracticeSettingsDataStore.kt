@@ -17,7 +17,8 @@ data class PracticeSettings(
     val isFrontCamera: Boolean = true,
     val countdownSeconds: Int = 3,
     val isAutoUpload: Boolean = true,
-    val isWifiOnlyUpload: Boolean = true
+    val isWifiOnlyUpload: Boolean = true,
+    val isServerUploadEnabled: Boolean = false
 )
 
 class PracticeSettingsDataStore(private val context: Context) {
@@ -28,6 +29,7 @@ class PracticeSettingsDataStore(private val context: Context) {
         val COUNTDOWN_SECONDS = intPreferencesKey("countdown_seconds")
         val AUTO_UPLOAD = booleanPreferencesKey("auto_upload")
         val WIFI_ONLY_UPLOAD = booleanPreferencesKey("wifi_only_upload")
+        val SERVER_UPLOAD_ENABLED = booleanPreferencesKey("server_upload_enabled")
     }
 
     val settingsFlow: Flow<PracticeSettings> = context.practiceSettingsDataStore.data.map { pref ->
@@ -36,7 +38,8 @@ class PracticeSettingsDataStore(private val context: Context) {
             isFrontCamera = pref[Keys.FRONT_CAMERA] ?: true,
             countdownSeconds = pref[Keys.COUNTDOWN_SECONDS] ?: 3,
             isAutoUpload = pref[Keys.AUTO_UPLOAD] ?: true,
-            isWifiOnlyUpload = pref[Keys.WIFI_ONLY_UPLOAD] ?: true
+            isWifiOnlyUpload = pref[Keys.WIFI_ONLY_UPLOAD] ?: true,
+            isServerUploadEnabled = pref[Keys.SERVER_UPLOAD_ENABLED] ?: false
         )
     }
 
@@ -58,5 +61,9 @@ class PracticeSettingsDataStore(private val context: Context) {
 
     suspend fun setWifiOnlyUpload(enabled: Boolean) {
         context.practiceSettingsDataStore.edit { it[Keys.WIFI_ONLY_UPLOAD] = enabled }
+    }
+
+    suspend fun setServerUploadEnabled(enabled: Boolean) {
+        context.practiceSettingsDataStore.edit { it[Keys.SERVER_UPLOAD_ENABLED] = enabled }
     }
 }

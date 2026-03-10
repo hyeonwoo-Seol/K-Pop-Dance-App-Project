@@ -52,6 +52,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
+import com.example.kpopdancepracticeai.util.NetworkUtils
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 import kotlinx.coroutines.launch
@@ -165,6 +166,21 @@ fun PracticeScreenTablet(
                                 val filename = "${userId}_${songIdClean}_${partNum}_${partName}_${timestamp}.mp4"
 
                                 scope.launch {
+                                    if (!settings.isServerUploadEnabled) {
+                                        Toast.makeText(context, "서버 전송 동의가 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
+
+                                    if (!settings.isAutoUpload) {
+                                        Toast.makeText(context, "자동 전송이 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
+
+                                    if (settings.isWifiOnlyUpload && !NetworkUtils.isWifiConnected(context)) {
+                                        Toast.makeText(context, "WIFI 전용 업로드 설정으로 로컬 저장합니다.", Toast.LENGTH_SHORT).show()
+                                        return@launch
+                                    }
+
                                     Toast.makeText(context, "업로드 시작...", Toast.LENGTH_SHORT).show()
                                     uploader.uploadVideo(
                                         fileUri = uri,
