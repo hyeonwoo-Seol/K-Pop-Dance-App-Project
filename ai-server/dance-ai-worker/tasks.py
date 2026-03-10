@@ -125,11 +125,19 @@ class S3Manager:
                 }
             )
             
-            # S3 URL 생성
-            s3_url = f"https://{bucket}.s3.{Config.AWS_REGION}.amazonaws.com/{s3_key}"
-            logger.info(f"[S3] 업로드 완료: {s3_url}")
+            # 3. 앱에서 바로 읽을 수 있도록 Presigned GET URL 생성
+            # 버킷이 private인 경우에도 다운로드 가능하게 한다.
+            presigned_url = self.client.generate_presigned_url(
+                'get_object',
+                Params={
+                    'Bucket': bucket,
+                    'Key': s3_key
+                },
+                ExpiresIn=3600
+            )
+            logger.info(f"[S3] 업로드 완료 및 Presigned URL 발급: {s3_key}")
             
-            return s3_url
+            return presigned_url
             
         except Exception as e:
             logger.error(f"[S3] 업로드 실패: {e}")
