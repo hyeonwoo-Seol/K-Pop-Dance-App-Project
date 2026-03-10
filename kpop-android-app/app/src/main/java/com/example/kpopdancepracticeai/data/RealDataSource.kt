@@ -21,68 +21,102 @@ object RealDataSource {
         Song(530L, "로코", "LOCO", "있지 (리아)", "ITZY (Lia)", "Female", "Dance", "Fast", "보통", "https://via.placeholder.com/400x300.png?text=Lia+Loco+Cover", "2021-09-24"),
         Song(531L, "로코", "LOCO", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Chaeryeong+Loco+Cover", "2021-09-24"),
         Song(556L, "러브다이브", "LOVE DIVE", "아이브 (원영)", "IVE (Wonyoung)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Wonyoung+LoveDive", "2022-04-05"),
-        Song(557L, "러브다이브", "LOVE DIVE", "아이브 (이서)", "IVE (Leeseo)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Leeseo+LoveDive", "2022-04-05")
+        Song(557L, "러브다이브", "LOVE DIVE", "아이브 (이서)", "IVE (Leeseo)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Leeseo+LoveDive", "2022-04-05"),
+        Song(568L, "스테이디스웨이", "Stay This Way", "프로미스나인 (하영)", "fromis_9 (Hayoung)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Hayoung+StayThisWay", "2022-06-27"),
+        Song(569L, "스테이디스웨이", "Stay This Way", "프로미스나인 (지헌)", "fromis_9 (Jiheon)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Jiheon+StayThisWay", "2022-06-27"),
+        Song(571L, "스니커즈", "SNEAKERS", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Chaeryeong+Sneakers", "2022-07-15"),
+        Song(572L, "스니커즈", "SNEAKERS", "있지 (예지)", "ITZY (Yeji)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Yeji+Sneakers", "2022-07-15"),
+        Song(573L, "스니커즈", "SNEAKERS", "있지 (유나)", "ITZY (Yuna)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Yuna+Sneakers", "2022-07-15")
+
     )
 
     val getRealSongParts = listOf(
-        SongPart(5401L, 540L, 1, "1절 코러스 (도입부)", 60, expertVideo("540_원영_1.mp4"), null, 0L, 60000L),
-        SongPart(5402L, 540L, 2, "2절 코러스 (프리코러스)", 60, expertVideo("540_원영_2.mp4"), null, 0L, 60000L),
-        SongPart(5403L, 540L, 3, "3절 코러스", 60, expertVideo("540_원영_3.mp4"), null, 0L, 60000L),
-        SongPart(5404L, 540L, 4, "댄스 브레이크", 45, expertVideo("540_원영_4.mp4"), null, 0L, 45000L),
+        SongPart(5401L, 540L, 1, "파트1", 60, expertVideo("540_원영_1.mp4"), null, 0L, 60000L),
+        SongPart(5402L, 540L, 2, "파트2", 60, expertVideo("540_원영_2.mp4"), null, 0L, 60000L),
+        SongPart(5403L, 540L, 3, "파트3", 60, expertVideo("540_원영_3.mp4"), null, 0L, 60000L),
+        SongPart(5404L, 540L, 4, "파트4", 45, expertVideo("540_원영_4.mp4"), null, 0L, 45000L),
 
-        SongPart(5411L, 541L, 1, "1절 코러스 (도입부)", 60, expertVideo("540_리즈_1.mp4"), null, 0L, 60000L),
-        SongPart(5412L, 541L, 2, "2절 코러스 (프리코러스)", 60, expertVideo("540_리즈_2.mp4"), null, 0L, 60000L),
-        SongPart(5413L, 541L, 3, "3절 코러스", 60, expertVideo("540_리즈_3.mp4"), null, 0L, 60000L),
-        SongPart(5414L, 541L, 4, "댄스 브레이크", 45, expertVideo("540_리즈_4.mp4"), null, 0L, 45000L),
+        SongPart(5411L, 541L, 1, "파트1", 60, expertVideo("540_리즈_1.mp4"), null, 0L, 60000L),
+        SongPart(5412L, 541L, 2, "파트2", 60, expertVideo("540_리즈_2.mp4"), null, 0L, 60000L),
+        SongPart(5413L, 541L, 3, "파트3", 60, expertVideo("540_리즈_3.mp4"), null, 0L, 60000L),
+        SongPart(5414L, 541L, 4, "파트4", 45, expertVideo("540_리즈_4.mp4"), null, 0L, 45000L),
 
-        SongPart(5421L, 542L, 1, "1절 코러스 (도입부)", 60, expertVideo("540_이서_1.mp4"), null, 0L, 60000L),
-        SongPart(5422L, 542L, 2, "2절 코러스 (프리코러스)", 60, expertVideo("540_이서_2.mp4"), null, 0L, 60000L),
-        SongPart(5423L, 542L, 3, "3절 코러스", 60, expertVideo("540_이서_3.mp4"), null, 0L, 60000L),
-        SongPart(5424L, 542L, 4, "아웃트로", 30, expertVideo("540_이서_4.mp4"), null, 0L, 30000L),
+        SongPart(5421L, 542L, 1, "파트1", 60, expertVideo("540_이서_1.mp4"), null, 0L, 60000L),
+        SongPart(5422L, 542L, 2, "파트2", 60, expertVideo("540_이서_2.mp4"), null, 0L, 60000L),
+        SongPart(5423L, 542L, 3, "파트3", 60, expertVideo("540_이서_3.mp4"), null, 0L, 60000L),
+        SongPart(5424L, 542L, 4, "파트4", 30, expertVideo("540_이서_4.mp4"), null, 0L, 30000L),
 
-        SongPart(5501L, 550L, 1, "도입부", 45, expertVideo("550_설윤_1.mp4"), null, 0L, 45000L),
-        SongPart(5502L, 550L, 2, "프리코러스", 45, expertVideo("550_설윤_2.mp4"), null, 0L, 45000L),
-        SongPart(5503L, 550L, 3, "코러스", 60, expertVideo("550_설윤_3.mp4"), null, 0L, 60000L),
-        SongPart(5504L, 550L, 4, "댄스 브레이크", 40, expertVideo("550_설윤_4.mp4"), null, 0L, 40000L),
+        SongPart(5501L, 550L, 1, "파트1", 45, expertVideo("550_설윤_1.mp4"), null, 0L, 45000L),
+        SongPart(5502L, 550L, 2, "파트2", 45, expertVideo("550_설윤_2.mp4"), null, 0L, 45000L),
+        SongPart(5503L, 550L, 3, "파트3", 60, expertVideo("550_설윤_3.mp4"), null, 0L, 60000L),
+        SongPart(5504L, 550L, 4, "파트4", 40, expertVideo("550_설윤_4.mp4"), null, 0L, 40000L),
 
-        SongPart(5511L, 551L, 1, "도입부", 45, expertVideo("550_해원_1.mp4"), null, 0L, 45000L),
-        SongPart(5512L, 551L, 2, "프리코러스", 45, expertVideo("550_해원_2.mp4"), null, 0L, 45000L),
-        SongPart(5513L, 551L, 3, "코러스", 60, expertVideo("550_해원_3.mp4"), null, 0L, 60000L),
-        SongPart(5514L, 551L, 4, "댄스 브레이크", 40, expertVideo("550_해원_4.mp4"), null, 0L, 40000L),
+        SongPart(5511L, 551L, 1, "파트1", 45, expertVideo("550_해원_1.mp4"), null, 0L, 45000L),
+        SongPart(5512L, 551L, 2, "파트2", 45, expertVideo("550_해원_2.mp4"), null, 0L, 45000L),
+        SongPart(5513L, 551L, 3, "파트3", 60, expertVideo("550_해원_3.mp4"), null, 0L, 60000L),
+        SongPart(5514L, 551L, 4, "파트4", 40, expertVideo("550_해원_4.mp4"), null, 0L, 40000L),
 
-        SongPart(4501L, 450L, 1, "어깨춤 도입부", 50, expertVideo("450_류진_1.mp4"), null, 0L, 50000L),
-        SongPart(4502L, 450L, 2, "프리코러스", 45, expertVideo("450_류진_2.mp4"), null, 0L, 45000L),
-        SongPart(4503L, 450L, 3, "코러스", 60, expertVideo("450_류진_3.mp4"), null, 0L, 60000L),
-        SongPart(4504L, 450L, 4, "댄스 브레이크", 45, expertVideo("450_류진_4.mp4"), null, 0L, 45000L),
+        SongPart(4501L, 450L, 1, "파트1", 50, expertVideo("450_류진_1.mp4"), null, 0L, 50000L),
+        SongPart(4502L, 450L, 2, "파트2", 45, expertVideo("450_류진_2.mp4"), null, 0L, 45000L),
+        SongPart(4503L, 450L, 3, "파트3", 60, expertVideo("450_류진_3.mp4"), null, 0L, 60000L),
+        SongPart(4504L, 450L, 4, "파트4", 45, expertVideo("450_류진_4.mp4"), null, 0L, 45000L),
 
-        SongPart(4511L, 451L, 1, "도입부", 50, expertVideo("450_리아_1.mp4"), null, 0L, 50000L),
-        SongPart(4512L, 451L, 2, "프리코러스", 45, expertVideo("450_리아_2.mp4"), null, 0L, 45000L),
-        SongPart(4513L, 451L, 3, "코러스", 60, expertVideo("450_리아_3.mp4"), null, 0L, 60000L),
-        SongPart(4514L, 451L, 4, "댄스 브레이크", 45, expertVideo("450_리아_4.mp4"), null, 0L, 45000L),
+        SongPart(4511L, 451L, 1, "파트1", 50, expertVideo("450_리아_1.mp4"), null, 0L, 50000L),
+        SongPart(4512L, 451L, 2, "파트2", 45, expertVideo("450_리아_2.mp4"), null, 0L, 45000L),
+        SongPart(4513L, 451L, 3, "파트3", 60, expertVideo("450_리아_3.mp4"), null, 0L, 60000L),
+        SongPart(4514L, 451L, 4, "파트4", 45, expertVideo("450_리아_4.mp4"), null, 0L, 45000L),
 
-        SongPart(4521L, 452L, 1, "도입부", 50, expertVideo("450_채령_1.mp4"), null, 0L, 50000L),
-        SongPart(4522L, 452L, 2, "프리코러스", 45, expertVideo("450_채령_2.mp4"), null, 0L, 45000L),
-        SongPart(4523L, 452L, 3, "코러스", 60, expertVideo("450_채령_3.mp4"), null, 0L, 60000L),
-        SongPart(4524L, 452L, 4, "댄스 브레이크", 45, expertVideo("450_채령_4.mp4"), null, 0L, 45000L),
+        SongPart(4521L, 452L, 1, "파트1", 50, expertVideo("450_채령_1.mp4"), null, 0L, 50000L),
+        SongPart(4522L, 452L, 2, "파트2", 45, expertVideo("450_채령_2.mp4"), null, 0L, 45000L),
+        SongPart(4523L, 452L, 3, "파트3", 60, expertVideo("450_채령_3.mp4"), null, 0L, 60000L),
+        SongPart(4524L, 452L, 4, "파트4", 45, expertVideo("450_채령_4.mp4"), null, 0L, 45000L),
 
-        SongPart(5301L, 530L, 1, "도입부", 45, expertVideo("530_리아_1.mp4"), null, 0L, 45000L),
-        SongPart(5302L, 530L, 2, "프리코러스", 50, expertVideo("530_리아_2.mp4"), null, 0L, 50000L),
-        SongPart(5303L, 530L, 3, "코러스", 60, expertVideo("530_리아_3.mp4"), null, 0L, 60000L),
-        SongPart(5304L, 530L, 4, "아웃트로", 35, expertVideo("530_리아_4.mp4"), null, 0L, 35000L),
+        SongPart(5301L, 530L, 1, "파트1", 45, expertVideo("530_리아_1.mp4"), null, 0L, 45000L),
+        SongPart(5302L, 530L, 2, "파트2", 50, expertVideo("530_리아_2.mp4"), null, 0L, 50000L),
+        SongPart(5303L, 530L, 3, "파트3", 60, expertVideo("530_리아_3.mp4"), null, 0L, 60000L),
+        SongPart(5304L, 530L, 4, "파트4", 35, expertVideo("530_리아_4.mp4"), null, 0L, 35000L),
 
-        SongPart(5311L, 531L, 1, "도입부", 45, expertVideo("530_채령_1.mp4"), null, 0L, 45000L),
-        SongPart(5312L, 531L, 2, "프리코러스", 50, expertVideo("530_채령_2.mp4"), null, 0L, 50000L),
-        SongPart(5313L, 531L, 3, "코러스", 60, expertVideo("530_채령_3.mp4"), null, 0L, 60000L),
-        SongPart(5314L, 531L, 4, "아웃트로", 35, expertVideo("530_채령_4.mp4"), null, 0L, 35000L),
+        SongPart(5311L, 531L, 1, "파트1", 45, expertVideo("530_채령_1.mp4"), null, 0L, 45000L),
+        SongPart(5312L, 531L, 2, "파트2", 50, expertVideo("530_채령_2.mp4"), null, 0L, 50000L),
+        SongPart(5313L, 531L, 3, "파트3", 60, expertVideo("530_채령_3.mp4"), null, 0L, 60000L),
+        SongPart(5314L, 531L, 4, "파트4", 35, expertVideo("530_채령_4.mp4"), null, 0L, 35000L),
 
-        SongPart(5561L, 556L, 1, "도입부", 50, expertVideo("556_원영_1.mp4"), null, 0L, 50000L),
-        SongPart(5562L, 556L, 2, "프리코러스", 45, expertVideo("556_원영_2.mp4"), null, 0L, 45000L),
-        SongPart(5563L, 556L, 3, "코러스", 60, expertVideo("556_원영_3.mp4"), null, 0L, 60000L),
-        SongPart(5564L, 556L, 4, "댄스 브레이크", 40, expertVideo("556_원영_4.mp4"), null, 0L, 40000L),
+        SongPart(5561L, 556L, 1, "파트1", 50, expertVideo("556_원영_1.mp4"), null, 0L, 50000L),
+        SongPart(5562L, 556L, 2, "파트2", 45, expertVideo("556_원영_2.mp4"), null, 0L, 45000L),
+        SongPart(5563L, 556L, 3, "파트3", 60, expertVideo("556_원영_3.mp4"), null, 0L, 60000L),
+        SongPart(5564L, 556L, 4, "파트4", 40, expertVideo("556_원영_4.mp4"), null, 0L, 40000L),
 
-        SongPart(5571L, 557L, 1, "도입부", 50, expertVideo("556_이서_1.mp4"), null, 0L, 50000L),
-        SongPart(5572L, 557L, 2, "프리코러스", 45, expertVideo("556_이서_2.mp4"), null, 0L, 45000L),
-        SongPart(5573L, 557L, 3, "코러스", 60, expertVideo("556_이서_3.mp4"), null, 0L, 60000L),
-        SongPart(5574L, 557L, 4, "댄스 브레이크", 40, expertVideo("556_이서_4.mp4"), null, 0L, 40000L)
+        SongPart(5571L, 557L, 1, "파트1", 50, expertVideo("556_이서_1.mp4"), null, 0L, 50000L),
+        SongPart(5572L, 557L, 2, "파트2", 45, expertVideo("556_이서_2.mp4"), null, 0L, 45000L),
+        SongPart(5573L, 557L, 3, "파트3", 60, expertVideo("556_이서_3.mp4"), null, 0L, 60000L),
+        SongPart(5574L, 557L, 4, "파트4", 40, expertVideo("556_이서_4.mp4"), null, 0L, 40000L),
+
+        SongPart(5681L, 568L, 1, "파트1", 45, expertVideo("568_하영_1.mp4"), null, 0L, 45000L),
+        SongPart(5682L, 568L, 2, "파트2", 45, expertVideo("568_하영_2.mp4"), null, 0L, 45000L),
+        SongPart(5683L, 568L, 3, "파트3", 60, expertVideo("568_하영_3.mp4"), null, 0L, 60000L),
+        SongPart(5684L, 568L, 4, "파트4", 40, expertVideo("568_하영_4.mp4"), null, 0L, 40000L),
+
+        SongPart(5691L, 569L, 1, "파트1", 45, expertVideo("568_지헌_1.mp4"), null, 0L, 45000L),
+        SongPart(5692L, 569L, 2, "파트2", 45, expertVideo("568_지헌_2.mp4"), null, 0L, 45000L),
+        SongPart(5693L, 569L, 3, "파트3", 60, expertVideo("568_지헌_3.mp4"), null, 0L, 60000L),
+        SongPart(5694L, 569L, 4, "파트4", 40, expertVideo("568_지헌_4.mp4"), null, 0L, 40000L),
+
+        SongPart(5711L, 571L, 1, "파트1", 45, expertVideo("571_채령_1.mp4"), null, 0L, 45000L),
+        SongPart(5712L, 571L, 2, "파트2", 50, expertVideo("571_채령_2.mp4"), null, 0L, 50000L),
+        SongPart(5713L, 571L, 3, "파트3", 60, expertVideo("571_채령_3.mp4"), null, 0L, 60000L),
+        SongPart(5714L, 571L, 4, "파트4", 45, expertVideo("571_채령_4.mp4"), null, 0L, 45000L),
+
+        SongPart(5721L, 572L, 1, "파트1", 45, expertVideo("571_예지_1.mp4"), null, 0L, 45000L),
+        SongPart(5722L, 572L, 2, "파트2", 50, expertVideo("571_예지_2.mp4"), null, 0L, 50000L),
+        SongPart(5723L, 572L, 3, "파트3", 60, expertVideo("571_예지_3.mp4"), null, 0L, 60000L),
+        SongPart(5724L, 572L, 4, "파트4", 45, expertVideo("571_예지_4.mp4"), null, 0L, 45000L),
+
+        SongPart(5731L, 573L, 1, "파트1", 45, expertVideo("571_유나_1.mp4"), null, 0L, 45000L),
+        SongPart(5732L, 573L, 2, "파트2", 50, expertVideo("571_유나_2.mp4"), null, 0L, 50000L),
+        SongPart(5733L, 573L, 3, "파트3", 60, expertVideo("571_유나_3.mp4"), null, 0L, 60000L),
+        SongPart(5734L, 573L, 4, "파트4", 45, expertVideo("571_유나_4.mp4"), null, 0L, 45000L)
+
+
+
     )
 }
