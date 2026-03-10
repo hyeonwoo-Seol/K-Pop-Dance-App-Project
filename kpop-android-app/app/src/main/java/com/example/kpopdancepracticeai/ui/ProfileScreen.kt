@@ -12,7 +12,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.HourglassEmpty
 import androidx.compose.material.icons.filled.Sync
@@ -54,7 +53,6 @@ fun ProfileScreen(
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
     onNavigateToAnalysis: () -> Unit,
-    onNavigateToTest: () -> Unit,
     viewModel: MainViewModel
 ) {
     val userStats by viewModel.userStats.collectAsState()
@@ -143,7 +141,6 @@ fun ProfileScreen(
                         onNavigateToPrivacySettings,
                         onNavigateToAppInfo,
                         onNavigateToWithdrawal,
-                        onNavigateToTest = onNavigateToTest,
                         onSyncClick = { viewModel.refreshData() },
                         isSyncing = isSyncing
                     )
@@ -450,7 +447,6 @@ fun SettingsContent(
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
     onSyncClick: () -> Unit,
-    onNavigateToTest: () -> Unit,
     isSyncing: Boolean
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -479,12 +475,6 @@ fun SettingsContent(
                     iconBgColor = Color(0xFFE3F2FD),
                     textColor = if (isSyncing) Color.Gray else Color.Black,
                     onClick = onSyncClick
-                ); SettingsMenuDivider()
-                SettingsMenuItem(
-                    text = "시스템 기능 테스트",
-                    icon = Icons.Default.Build,
-                    iconBgColor = Color(0xFFEEEEEE),
-                    onClick = onNavigateToTest
                 ); SettingsMenuDivider()
                 SettingsMenuItem(
                     "회원 탈퇴",
