@@ -32,9 +32,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import com.example.kpopdancepracticeai.data.entity.Song
+import com.example.kpopdancepracticeai.viewmodel.SearchFilters
 import com.example.kpopdancepracticeai.viewmodel.SearchUiState
 import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 
@@ -42,6 +42,9 @@ import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 @Composable
 fun SearchResultsScreen(
     query: String,
+    difficulty: String?,
+    artistGender: String?,
+    tempo: String?,
     navController: NavHostController,
     paddingValues: PaddingValues,
     viewModel: SearchViewModel
@@ -49,8 +52,15 @@ fun SearchResultsScreen(
     val uiState by viewModel.uiState.collectAsState()
     val text by viewModel.query.collectAsState()
 
-    LaunchedEffect(query) {
+    LaunchedEffect(query, difficulty, artistGender, tempo) {
         viewModel.updateQuery(query)
+        viewModel.updateFilters(
+            SearchFilters(
+                difficulty = difficulty,
+                artistGender = artistGender,
+                tempo = tempo
+            )
+        )
     }
 
     LazyColumn(

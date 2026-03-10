@@ -97,7 +97,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object PrivacyPolicy : Screen("privacyPolicy", "개인정보 처리 방침", Icons.Outlined.Shield)
     object OpenSourceLicense : Screen("openSourceLicense", "오픈소스 라이선스", Icons.Outlined.Code)
 
-    object SearchResults : Screen("searchResults/{query}", "검색 결과", Icons.Default.Search)
+    object SearchResults : Screen("searchResults/{query}/{difficulty}/{artistGender}/{tempo}", "검색 결과", Icons.Default.Search)
     object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
 
     object Test : Screen("test", "시스템 테스트", Icons.Default.Build)
@@ -410,7 +410,8 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onSearch = { query ->
                     if (query.isNotBlank()) {
-                        navController.navigate("searchResults/${Screen.encodeArg(query.trim())}")
+                        val encodedQuery = Screen.encodeArg(query.trim().ifBlank { "all" })
+                        navController.navigate("searchResults/$encodedQuery/all/all/all")
                     }
                 },
                 onSongClick = { songId ->
@@ -519,9 +520,22 @@ fun AppNavHost(
         }
         composable(
             route = Screen.SearchResults.route,
-            arguments = listOf(navArgument("query") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("query") { type = NavType.StringType },
+                navArgument("difficulty") { type = NavType.StringType },
+                navArgument("artistGender") { type = NavType.StringType },
+                navArgument("tempo") { type = NavType.StringType }
+            )
         ) { backStackEntry ->
-            val query = backStackEntry.arguments?.getString("query")?.let { Screen.decodeArg(it) } ?: ""
+            val queryArg = backStackEntry.arguments?.getString("query")?.let { Screen.decodeArg(it) } ?: "all"
+            val difficultyArg = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: "all"
+            val artistArg = backStackEntry.arguments?.getString("artistGender")?.let { Screen.decodeArg(it) } ?: "all"
+            val tempoArg = backStackEntry.arguments?.getString("tempo")?.let { Screen.decodeArg(it) } ?: "all"
+
+            val query = if (queryArg == "all") "" else queryArg
+            val difficulty = if (difficultyArg == "all") null else difficultyArg
+            val artistGender = if (artistArg == "all") null else artistArg
+            val tempo = if (tempoArg == "all") null else tempoArg
             val searchViewModel: SearchViewModel = viewModel(
                 factory = SearchViewModel.provideFactory(
                     RoomSongDataRepository((LocalContext.current.applicationContext as KpopApplication).database.songDao())
@@ -529,6 +543,9 @@ fun AppNavHost(
             )
             SearchResultsScreen(
                 query = query,
+                difficulty = difficulty,
+                artistGender = artistGender,
+                tempo = tempo,
                 navController = navController,
                 paddingValues = innerPadding,
                 viewModel = searchViewModel
