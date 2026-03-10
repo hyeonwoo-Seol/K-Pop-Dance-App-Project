@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.systemBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Home
@@ -68,7 +67,6 @@ import androidx.navigation.navArgument
 import com.example.kpopdancepracticeai.KpopApplication
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.data.repository.RoomSongDataRepository
-import com.example.kpopdancepracticeai.ui.test.IntegrationTestScreen
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 import java.net.URLDecoder
@@ -100,7 +98,6 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object SearchResults : Screen("searchResults/{query}/{difficulty}/{artistGender}/{tempo}", "검색 결과", Icons.Default.Search)
     object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
 
-    object Test : Screen("test", "시스템 테스트", Icons.Default.Build)
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
 
     // 💡 [수정] URL을 전달받기 위해 경로 끝에 /{videoUrl} 추가
@@ -192,7 +189,6 @@ fun AppNavigation(
         Screen.AnalysisLoading.route,
         Screen.Record.route,
         Screen.Analysis.route,
-        Screen.Test.route
     )
 
     val showMainBars = if (currentRoute != null) {
@@ -417,9 +413,6 @@ fun AppNavHost(
                 onSongClick = { songId ->
                     navController.navigate("songDetail/$songId")
                 },
-                onTestClick = {
-                    navController.navigate("songPartSelect/1")
-                },
                 modifier = Modifier.padding(innerPadding)
             )
         }
@@ -448,14 +441,10 @@ fun AppNavHost(
                 onNavigateToAppInfo = { navController.navigate(Screen.AppInfo.route) },
                 onNavigateToWithdrawal = { navController.navigate(Screen.Withdrawal.route) },
                 onNavigateToAnalysis = { navController.navigate(Screen.Analysis.route) },
-                onNavigateToTest = { navController.navigate(Screen.Test.route) },
                 viewModel = viewModel
             )
         }
 
-        composable(Screen.Test.route) {
-            IntegrationTestScreen(navController)
-        }
 
         composable(Screen.ProfileEdit.route) {
             ProfileEditScreen(

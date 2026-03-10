@@ -38,7 +38,6 @@ fun HomeScreen(
     viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
     onSongClick: (String) -> Unit,
-    onTestClick: () -> Unit = {}, // [추가] 테스트 버튼 클릭 핸들러
     modifier: Modifier = Modifier // AppNavigation에서 전달하는 패딩을 받기 위해 modifier 사용
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
@@ -64,7 +63,7 @@ fun HomeScreen(
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
+                    horizontalArrangement = Arrangement.Start,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -73,11 +72,6 @@ fun HomeScreen(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onBackground
                     )
-                    
-                    // [추가] 테스트 버튼
-                    TextButton(onClick = onTestClick) {
-                        Text("테스트", fontSize = 12.sp)
-                    }
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
