@@ -17,6 +17,14 @@ import kotlin.math.min
 // 에러 표시 색상 정의
 private val ColorError = Color.Red
 private val ColorNormal = PointGreen
+private val HiddenOverlayParts = setOf(
+    BodyPart.NOSE,
+    BodyPart.LEFT_EYE,
+    BodyPart.RIGHT_EYE,
+    BodyPart.LEFT_EAR,
+    BodyPart.RIGHT_EAR,
+    BodyPart.NECK
+)
 
 @Composable
 fun SkeletonOverlay(
@@ -70,7 +78,14 @@ fun SkeletonOverlay(
             val startConfidence = confidenceMap[startPart] ?: 0f
             val endConfidence = confidenceMap[endPart] ?: 0f
 
-            if (start != null && end != null && startConfidence > 0f && endConfidence > 0f) {
+            if (
+                start != null &&
+                end != null &&
+                startPart !in HiddenOverlayParts &&
+                endPart !in HiddenOverlayParts &&
+                startConfidence > 0f &&
+                endConfidence > 0f
+            ) {
                 drawLine(
                     color = lineColor,
                     start = start,
@@ -83,8 +98,8 @@ fun SkeletonOverlay(
 
         // 3. 관절 그리기 (점) 및 에러 시각화
         keyPoints.forEach { point ->
-            // [수정] NECK(목) 부위는 오버레이에 표시하지 않음
-            if (point.type == BodyPart.NECK) return@forEach
+            // 얼굴/목 부위는 오버레이에서 제외
+            if (point.type in HiddenOverlayParts) return@forEach
             if (point.confidence <= 0f) return@forEach
 
             val offset = pointMap[point.type] ?: return@forEach
