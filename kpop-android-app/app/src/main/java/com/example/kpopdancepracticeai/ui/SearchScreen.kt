@@ -32,7 +32,6 @@ fun SearchScreen(
     // 필터 선택 상태 (null은 "선택 안 함"을 의미)
     var selectedDifficulty by remember { mutableStateOf<String?>(null) }
     var selectedArtist by remember { mutableStateOf<String?>(null) }
-    var selectedTimeline by remember { mutableStateOf<String?>(null) }
     var selectedTempo by remember { mutableStateOf<String?>(null) }
 
     // 🚨 Scaffold( ... ) { innerPadding -> 괄호 전체 삭제
@@ -98,18 +97,10 @@ fun SearchScreen(
                         onOptionSelected = { selectedArtist = it }
                     )
 
-                    // --- 타임라인 ---
+                    // --- 템포 ---
                     FilterSection(
-                        title = "타임라인",
-                        options = listOf("최신곡", "인기곡"),
-                        selectedOption = selectedTimeline,
-                        onOptionSelected = { selectedTimeline = it }
-                    )
-
-                    // --- 탬포 ---
-                    FilterSection(
-                        title = "탬포",
-                        options = listOf("빠른 탬포", "보통 탬포", "느린 탬포"),
+                        title = "템포",
+                        options = listOf("빠른 템포", "보통 템포", "느린 템포"),
                         selectedOption = selectedTempo,
                         onOptionSelected = { selectedTempo = it }
                     )
@@ -121,9 +112,11 @@ fun SearchScreen(
         item {
             Button(
                 onClick = {
-                    if (searchText.isNotBlank()) {
-                        navController.navigate("searchResults/${Screen.encodeArg(searchText.trim())}")
-                    }
+                    val queryArg = Screen.encodeArg(searchText.trim().ifBlank { "all" })
+                    val difficultyArg = Screen.encodeArg(selectedDifficulty ?: "all")
+                    val artistArg = Screen.encodeArg(selectedArtist.toArtistGenderValue() ?: "all")
+                    val tempoArg = Screen.encodeArg(selectedTempo.toTempoValue() ?: "all")
+                    navController.navigate("searchResults/$queryArg/$difficultyArg/$artistArg/$tempoArg")
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -213,13 +206,10 @@ private fun getChipColors(option: String): ChipUiColors {
         // 아티스트
         "보이그룹" -> ChipUiColors(Color(0xffeff6ff), Color(0xff155dfc), Color(0xffbedbff))
         "걸그룹" -> ChipUiColors(Color(0xfffdf2f8), Color(0xffe60076), Color(0xfffccee8))
-        // 타임라인
-        "최신곡" -> ChipUiColors(Color(0xfffaf5ff), Color(0xff9810fa), Color(0xffe9d4ff))
-        "인기곡" -> ChipUiColors(Color(0xfffff1f2), Color(0xffec003f), Color(0xffffccd3))
-        // 탬포
-        "빠른 탬포" -> ChipUiColors(Color(0xfffff7ed), Color(0xfff54900), Color(0xffffd6a7))
-        "보통 탬포" -> ChipUiColors(Color(0xfff0fdfa), Color(0xff009689), Color(0xff96f7e4))
-        "느린 탬포" -> ChipUiColors(Color(0xffeef2ff), Color(0xff4f39f6), Color(0xffc6d2ff))
+        // 템포
+        "빠른 템포" -> ChipUiColors(Color(0xfffff7ed), Color(0xfff54900), Color(0xffffd6a7))
+        "보통 템포" -> ChipUiColors(Color(0xfff0fdfa), Color(0xff009689), Color(0xff96f7e4))
+        "느린 템포" -> ChipUiColors(Color(0xffeef2ff), Color(0xff4f39f6), Color(0xffc6d2ff))
         // 기본값
         else -> ChipUiColors(
             MaterialTheme.colorScheme.secondaryContainer,
@@ -227,6 +217,21 @@ private fun getChipColors(option: String): ChipUiColors {
             MaterialTheme.colorScheme.outline
         )
     }
+}
+
+
+
+private fun String?.toArtistGenderValue(): String? = when (this) {
+    "보이그룹" -> "Male"
+    "걸그룹" -> "Female"
+    else -> null
+}
+
+private fun String?.toTempoValue(): String? = when (this) {
+    "빠른 템포" -> "Fast"
+    "보통 템포" -> "Medium"
+    "느린 템포" -> "Slow"
+    else -> null
 }
 
 // --- 미리보기 ---
