@@ -13,7 +13,7 @@ data class PresignedUrlResponse(
 
 interface DownloadApiService {
 
-    @GET("presign")
+    @GET("preSignedUrlDownloadExpertVideos")
     suspend fun getPresignedUrl(
         @Query("key") key: String
     ): PresignedUrlResponse
@@ -21,7 +21,7 @@ interface DownloadApiService {
 
 object ApiClient {
     private const val BASE_URL =
-        "https://aujfpfdg6e.execute-api.ap-northeast-1.amazonaws.com/default/preSignedUrlDownloadExpertVideos/"
+        "https://aujfpfdg6e.execute-api.ap-northeast-1.amazonaws.com/default/"
 
     private val retrofit = Retrofit.Builder()
         .baseUrl(BASE_URL)
