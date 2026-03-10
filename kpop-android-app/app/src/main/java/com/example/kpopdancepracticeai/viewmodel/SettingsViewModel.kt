@@ -24,4 +24,5 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
     fun setCountdownSeconds(seconds: Int) = viewModelScope.launch { dataStore.setCountdownSeconds(seconds) }
     fun setAutoUpload(enabled: Boolean) = viewModelScope.launch { dataStore.setAutoUpload(enabled) }
     fun setWifiOnlyUpload(enabled: Boolean) = viewModelScope.launch { dataStore.setWifiOnlyUpload(enabled) }
+    fun setServerUploadEnabled(enabled: Boolean) = viewModelScope.launch { dataStore.setServerUploadEnabled(enabled) }
 }

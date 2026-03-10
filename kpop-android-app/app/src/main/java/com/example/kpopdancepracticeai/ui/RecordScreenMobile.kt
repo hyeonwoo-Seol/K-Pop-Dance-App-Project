@@ -179,6 +179,12 @@ fun RecordScreen(
         val filename = "${userId}_${songIdClean}_${partNum}_${partName}_${timestamp}.mp4"
 
         scope.launch {
+            if (!settings.isServerUploadEnabled) {
+                Toast.makeText(context, "서버 전송 동의가 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                onNavigateHome()
+                return@launch
+            }
+
             if (!settings.isAutoUpload) {
                 Toast.makeText(context, "자동 전송이 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
                 onNavigateHome()
