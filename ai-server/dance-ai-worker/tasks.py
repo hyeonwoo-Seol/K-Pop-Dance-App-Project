@@ -12,6 +12,7 @@ import gzip
 import shutil
 import logging
 from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.config import Config as AwsClientConfig
 from celery.signals import worker_process_init
 from celery_app import app
 from config import Config
@@ -79,7 +80,12 @@ class S3Manager:
                     's3',
                     aws_access_key_id=Config.AWS_ACCESS_KEY_ID,
                     aws_secret_access_key=Config.AWS_SECRET_ACCESS_KEY,
-                    region_name=Config.AWS_REGION
+                    region_name=Config.AWS_REGION,
+                    endpoint_url=f"https://s3.{Config.AWS_REGION}.amazonaws.com",
+                    config=AwsClientConfig(
+                        signature_version='s3v4',
+                        s3={'addressing_style': 'virtual'}
+                    )
                 )
             except Exception as e:
                 logger.error(f"[S3] 클라이언트 초기화 실패: {e}")
