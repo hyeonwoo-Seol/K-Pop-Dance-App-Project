@@ -38,22 +38,24 @@ scoring_engine = None
 class VideoMetadataParser:
     @staticmethod
     def parse(video_path, song_id, user_id):
-        # >> [변경] 파일명에서 정보 파싱
-        # >> 영상 파일명 예시: userID_songID_Artist_PartNumber.mp4
         try:
             video_filename = os.path.basename(video_path)
             video_name_no_ext = os.path.splitext(video_filename)[0]
             
-            # 1. Full ID 설정 (userID_songID_Artist_PartNumber)
+            # 1. Full ID 설정 (결과물 저장용: userID_songID_Artist_PartNumber_timestamp 유지)
             full_song_identifier = video_name_no_ext
 
-            # 2. 전문가 파일명 파싱 (userID_ 접두사 제거)
-            # >> [변경] 전문가 JSON 파일 이름은 songID_Artist_PartNumber.json으로 저장할거야.
+            # 2. 전문가 파일명 파싱 (userID_ 접두사 및 뒷부분 타임스탬프 제거)
             expert_json_filename = ""
             prefix = f"{user_id}_"
             
             if video_name_no_ext.startswith(prefix):
-                parsed_song_part = video_name_no_ext[len(prefix):]
+                # 1단계: 앞의 userID_ 접두사 제거 (결과: songID_Artist_PartNumber_timestamp)
+                parsed_song_part_with_ts = video_name_no_ext[len(prefix):]
+                
+                # 2단계: 맨 뒤의 _timestamp 부분만 분리 및 제거 (결과: songID_Artist_PartNumber)
+                parsed_song_part = parsed_song_part_with_ts.rsplit('_', 1)[0]
+                
                 expert_json_filename = f"{parsed_song_part}.json"
             else:
                 # 파싱 실패 시 SQS에서 받은 song_id 사용 (Fallback)
