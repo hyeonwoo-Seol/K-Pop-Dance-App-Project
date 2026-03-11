@@ -181,23 +181,40 @@ class AppRepository(
     }
 
     private suspend fun updateArtistAchievements(result: PracticeHistory) {
-        val artistKey = normalizeArtistKey(result.artistName) ?: return
+        val artistKey = resolveArtistKey(result.songId, result.artistName) ?: return
+        incrementArtistAchievements(result.userUuid, artistKey)
+    }
+
+
+    suspend fun markPracticePartCompleted(userId: String, songId: Long, artistName: String) {
+        val artistKey = resolveArtistKey(songId, artistName) ?: return
+        incrementArtistAchievements(userId, artistKey)
+    }
+
+    private suspend fun incrementArtistAchievements(userId: String, artistKey: String) {
         val achievementCodes = listOf("${artistKey}_complete_01", "${artistKey}_complete_50")
 
         achievementCodes.forEach { code ->
-            val progress = achievementDao.getUserAchievementProgressOneShot(result.userUuid, code) ?: return@forEach
+            val progress = achievementDao.getUserAchievementProgressOneShot(userId, code) ?: return@forEach
             if (progress.isCompleted) return@forEach
 
             val updatedStep = min(progress.currentStep + 1, progress.goalStep)
             val completed = updatedStep >= progress.goalStep
             achievementDao.updateProgress(
-                userId = result.userUuid,
+                userId = userId,
                 code = code,
                 step = updatedStep,
                 completed = completed,
                 date = if (completed) getCurrentTime() else null
             )
         }
+    }
+
+    private suspend fun resolveArtistKey(songId: Long, rawArtist: String): String? {
+        val song = songDao.getSongById(songId)
+        return normalizeArtistKey(rawArtist)
+            ?: song?.artistKr?.let(::normalizeArtistKey)
+            ?: song?.artistEn?.let(::normalizeArtistKey)
     }
 
     private fun normalizeArtistKey(rawArtist: String): String? {
