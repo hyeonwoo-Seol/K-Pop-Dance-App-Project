@@ -153,10 +153,42 @@ object RealDataSource {
 
     val getRealLightSticks = listOf(
         LightStick(
+            id = "icon_itzy_complete_50",
+            name = "ITZY 응원봉",
+            localImagePath = "",
+            artist = "ITZY",
+            isOwned = false,
+            obtainedAt = null
+        ),
+        LightStick(
             id = "icon_ive_complete_50",
             name = "IVE 응원봉",
             localImagePath = "",
             artist = "IVE",
+            isOwned = false,
+            obtainedAt = null
+        ),
+        LightStick(
+            id = "icon_nmixx_complete_50",
+            name = "NMIXX 응원봉",
+            localImagePath = "",
+            artist = "NMIXX",
+            isOwned = false,
+            obtainedAt = null
+        ),
+        LightStick(
+            id = "icon_fromis9_complete_50",
+            name = "프로미스나인 응원봉",
+            localImagePath = "",
+            artist = "프로미스나인",
+            isOwned = false,
+            obtainedAt = null
+        ),
+        LightStick(
+            id = "icon_straykids_complete_50",
+            name = "스트레이키즈 응원봉",
+            localImagePath = "",
+            artist = "스트레이키즈",
             isOwned = false,
             obtainedAt = null
         )
@@ -167,7 +199,43 @@ object RealDataSource {
             id = "badge_itzy_complete_01_$userId",
             userUuid = userId,
             name = "ITZY 초보자",
-            description = "ITZY 파트 하나라도 플레이",
+            description = "ITZY 파트 하나라도 풀레이",
+            category = "starter",
+            isUnlocked = false,
+            obtainedAt = null
+        ),
+        Badge(
+            id = "badge_ive_complete_01_$userId",
+            userUuid = userId,
+            name = "IVE 초보자",
+            description = "IVE 파트 하나라도 풀레이",
+            category = "starter",
+            isUnlocked = false,
+            obtainedAt = null
+        ),
+        Badge(
+            id = "badge_nmixx_complete_01_$userId",
+            userUuid = userId,
+            name = "NMIXX 초보자",
+            description = "NMIXX 파트 하나라도 풀레이",
+            category = "starter",
+            isUnlocked = false,
+            obtainedAt = null
+        ),
+        Badge(
+            id = "badge_fromis9_complete_01_$userId",
+            userUuid = userId,
+            name = "프로미스나인 초보자",
+            description = "프로미스나인 파트 하나라도 풀레이",
+            category = "starter",
+            isUnlocked = false,
+            obtainedAt = null
+        ),
+        Badge(
+            id = "badge_straykids_complete_01_$userId",
+            userUuid = userId,
+            name = "스트레이키즈 초보자",
+            description = "스트레이키즈 파트 하나라도 풀레이",
             category = "starter",
             isUnlocked = false,
             obtainedAt = null
