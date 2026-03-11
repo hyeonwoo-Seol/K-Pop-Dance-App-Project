@@ -169,6 +169,7 @@ fun RecordScreen(
     var countdownNumber by remember { mutableIntStateOf(0) }
     var isCountdownVisible by remember { mutableStateOf(false) }
     var showAnalysisLoading by remember { mutableStateOf(false) }
+    var hasAutoStoppedRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
         lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
@@ -184,12 +185,34 @@ fun RecordScreen(
         if (expertVideoUrl.isNotBlank()) {
             try {
                 exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(expertVideoUrl)))
-                exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
+                exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
             } catch (e: Exception) {
                 Log.e("RecordScreen", "영상 로드 실패: $expertVideoUrl", e)
             }
+        }
+    }
+
+    DisposableEffect(exoPlayer, isRecording) {
+        val playbackListener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (
+                    playbackState == Player.STATE_ENDED &&
+                    isRecording &&
+                    !hasAutoStoppedRecording
+                ) {
+                    hasAutoStoppedRecording = true
+                    recordingState.value?.stop()
+                    recordingState.value = null
+                    isRecording = false
+                }
+            }
+        }
+
+        exoPlayer.addListener(playbackListener)
+        onDispose {
+            exoPlayer.removeListener(playbackListener)
         }
     }
 
@@ -326,6 +349,7 @@ fun RecordScreen(
 
             exoPlayer.seekTo(0)
             exoPlayer.play()
+            hasAutoStoppedRecording = false
 
             isRecording = true
             val name = "Kpop_${System.currentTimeMillis()}.mp4"
