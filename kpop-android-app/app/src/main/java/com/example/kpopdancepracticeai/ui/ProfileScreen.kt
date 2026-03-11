@@ -126,8 +126,9 @@ fun ProfileScreen(
                         AchievementCard(
                             title = item.title,
                             description = item.description,
+                            progressDetail = item.progressText,
                             progress = item.progress,
-                            progressText = item.progressText
+                            progressText = "${(item.progress * 100).toInt()}%"
                         )
                     }
                 }
@@ -525,7 +526,13 @@ fun SettingsMenuDivider() {
 }
 
 @Composable
-fun AchievementCard(title: String, description: String, progress: Float, progressText: String) {
+fun AchievementCard(
+    title: String,
+    description: String,
+    progressDetail: String,
+    progress: Float,
+    progressText: String
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -537,6 +544,7 @@ fun AchievementCard(title: String, description: String, progress: Float, progres
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+            Text(progressDetail, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
             Spacer(modifier = Modifier.height(8.dp))
             Row(

@@ -4,6 +4,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
 import kotlinx.coroutines.flow.*
@@ -11,8 +12,12 @@ import kotlinx.coroutines.launch
 
 // UI용 업적 데이터 클래스
 data class AchievementUiModel(
+    val code: String,
     val title: String,
     val description: String,
+    val currentStep: Int,
+    val goalStep: Int,
+    val isUnlocked: Boolean,
     val progress: Float, // 0.0 ~ 1.0
     val progressText: String
 )
@@ -78,14 +83,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userBadges = MutableStateFlow<List<BadgeUiModel>>(emptyList())
     val userBadges: StateFlow<List<BadgeUiModel>> = _userBadges.asStateFlow()
 
-    // 업적 코드와 UI 텍스트 매핑
-    private val achievementMeta = mapOf(
-        "PERFECTIONIST" to ("완벽주의자" to "95% 이상의 정확도 5회 달성"),
-        "PRACTICE_BUG" to ("연습 벌레" to "총 연습 시간 100시간 달성"),
-        "BTS_MASTER" to ("BTS 마스터" to "BTS 챌린지 10개 완료"),
-        "CHALLENGE_HUNTER" to ("챌린지 헌터" to "모든 챌린지 1회 이상 완료"),
-        "NEW_DANCER" to ("신입 댄서" to "첫 연습 영상 업로드")
-    )
+    private val achievementMetaByCode = RealDataSource.getRealAchievements.associateBy { it.id }
 
     private var currentUserId: String? = null
 
@@ -131,17 +129,32 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 // 업적 구독 및 변환
                 launch {
                     repository.getUserAchievements(userId).collect { list ->
-                        val uiModels = list.mapNotNull { item ->
-                            val meta = achievementMeta[item.achievementCode] ?: return@mapNotNull null
-                            val progress = if (item.goalStep > 0) item.currentStep.toFloat() / item.goalStep else 0f
-                            val progressText = "${(progress * 100).toInt()}%"
+                        val progressByCode = list.associateBy { it.achievementCode }
+                        val uiModels = achievementMetaByCode.values.map { meta ->
+                            val item = progressByCode[meta.id]
+                            val currentStep = item?.currentStep ?: 0
+                            val goalStep = item?.goalStep ?: meta.goalCount
+                            val isUnlocked = item?.isCompleted ?: false
+                            val progress = if (goalStep > 0) currentStep.toFloat() / goalStep else 0f
+                            val safeProgress = progress.coerceIn(0f, 1f)
+                            val progressText = "$currentStep / $goalStep (${(safeProgress * 100).toInt()}%)"
+
                             AchievementUiModel(
-                                title = meta.first,
-                                description = meta.second,
-                                progress = progress.coerceIn(0f, 1f),
+                                code = meta.id,
+                                title = meta.title,
+                                description = meta.description,
+                                currentStep = currentStep,
+                                goalStep = goalStep,
+                                isUnlocked = isUnlocked,
+                                progress = safeProgress,
                                 progressText = progressText
                             )
-                        }
+                        }.sortedWith(
+                            compareByDescending<AchievementUiModel> { it.isUnlocked }
+                                .thenByDescending { it.progress }
+                                .thenBy { it.title }
+                        )
+
                         _achievementProgress.value = uiModels
                     }
                 }
