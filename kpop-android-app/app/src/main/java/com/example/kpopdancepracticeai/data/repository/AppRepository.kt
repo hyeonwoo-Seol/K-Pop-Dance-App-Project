@@ -162,16 +162,6 @@ class AppRepository(
 
         val songsById = songDao.getAllSongsSync().associateBy { it.songId }
 
-        val artistOverrides = mapOf(
-            5401L to "원영",
-            5404L to "이서",
-            5422L to "안유진",
-            5424L to "리즈",
-            5511L to "리아",
-            4522L to "현진",
-            5681L to "해원"
-        )
-
         var insertedCount = 0
 
         songParts.forEach { part ->
@@ -204,9 +194,7 @@ class AppRepository(
                         userUuid = userId,
                         songId = part.songId,
                         partNumber = part.partNumber,
-                        artistName = artistOverrides[part.partId]
-                            ?: songsById[part.songId]?.artistKr
-                            ?: "Unknown",
+                        artistName = songsById[part.songId]?.artistKr ?: "Unknown",
                         totalScore = Random.nextInt(62, 99),
                         grade = randomGrade(),
                         partAccuracies = partAccuracies,

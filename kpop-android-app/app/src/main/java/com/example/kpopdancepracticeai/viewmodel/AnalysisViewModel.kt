@@ -23,7 +23,6 @@ class AnalysisViewModel(
         val key: String,
         val songId: Long,
         val partNumber: Int,
-        val artistName: String,
         val label: String
     )
 
@@ -54,7 +53,7 @@ class AnalysisViewModel(
 
     private var currentUserId: String? = null
     private var allHistoryCache: List<PracticeHistory> = emptyList()
-    private var songTitleMap: Map<Long, String> = emptyMap()
+    private var songMetaMap: Map<Long, Pair<String, String>> = emptyMap()
 
     // 화면 진입 시 호출
     fun loadStatistics(userId: String) {
@@ -74,7 +73,7 @@ class AnalysisViewModel(
 
         viewModelScope.launch {
             repository.allSongs.collectLatest { songs ->
-                songTitleMap = songs.associate { it.songId to it.titleKr }
+                songMetaMap = songs.associate { it.songId to (it.titleKr to it.artistKr) }
                 recalculateChoreoInsights()
             }
         }
@@ -117,17 +116,18 @@ class AnalysisViewModel(
 
     private fun recalculateChoreoInsights() {
         val grouped = allHistoryCache.groupBy {
-            Triple(it.songId, it.partNumber, it.artistName.ifBlank { "Unknown" })
+            it.songId to it.partNumber
         }
 
         val options = grouped.keys.map { key ->
-            val songTitle = songTitleMap[key.first] ?: "곡 ${key.first}"
-            val label = "$songTitle (${key.third}) P${key.second}"
+            val songMeta = songMetaMap[key.first]
+            val songTitle = songMeta?.first ?: "곡 ${key.first}"
+            val artist = songMeta?.second ?: "Unknown"
+            val label = "$songTitle ($artist) 파트${key.second}"
             ChoreoFilterOption(
-                key = "${key.first}_${key.second}_${key.third}",
+                key = "${key.first}_${key.second}",
                 songId = key.first,
                 partNumber = key.second,
-                artistName = key.third,
                 label = label
             )
         }.sortedBy { it.label }
@@ -140,7 +140,7 @@ class AnalysisViewModel(
         val selectedHistory = if (selectedOption == null) {
             emptyList()
         } else {
-            grouped[Triple(selectedOption.songId, selectedOption.partNumber, selectedOption.artistName)] ?: emptyList()
+            grouped[selectedOption.songId to selectedOption.partNumber] ?: emptyList()
         }
 
         val bestGrade = getBestGrade(selectedHistory)
