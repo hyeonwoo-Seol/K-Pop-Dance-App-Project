@@ -194,7 +194,7 @@ class AppRepository(
                         userUuid = userId,
                         songId = part.songId,
                         partNumber = part.partNumber,
-                        artistName = songsById[part.songId]?.artistKr ?: "Unknown",
+                        artistName = extractMemberName(songsById[part.songId]?.artistKr),
                         totalScore = Random.nextInt(62, 99),
                         grade = randomGrade(),
                         partAccuracies = partAccuracies,
@@ -236,6 +236,17 @@ class AppRepository(
             bucket >= 70 -> "B"
             bucket >= 58 -> "C"
             else -> "F"
+        }
+    }
+
+    private fun extractMemberName(artistKr: String?): String {
+        if (artistKr.isNullOrBlank()) return "Unknown"
+        val start = artistKr.indexOf('(')
+        val end = artistKr.indexOf(')')
+        return if (start >= 0 && end > start + 1) {
+            artistKr.substring(start + 1, end).trim()
+        } else {
+            artistKr.trim()
         }
     }
 

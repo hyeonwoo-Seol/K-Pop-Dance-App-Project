@@ -23,6 +23,7 @@ class AnalysisViewModel(
         val key: String,
         val songId: Long,
         val partNumber: Int,
+        val artistName: String,
         val label: String
     )
 
@@ -53,7 +54,13 @@ class AnalysisViewModel(
 
     private var currentUserId: String? = null
     private var allHistoryCache: List<PracticeHistory> = emptyList()
-    private var songMetaMap: Map<Long, Pair<String, String>> = emptyMap()
+    private var songsCache: List<SongMeta> = emptyList()
+
+    private data class SongMeta(
+        val songId: Long,
+        val titleKr: String,
+        val artistKr: String
+    )
 
     // 화면 진입 시 호출
     fun loadStatistics(userId: String) {
@@ -73,7 +80,13 @@ class AnalysisViewModel(
 
         viewModelScope.launch {
             repository.allSongs.collectLatest { songs ->
-                songMetaMap = songs.associate { it.songId to (it.titleKr to it.artistKr) }
+                songsCache = songs.map {
+                    SongMeta(
+                        songId = it.songId,
+                        titleKr = it.titleKr,
+                        artistKr = it.artistKr
+                    )
+                }
                 recalculateChoreoInsights()
             }
         }
@@ -116,18 +129,19 @@ class AnalysisViewModel(
 
     private fun recalculateChoreoInsights() {
         val grouped = allHistoryCache.groupBy {
-            it.songId to it.partNumber
+            Triple(it.songId, it.partNumber, it.artistName)
         }
 
         val options = grouped.keys.map { key ->
-            val songMeta = songMetaMap[key.first]
-            val songTitle = songMeta?.first ?: "곡 ${key.first}"
-            val artist = songMeta?.second ?: "Unknown"
+            val resolved = resolveSongMeta(key.first, key.third)
+            val songTitle = resolved?.titleKr ?: "곡 ${key.first}"
+            val artist = resolved?.artistKr ?: key.third.ifBlank { "Unknown" }
             val label = "$songTitle ($artist) 파트${key.second}"
             ChoreoFilterOption(
-                key = "${key.first}_${key.second}",
+                key = "${key.first}_${key.second}_${key.third}",
                 songId = key.first,
                 partNumber = key.second,
+                artistName = key.third,
                 label = label
             )
         }.sortedBy { it.label }
@@ -140,7 +154,7 @@ class AnalysisViewModel(
         val selectedHistory = if (selectedOption == null) {
             emptyList()
         } else {
-            grouped[selectedOption.songId to selectedOption.partNumber] ?: emptyList()
+            grouped[Triple(selectedOption.songId, selectedOption.partNumber, selectedOption.artistName)] ?: emptyList()
         }
 
         val bestGrade = getBestGrade(selectedHistory)
@@ -199,6 +213,20 @@ class AnalysisViewModel(
             .map { it.grade.uppercase(Locale.getDefault()) }
             .maxByOrNull { priority[it] ?: 0 }
             ?: "-"
+    }
+
+    private fun resolveSongMeta(historySongId: Long, historyArtistName: String): SongMeta? {
+        val candidates = songsCache.filter { it.songId in historySongId..(historySongId + 2) }
+        if (candidates.isEmpty()) return songsCache.firstOrNull { it.songId == historySongId }
+
+        val normalizedArtist = historyArtistName.trim().lowercase(Locale.getDefault())
+        if (normalizedArtist.isNotBlank()) {
+            candidates.firstOrNull { candidate ->
+                candidate.artistKr.lowercase(Locale.getDefault()).contains(normalizedArtist)
+            }?.let { return it }
+        }
+
+        return candidates.firstOrNull { it.songId == historySongId } ?: candidates.firstOrNull()
     }
 
     private fun processHistoryData(historyList: List<PracticeHistory>) {
