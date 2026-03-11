@@ -102,12 +102,12 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
 
     // 💡 [수정] URL을 전달받기 위해 경로 끝에 /{videoUrl} 추가
     object DancePractice : Screen(
-        "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}/{videoUrl}",
+        "dancePractice/{songId}/{songTitle}/{artistPart}/{difficulty}/{length}/{videoUrl}",
         "댄스 연습",
         Icons.Default.MusicNote
     )
     object Record : Screen(
-        "record/{songTitle}/{artistPart}/{difficulty}/{videoUrl}",
+        "record/{songId}/{songTitle}/{artistPart}/{difficulty}/{videoUrl}",
         "녹화",
         Icons.Default.CameraAlt
     )
@@ -562,13 +562,13 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onBackClick = { navController.popBackStack() },
                 // 💡 [수정] 5번째 인자인 URL(videoUrl)도 함께 인코딩해서 라우터로 넘겨줍니다.
-                onNavigateToPractice = { songTitle, artistPart, difficulty, length, videoUrl ->
+                onNavigateToPractice = { songId, songTitle, artistPart, difficulty, length, videoUrl ->
                     val encodedTitle = Screen.encodeArg(songTitle)
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
                     val encodedLength = Screen.encodeArg(length)
                     val encodedUrl = Screen.encodeArg(videoUrl)
-                    navController.navigate("dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength/$encodedUrl")
+                    navController.navigate("dancePractice/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength/$encodedUrl")
                 },
                 onNavigateToResult = { jsonFileName, videoPath ->
                     val encodedJson = Screen.encodeArg(jsonFileName)
@@ -580,6 +580,7 @@ fun AppNavHost(
         composable(
             route = Screen.DancePractice.route,
             arguments = listOf(
+                navArgument("songId") { type = NavType.LongType },
                 navArgument("songTitle") { type = NavType.StringType },
                 navArgument("artistPart") { type = NavType.StringType },
                 navArgument("difficulty") { type = NavType.StringType },
@@ -588,6 +589,7 @@ fun AppNavHost(
                 navArgument("videoUrl") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val songId = backStackEntry.arguments?.getLong("songId") ?: 0L
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
@@ -595,6 +597,7 @@ fun AppNavHost(
             val videoUrl = backStackEntry.arguments?.getString("videoUrl")?.let { Screen.decodeArg(it) } ?: ""
 
             PracticeScreenMobile(
+                songId = songId,
                 songTitle = songTitle,
                 artistPart = artistPart,
                 difficulty = difficulty,
@@ -606,7 +609,7 @@ fun AppNavHost(
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
                     val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
-                    navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl")
+                    navController.navigate("record/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl")
                 },
                 onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
             )
@@ -644,6 +647,7 @@ fun AppNavHost(
         composable(
             route = Screen.Record.route,
             arguments = listOf(
+                navArgument("songId") { type = NavType.LongType },
                 navArgument("songTitle") { type = NavType.StringType },
                 navArgument("artistPart") { type = NavType.StringType },
                 navArgument("difficulty") { type = NavType.StringType },
@@ -651,6 +655,7 @@ fun AppNavHost(
                 navArgument("videoUrl") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val songId = backStackEntry.arguments?.getLong("songId") ?: 0L
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
@@ -661,6 +666,7 @@ fun AppNavHost(
             val partName = parts.getOrNull(1) ?: artistPart
 
             RecordScreen(
+                songId = songId,
                 songTitle = songTitle,
                 difficulty = difficulty,
                 artist = artistName,

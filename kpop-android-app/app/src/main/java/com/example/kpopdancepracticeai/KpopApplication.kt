@@ -22,7 +22,8 @@ class KpopApplication : Application() {
             userDao = database.userDao(),
             songDao = database.songDao(), // 이 부분이 추가되어야 합니다.
             historyDao = database.historyDao(),
-            achievementDao = database.achievementDao()
+            achievementDao = database.achievementDao(),
+            userChoreoStatsDao = database.userChoreoStatsDao()
         )
     }
 

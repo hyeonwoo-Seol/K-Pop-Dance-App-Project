@@ -28,6 +28,18 @@ data class BadgeUiModel(
     val color: Color
 )
 
+
+// 홈 화면 최근 연습 안무 UI 모델
+data class RecentChoreoUiModel(
+    val songId: Long,
+    val partNumber: Int,
+    val title: String,
+    val artist: String,
+    val coverUrl: String?,
+    val practiceCount: Int,
+    val lastPracticedAt: String
+)
+
 // 로그인 상태 정의
 sealed interface LoginState {
     object Idle : LoginState
@@ -63,6 +75,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     private val _recentHistory = MutableStateFlow<List<PracticeHistory>>(emptyList())
     val recentHistory: StateFlow<List<PracticeHistory>> = _recentHistory.asStateFlow()
+
+    private val _recentChoreo = MutableStateFlow<List<RecentChoreoUiModel>>(emptyList())
+    val recentChoreo: StateFlow<List<RecentChoreoUiModel>> = _recentChoreo.asStateFlow()
 
     // --- 계산된 레벨 및 경험치 정보 ---
     val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
@@ -125,6 +140,21 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
                 launch { repository.allSongs.collect { _songs.value = it } }
                 launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
+                launch {
+                    repository.getRecentChoreoRows(userId).collect { rows ->
+                        _recentChoreo.value = rows.map { row ->
+                            RecentChoreoUiModel(
+                                songId = row.songId,
+                                partNumber = row.partNumber,
+                                title = row.titleKr,
+                                artist = row.artistKr,
+                                coverUrl = row.coverUrl,
+                                practiceCount = row.practiceCount,
+                                lastPracticedAt = row.lastPracticedAt
+                            )
+                        }
+                    }
+                }
 
                 // 업적 구독 및 변환
                 launch {
@@ -255,8 +285,8 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch { repository.savePracticeResult(history) }
     }
 
-    fun markPracticePartCompleted(userId: String, songId: Long, artistName: String) {
-        viewModelScope.launch { repository.markPracticePartCompleted(userId, songId, artistName) }
+    fun markPracticePartCompleted(userId: String, songId: Long, partNumber: Int, artistName: String) {
+        viewModelScope.launch { repository.markPracticePartCompleted(userId, songId, partNumber, artistName) }
     }
 
     fun clearSyncMessage() { _syncMessage.value = null }

@@ -63,6 +63,7 @@ private val ColorSpeedTextInactive = Color(0xFFD1D5DC)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PracticeScreenMobile(
+    songId: Long = 0L,
     songTitle: String,
     artistPart: String,
     difficulty: String,
