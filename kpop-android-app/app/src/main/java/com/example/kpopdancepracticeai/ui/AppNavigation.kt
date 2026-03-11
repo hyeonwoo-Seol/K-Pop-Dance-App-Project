@@ -413,7 +413,7 @@ fun AppNavHost(
                 onSongClick = { songId ->
                     navController.navigate("songDetail/$songId")
                 },
-                modifier = Modifier.padding(innerPadding)
+                paddingValues = innerPadding
             )
         }
 
