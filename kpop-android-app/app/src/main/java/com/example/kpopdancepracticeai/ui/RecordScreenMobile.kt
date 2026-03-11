@@ -240,26 +240,29 @@ fun RecordScreen(
         val partNum = expertIdentifier.substringAfterLast("_", "0").ifBlank { "0" }
         val timestamp = System.currentTimeMillis()
         val filename = "${userId}_${expertIdentifier}_${timestamp}.mp4"
-        val songIdForDb = expertIdentifier
+        val songIdForDbLong = expertIdentifier
             .substringBefore("_")
-            .toLongOrNull()
-            ?.toString() ?: "0"
+            .toLongOrNull() ?: 0L
+        val songIdForDb = songIdForDbLong.toString()
 
         scope.launch {
             if (!settings.isServerUploadEnabled) {
                 Toast.makeText(context, "서버 전송 동의가 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, artist)
                 onNavigateHome()
                 return@launch
             }
 
             if (!settings.isAutoUpload) {
                 Toast.makeText(context, "자동 전송이 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, artist)
                 onNavigateHome()
                 return@launch
             }
 
             if (settings.isWifiOnlyUpload && !NetworkUtils.isWifiConnected(context)) {
                 Toast.makeText(context, "WIFI 전용 업로드 설정으로 로컬 저장 후 홈으로 이동합니다.", Toast.LENGTH_SHORT).show()
+                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, artist)
                 onNavigateHome()
                 return@launch
             }

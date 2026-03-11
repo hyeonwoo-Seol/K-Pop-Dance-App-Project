@@ -255,6 +255,10 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch { repository.savePracticeResult(history) }
     }
 
+    fun markPracticePartCompleted(userId: String, songId: Long, artistName: String) {
+        viewModelScope.launch { repository.markPracticePartCompleted(userId, songId, artistName) }
+    }
+
     fun clearSyncMessage() { _syncMessage.value = null }
 
     companion object {
