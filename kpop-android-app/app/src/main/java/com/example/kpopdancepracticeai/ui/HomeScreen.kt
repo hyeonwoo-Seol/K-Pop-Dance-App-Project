@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -38,7 +39,7 @@ fun HomeScreen(
     viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
     onSongClick: (String) -> Unit,
-    modifier: Modifier = Modifier // AppNavigation에서 전달하는 패딩을 받기 위해 modifier 사용
+    paddingValues: PaddingValues
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
     val dbSongs by viewModel.songs.collectAsState()
@@ -50,9 +51,16 @@ fun HomeScreen(
         viewModel.refreshData()
     }
 
+    val layoutDirection = LocalLayoutDirection.current
+
     LazyColumn(
-        modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 24.dp), // 하단 여백 추가
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(
+            start = paddingValues.calculateStartPadding(layoutDirection),
+            top = paddingValues.calculateTopPadding(),
+            end = paddingValues.calculateEndPadding(layoutDirection),
+            bottom = paddingValues.calculateBottomPadding() + 24.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(24.dp)
     ) {
         // 1. 타이틀 및 검색창 섹션
