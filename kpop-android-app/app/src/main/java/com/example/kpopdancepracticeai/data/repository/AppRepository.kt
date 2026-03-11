@@ -3,6 +3,7 @@ package com.example.kpopdancepracticeai.data.repository
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
+import com.example.kpopdancepracticeai.data.dao.UserChoreoStatsDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
 import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
@@ -16,7 +17,8 @@ class AppRepository(
     private val userDao: UserDao,
     private val songDao: SongDao,
     private val historyDao: HistoryDao,
-    private val achievementDao: AchievementDao
+    private val achievementDao: AchievementDao,
+    private val userChoreoStatsDao: UserChoreoStatsDao
 ) {
     // 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
     private var sessionStartTime: Long = System.currentTimeMillis()
@@ -154,6 +156,7 @@ class AppRepository(
     // --- History & Stats Update ---
     suspend fun savePracticeResult(result: PracticeHistory) {
         historyDao.insertHistory(result)
+        upsertUserChoreoStats(result)
 
         val currentStats = userDao.getUserStatsOneShot(result.userUuid)
         if (currentStats != null) {
@@ -185,6 +188,22 @@ class AppRepository(
         incrementArtistAchievements(result.userUuid, artistKey)
     }
 
+
+
+    private suspend fun upsertUserChoreoStats(result: PracticeHistory) {
+        val existing = userChoreoStatsDao.getOne(result.userUuid, result.songId, result.partNumber)
+        val updated = UserChoreoStats(
+            id = "${result.userUuid}_${result.songId}_${result.partNumber}",
+            userUuid = result.userUuid,
+            songId = result.songId,
+            partNumber = result.partNumber,
+            practiceCount = (existing?.practiceCount ?: 0) + 1,
+            lastPracticedAt = result.createdAt
+        )
+        userChoreoStatsDao.upsert(updated)
+    }
+
+    fun getRecentChoreoRows(userId: String) = userChoreoStatsDao.getRecentChoreoRows(userId)
 
     suspend fun markPracticePartCompleted(userId: String, songId: Long, artistName: String) {
         val artistKey = resolveArtistKey(songId, artistName) ?: return

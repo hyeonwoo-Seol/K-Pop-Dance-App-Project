@@ -42,6 +42,7 @@ fun HomeScreen(
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
     val dbSongs by viewModel.songs.collectAsState()
+    val recentChoreo by viewModel.recentChoreo.collectAsState()
     var searchText by remember { mutableStateOf("") }
 
     // 화면 진입 시 최신 데이터 로드 (필요한 경우)
@@ -94,6 +95,39 @@ fun HomeScreen(
                         onSearch = { onSearch(searchText) }
                     )
                 )
+            }
+        }
+
+        item {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                SectionTitle(
+                    title = "최근 연습한 안무",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+
+                if (recentChoreo.isEmpty()) {
+                    Text(
+                        text = "최근에 연습한 안무가 없습니다",
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        color = Color.Gray,
+                        fontSize = 14.sp
+                    )
+                } else {
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        items(recentChoreo.take(4)) { item ->
+                            SongCard(
+                                artist = item.artist,
+                                title = "${item.title} (파트 ${item.partNumber})",
+                                views = "마지막 연습 ${item.lastPracticedAt}",
+                                imageUrl = item.coverUrl,
+                                onClick = { onSongClick(item.songId.toString()) }
+                            )
+                        }
+                    }
+                }
             }
         }
 
