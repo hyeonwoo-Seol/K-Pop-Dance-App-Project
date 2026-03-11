@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
@@ -28,9 +29,12 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.kpopdancepracticeai.KpopApplication
 import com.example.kpopdancepracticeai.R
+import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.util.sendSupportEmail
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -42,6 +46,9 @@ fun AppInfoScreen(
     onNavigateToOpenSource: () -> Unit // ⭐️ 이 부분이 추가되었습니다.
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as KpopApplication
+    val repository = app.repository
+    val scope = rememberCoroutineScope()
 
     // 기기에서 실제 앱 버전을 불러옵니다.
     val versionInfo = remember(context) {
@@ -186,6 +193,28 @@ fun AppInfoScreen(
                                     description = "",
                                     icon = Icons.Outlined.Code,
                                     onClick = onNavigateToOpenSource // ⭐️ 여기 연결이 누락되어 있었습니다! 이제 정상 작동합니다.
+                                )
+                                SettingsDivider()
+                                SettingsClickableItem(
+                                    title = "테스트 데이터 생성(개발자)",
+                                    description = "partId 5401, 5404, 5422, 5424, 5511, 4522, 5681에 대해 5~8일 / 1~3회 랜덤 생성",
+                                    icon = Icons.Outlined.Code,
+                                    onClick = {
+                                        scope.launch {
+                                            val currentUser = AuthRepository(context).getCurrentUser()
+                                            if (currentUser == null) {
+                                                Toast.makeText(context, "로그인 사용자가 없습니다.", Toast.LENGTH_SHORT).show()
+                                                return@launch
+                                            }
+
+                                            val inserted = repository.generateDeveloperPracticeHistory(currentUser.uid)
+                                            Toast.makeText(
+                                                context,
+                                                if (inserted > 0) "테스트 데이터 ${inserted}건 생성 완료" else "대상 파트가 없어 생성된 데이터가 없습니다.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
                                 )
                             }
                         }

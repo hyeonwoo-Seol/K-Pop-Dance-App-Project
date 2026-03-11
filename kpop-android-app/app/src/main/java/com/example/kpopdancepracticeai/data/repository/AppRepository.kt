@@ -9,8 +9,10 @@ import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.random.Random
 import kotlin.math.min
 
 class AppRepository(
@@ -151,6 +153,102 @@ class AppRepository(
 
     suspend fun insertSongParts(parts: List<SongPart>) {
         songDao.insertSongParts(parts)
+    }
+
+    suspend fun generateDeveloperPracticeHistory(userId: String): Int {
+        val targetPartIds = listOf(5401L, 5404L, 5422L, 5424L, 5511L, 4522L, 5681L)
+        val songParts = songDao.getSongPartsByPartIds(targetPartIds)
+        if (songParts.isEmpty()) return 0
+
+        val songsById = songDao.getAllSongsSync().associateBy { it.songId }
+
+        val artistOverrides = mapOf(
+            5401L to "원영",
+            5404L to "이서",
+            5422L to "안유진",
+            5424L to "리즈",
+            5511L to "리아",
+            4522L to "현진",
+            5681L to "해원"
+        )
+
+        var insertedCount = 0
+
+        songParts.forEach { part ->
+            val daysToGenerate = Random.nextInt(5, 9) // 5~8일
+            val calendar = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, -(daysToGenerate - 1))
+            }
+
+            repeat(daysToGenerate) {
+                val dailyPracticeCount = Random.nextInt(1, 4) // 1~3회
+                repeat(dailyPracticeCount) { attemptIndex ->
+                    val date = calendar.time
+                    val timeStamp = String.format(
+                        Locale.getDefault(),
+                        "%02d:%02d:%02d",
+                        9 + Random.nextInt(0, 12),
+                        Random.nextInt(0, 60),
+                        (attemptIndex * 11 + Random.nextInt(0, 40)) % 60
+                    )
+                    val createdAt = "${SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)} $timeStamp"
+
+                    val partAccuracies = createRandomPartAccuracies()
+                    val worstPoints = partAccuracies
+                        .toList()
+                        .sortedBy { it.second }
+                        .take(3)
+                        .map { it.first }
+
+                    val history = PracticeHistory(
+                        userUuid = userId,
+                        songId = part.songId,
+                        partNumber = part.partNumber,
+                        artistName = artistOverrides[part.partId]
+                            ?: songsById[part.songId]?.artistKr
+                            ?: "Unknown",
+                        totalScore = Random.nextInt(62, 99),
+                        grade = randomGrade(),
+                        partAccuracies = partAccuracies,
+                        worstPoints = worstPoints,
+                        durationSec = part.durationSec.toDouble(),
+                        fps = 30.0,
+                        createdAt = createdAt,
+                        fullJsonPath = "developer_generated/${part.partId}_${System.currentTimeMillis()}_${Random.nextInt(100, 999)}.json",
+                        userVideoPath = "developer_generated/video_${part.partId}_${System.currentTimeMillis()}.mp4",
+                        videoWidth = 1080,
+                        videoHeight = 1920,
+                        totalFrames = (part.durationSec * 30)
+                    )
+
+                    savePracticeResult(history)
+                    insertedCount++
+                }
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+
+        return insertedCount
+    }
+
+    private fun createRandomPartAccuracies(): Map<String, Int> {
+        val points = listOf(
+            "Left Shoulder", "Right Shoulder", "Left Elbow", "Right Elbow",
+            "Left Wrist", "Right Wrist", "Left Hip", "Right Hip",
+            "Left Knee", "Right Knee", "Left Ankle", "Right Ankle"
+        )
+        return points.associateWith { Random.nextInt(55, 99) }
+    }
+
+    private fun randomGrade(): String {
+        val bucket = Random.nextInt(0, 100)
+        return when {
+            bucket >= 92 -> "S"
+            bucket >= 82 -> "A"
+            bucket >= 70 -> "B"
+            bucket >= 58 -> "C"
+            else -> "F"
+        }
     }
 
     // --- History & Stats Update ---
