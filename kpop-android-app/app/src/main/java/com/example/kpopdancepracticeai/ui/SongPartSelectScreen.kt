@@ -38,7 +38,7 @@ fun SongPartSelectScreen(
     songId: String,
     viewModel: MainViewModel = viewModel(),
     onBackClick: () -> Unit,
-    onNavigateToPractice: (String, String, String, String, String) -> Unit,
+    onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onNavigateToResult: (String, String) -> Unit
 ) {
     val context = LocalContext.current
@@ -197,7 +197,7 @@ fun SongPartSelectContent(
     currentSong: Song?,
     dbParts: List<SongPart>,
     onBackClick: () -> Unit,
-    onNavigateToPractice: (String, String, String, String, String) -> Unit,
+    onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
     Scaffold(
@@ -234,6 +234,7 @@ fun SongPartSelectContent(
                             time = "${part.startTimeMs/1000}초 - ${part.endTimeMs/1000}초",
                             onPracticeClick = {
                                 onNavigateToPractice(
+                                    currentSong?.songId ?: 0L,
                                     currentSong?.titleKr ?: "",
                                     "${currentSong?.artistKr} · ${part.partName}",
                                     "Normal",
@@ -308,7 +309,7 @@ fun SongPartSelectScreenPreview() {
             currentSong = sampleSong,
             dbParts = sampleParts,
             onBackClick = {},
-            onNavigateToPractice = { _, _, _, _, _ -> },
+            onNavigateToPractice = { _, _, _, _, _, _ -> },
             onUploadClick = {}
         )
     }

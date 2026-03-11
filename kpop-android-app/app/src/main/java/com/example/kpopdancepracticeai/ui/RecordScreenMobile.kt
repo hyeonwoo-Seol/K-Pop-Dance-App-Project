@@ -120,6 +120,7 @@ private fun extractExpertIdentifier(
 
 @Composable
 fun RecordScreen(
+    songId: Long = 0L,
     songTitle: String = "ELEVEN",
     difficulty: String = "보통",
     artist: String = "IVE",
@@ -241,9 +242,9 @@ fun RecordScreen(
         val partNumberForDb = partNum.toIntOrNull() ?: 0
         val timestamp = System.currentTimeMillis()
         val filename = "${userId}_${expertIdentifier}_${timestamp}.mp4"
-        val songIdForDbLong = expertIdentifier
-            .substringBefore("_")
-            .toLongOrNull() ?: 0L
+        val songIdForDbLong = if (songId > 0L) songId else (
+            expertIdentifier.substringBefore("_").toLongOrNull() ?: 0L
+        )
         val songIdForDb = songIdForDbLong.toString()
 
         scope.launch {
