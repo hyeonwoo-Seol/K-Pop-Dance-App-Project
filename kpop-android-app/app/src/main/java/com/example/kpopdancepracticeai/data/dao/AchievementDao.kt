@@ -17,7 +17,7 @@ interface AchievementDao {
     fun getUserAchievementProgress(userId: String): Flow<List<UserAchievementProgress>>
 
     // [수정됨] 이제 Badge.kt에 user_uuid가 추가되었으므로 오류 없이 정상 작동합니다!
-    @Query("SELECT * FROM badges WHERE user_uuid = :userId")
+    @Query("SELECT * FROM badges WHERE user_uuid = :userId AND isUnlocked = 1")
     fun getUserBadges(userId: String): Flow<List<Badge>>
 
     // 초기 데이터 세팅용: 업적 메타 데이터 삽입
