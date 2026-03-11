@@ -168,7 +168,6 @@ object RealDataSource {
             userUuid = userId,
             name = "ITZY 초보자",
             description = "ITZY 파트 하나라도 플레이",
-            iconResName = "ic_badge_itzy_starter",
             category = "starter",
             isUnlocked = false,
             obtainedAt = null

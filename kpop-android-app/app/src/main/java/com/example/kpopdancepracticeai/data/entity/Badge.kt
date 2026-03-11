@@ -23,9 +23,6 @@ data class Badge(
     @ColumnInfo(name = "description")
     val description: String,
 
-    @ColumnInfo(name = "iconResName")
-    val iconResName: String,
-
     @ColumnInfo(name = "category")
     val category: String,
 
