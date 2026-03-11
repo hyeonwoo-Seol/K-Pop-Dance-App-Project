@@ -138,6 +138,54 @@ object RealDataSource {
             rewardId = "badge_itzy_complete_01"
         ),
         Achievement(
+            id = "ive_complete_01",
+            title = "IVE 첫 시작",
+            description = "IVE 노래 파트 하나 완료하기",
+            goalCount = 1,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "badge",
+            rewardId = "badge_ive_complete_01"
+        ),
+        Achievement(
+            id = "nmixx_complete_01",
+            title = "NMIXX 첫 시작",
+            description = "NMIXX 노래 파트 하나 완료하기",
+            goalCount = 1,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "badge",
+            rewardId = "badge_nmixx_complete_01"
+        ),
+        Achievement(
+            id = "fromis9_complete_01",
+            title = "프로미스나인 첫 시작",
+            description = "프로미스나인 노래 파트 하나 완료하기",
+            goalCount = 1,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "badge",
+            rewardId = "badge_fromis9_complete_01"
+        ),
+        Achievement(
+            id = "straykids_complete_01",
+            title = "스트레이키즈 첫 시작",
+            description = "스트레이키즈 노래 파트 하나 완료하기",
+            goalCount = 1,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "badge",
+            rewardId = "badge_straykids_complete_01"
+        ),
+        Achievement(
             id = "itzy_complete_50",
             title = "ITZY 50회 달성",
             description = "ITZY 노래 파트 50회 완료",
@@ -148,6 +196,54 @@ object RealDataSource {
             achievedAt = null,
             rewardType = "icon",
             rewardId = "icon_itzy_complete_50"
+        ),
+        Achievement(
+            id = "ive_complete_50",
+            title = "IVE 50회 달성",
+            description = "IVE 노래 파트 50회 완료",
+            goalCount = 50,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "icon",
+            rewardId = "icon_ive_complete_50"
+        ),
+        Achievement(
+            id = "nmixx_complete_50",
+            title = "NMIXX 50회 달성",
+            description = "NMIXX 노래 파트 50회 완료",
+            goalCount = 50,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "icon",
+            rewardId = "icon_nmixx_complete_50"
+        ),
+        Achievement(
+            id = "fromis9_complete_50",
+            title = "프로미스나인 50회 달성",
+            description = "프로미스나인 노래 파트 50회 완료",
+            goalCount = 50,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "icon",
+            rewardId = "icon_fromis9_complete_50"
+        ),
+        Achievement(
+            id = "straykids_complete_50",
+            title = "스트레이키즈 50회 달성",
+            description = "스트레이키즈 노래 파트 50회 완료",
+            goalCount = 50,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "icon",
+            rewardId = "icon_straykids_complete_50"
         )
     )
 
