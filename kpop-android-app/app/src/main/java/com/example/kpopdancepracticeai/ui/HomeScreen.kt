@@ -305,6 +305,6 @@ fun SongCard(
 fun HomeScreenPreview() {
     KpopDancePracticeAITheme {
         // Preview를 위한 더미 데이터 구성은 실제 런타임에는 영향을 주지 않습니다.
-        HomeScreen(onSearch = {}, onSongClick = {}, modifier = Modifier)
+        HomeScreen(onSearch = {}, onSongClick = {}, paddingValues = PaddingValues())
     }
 }
