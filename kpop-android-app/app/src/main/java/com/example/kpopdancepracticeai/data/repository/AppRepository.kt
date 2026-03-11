@@ -205,9 +205,23 @@ class AppRepository(
 
     fun getRecentChoreoRows(userId: String) = userChoreoStatsDao.getRecentChoreoRows(userId)
 
-    suspend fun markPracticePartCompleted(userId: String, songId: Long, artistName: String) {
+    suspend fun markPracticePartCompleted(userId: String, songId: Long, partNumber: Int, artistName: String) {
+        upsertLocalPracticeStats(userId, songId, partNumber)
         val artistKey = resolveArtistKey(songId, artistName) ?: return
         incrementArtistAchievements(userId, artistKey)
+    }
+
+    private suspend fun upsertLocalPracticeStats(userId: String, songId: Long, partNumber: Int) {
+        val existing = userChoreoStatsDao.getOne(userId, songId, partNumber)
+        val updated = UserChoreoStats(
+            id = "${userId}_${songId}_${partNumber}",
+            userUuid = userId,
+            songId = songId,
+            partNumber = partNumber,
+            practiceCount = (existing?.practiceCount ?: 0) + 1,
+            lastPracticedAt = getCurrentTime()
+        )
+        userChoreoStatsDao.upsert(updated)
     }
 
     private suspend fun incrementArtistAchievements(userId: String, artistKey: String) {
