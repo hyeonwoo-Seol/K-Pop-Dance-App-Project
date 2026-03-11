@@ -226,6 +226,7 @@ class AppRepository(
 
     private suspend fun incrementArtistAchievements(userId: String, artistKey: String) {
         val achievementCodes = listOf("${artistKey}_complete_01", "${artistKey}_complete_50")
+        val nowMillis = System.currentTimeMillis()
 
         achievementCodes.forEach { code ->
             val progress = achievementDao.getUserAchievementProgressOneShot(userId, code) ?: return@forEach
@@ -240,6 +241,22 @@ class AppRepository(
                 completed = completed,
                 date = if (completed) getCurrentTime() else null
             )
+
+            if (completed) {
+                val achievementMeta = achievementDao.getAchievementByCode(code) ?: return@forEach
+                when (achievementMeta.rewardType) {
+                    "badge" -> {
+                        val badgeBaseId = achievementMeta.rewardId ?: return@forEach
+                        val badgeId = "${badgeBaseId}_$userId"
+                        achievementDao.unlockBadge(userId, badgeId, nowMillis)
+                    }
+
+                    "icon" -> {
+                        val lightStickId = achievementMeta.rewardId ?: return@forEach
+                        achievementDao.unlockLightStick(lightStickId, nowMillis)
+                    }
+                }
+            }
         }
     }
 
