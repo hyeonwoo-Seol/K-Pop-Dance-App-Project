@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import kotlin.math.min
 
 class AppRepository(
     private val userDao: UserDao,
@@ -174,6 +175,40 @@ class AppRepository(
                 lastUpdated = getCurrentTime()
             )
             userDao.insertOrUpdate(updatedStats)
+        }
+
+        updateArtistAchievements(result)
+    }
+
+    private suspend fun updateArtistAchievements(result: PracticeHistory) {
+        val artistKey = normalizeArtistKey(result.artistName) ?: return
+        val achievementCodes = listOf("${artistKey}_complete_01", "${artistKey}_complete_50")
+
+        achievementCodes.forEach { code ->
+            val progress = achievementDao.getUserAchievementProgressOneShot(result.userUuid, code) ?: return@forEach
+            if (progress.isCompleted) return@forEach
+
+            val updatedStep = min(progress.currentStep + 1, progress.goalStep)
+            val completed = updatedStep >= progress.goalStep
+            achievementDao.updateProgress(
+                userId = result.userUuid,
+                code = code,
+                step = updatedStep,
+                completed = completed,
+                date = if (completed) getCurrentTime() else null
+            )
+        }
+    }
+
+    private fun normalizeArtistKey(rawArtist: String): String? {
+        val normalized = rawArtist.lowercase(Locale.getDefault()).replace(" ", "")
+        return when {
+            normalized.contains("itzy") || normalized.contains("있지") -> "itzy"
+            normalized.contains("ive") || normalized.contains("아이브") -> "ive"
+            normalized.contains("nmixx") || normalized.contains("엔믹스") -> "nmixx"
+            normalized.contains("fromis") || normalized.contains("프로미스") -> "fromis9"
+            normalized.contains("straykids") || normalized.contains("스트레이키즈") -> "straykids"
+            else -> null
         }
     }
 
