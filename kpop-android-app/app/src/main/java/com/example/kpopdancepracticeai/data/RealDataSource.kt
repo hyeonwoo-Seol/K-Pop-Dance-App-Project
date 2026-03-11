@@ -10,27 +10,41 @@ import com.example.kpopdancepracticeai.data.entity.UserAchievementProgress
 object RealDataSource {
     private const val EXPERT_VIDEO_BASE_PATH =
         "file:///data/data/com.example.kpopdancepracticeai/files/expert_videos/"
+    private const val APP_PACKAGE_NAME = "com.example.kpopdancepracticeai"
 
     private fun expertVideo(fileName: String): String = "$EXPERT_VIDEO_BASE_PATH$fileName"
+    private fun drawableCover(fileName: String): String =
+        "android.resource://$APP_PACKAGE_NAME/drawable/$fileName"
+
+    private fun coverForSongTitle(titleEn: String): String = when (titleEn.lowercase()) {
+        "eleven" -> drawableCover("cover_eleven")
+        "o.o" -> drawableCover("cover_oo")
+        "wannabe" -> drawableCover("cover_wannabe")
+        "loco" -> drawableCover("cover_loco")
+        "love dive" -> drawableCover("cover_lovedive")
+        "stay this way" -> drawableCover("cover_staythisway")
+        "sneakers" -> drawableCover("cover_sneakers")
+        else -> drawableCover("cover_eleven")
+    }
 
     val getRealSongs = listOf(
-        Song(540L, "일레븐", "ELEVEN", "아이브 (원영)", "IVE (Wonyoung)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Wonyoung+Cover", "2021-12-01"),
-        Song(541L, "일레븐", "ELEVEN", "아이브 (리즈)", "IVE (Liz)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Liz+Cover", "2021-12-01"),
-        Song(542L, "일레븐", "ELEVEN", "아이브 (이서)", "IVE (Leeseo)", "Female", "Dance", "Medium", "쉬움", "https://via.placeholder.com/400x300.png?text=Leeseo+Cover", "2021-12-01"),
-        Song(550L, "오오", "O.O", "엔믹스 (설윤)", "NMIXX (Sullyoon)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Sullyoon+Cover", "2022-02-22"),
-        Song(551L, "오오", "O.O", "엔믹스 (해원)", "NMIXX (Haewon)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Haewon+Cover", "2022-02-22"),
-        Song(450L, "워너비", "WANNABE", "있지 (류진)", "ITZY (Ryujin)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Ryujin+Cover", "2020-03-09"),
-        Song(451L, "워너비", "WANNABE", "있지 (리아)", "ITZY (Lia)", "Female", "Dance", "Fast", "보통", "https://via.placeholder.com/400x300.png?text=Lia+Cover", "2020-03-09"),
-        Song(452L, "워너비", "WANNABE", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Chaeryeong+Cover", "2020-03-09"),
-        Song(530L, "로코", "LOCO", "있지 (리아)", "ITZY (Lia)", "Female", "Dance", "Fast", "보통", "https://via.placeholder.com/400x300.png?text=Lia+Loco+Cover", "2021-09-24"),
-        Song(531L, "로코", "LOCO", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Chaeryeong+Loco+Cover", "2021-09-24"),
-        Song(556L, "러브다이브", "LOVE DIVE", "아이브 (원영)", "IVE (Wonyoung)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Wonyoung+LoveDive", "2022-04-05"),
-        Song(557L, "러브다이브", "LOVE DIVE", "아이브 (이서)", "IVE (Leeseo)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Leeseo+LoveDive", "2022-04-05"),
-        Song(568L, "스테이디스웨이", "Stay This Way", "프로미스나인 (하영)", "fromis_9 (Hayoung)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Hayoung+StayThisWay", "2022-06-27"),
-        Song(569L, "스테이디스웨이", "Stay This Way", "프로미스나인 (지헌)", "fromis_9 (Jiheon)", "Female", "Dance", "Medium", "보통", "https://via.placeholder.com/400x300.png?text=Jiheon+StayThisWay", "2022-06-27"),
-        Song(571L, "스니커즈", "SNEAKERS", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Chaeryeong+Sneakers", "2022-07-15"),
-        Song(572L, "스니커즈", "SNEAKERS", "있지 (예지)", "ITZY (Yeji)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Yeji+Sneakers", "2022-07-15"),
-        Song(573L, "스니커즈", "SNEAKERS", "있지 (유나)", "ITZY (Yuna)", "Female", "Dance", "Fast", "어려움", "https://via.placeholder.com/400x300.png?text=Yuna+Sneakers", "2022-07-15")
+        Song(540L, "일레븐", "ELEVEN", "아이브 (원영)", "IVE (Wonyoung)", "Female", "Dance", "Medium", "보통", coverForSongTitle("ELEVEN"), "2021-12-01"),
+        Song(541L, "일레븐", "ELEVEN", "아이브 (리즈)", "IVE (Liz)", "Female", "Dance", "Medium", "보통", coverForSongTitle("ELEVEN"), "2021-12-01"),
+        Song(542L, "일레븐", "ELEVEN", "아이브 (이서)", "IVE (Leeseo)", "Female", "Dance", "Medium", "쉬움", coverForSongTitle("ELEVEN"), "2021-12-01"),
+        Song(550L, "오오", "O.O", "엔믹스 (설윤)", "NMIXX (Sullyoon)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("O.O"), "2022-02-22"),
+        Song(551L, "오오", "O.O", "엔믹스 (해원)", "NMIXX (Haewon)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("O.O"), "2022-02-22"),
+        Song(450L, "워너비", "WANNABE", "있지 (류진)", "ITZY (Ryujin)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("WANNABE"), "2020-03-09"),
+        Song(451L, "워너비", "WANNABE", "있지 (리아)", "ITZY (Lia)", "Female", "Dance", "Fast", "보통", coverForSongTitle("WANNABE"), "2020-03-09"),
+        Song(452L, "워너비", "WANNABE", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("WANNABE"), "2020-03-09"),
+        Song(530L, "로코", "LOCO", "있지 (리아)", "ITZY (Lia)", "Female", "Dance", "Fast", "보통", coverForSongTitle("LOCO"), "2021-09-24"),
+        Song(531L, "로코", "LOCO", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("LOCO"), "2021-09-24"),
+        Song(556L, "러브다이브", "LOVE DIVE", "아이브 (원영)", "IVE (Wonyoung)", "Female", "Dance", "Medium", "보통", coverForSongTitle("LOVE DIVE"), "2022-04-05"),
+        Song(557L, "러브다이브", "LOVE DIVE", "아이브 (이서)", "IVE (Leeseo)", "Female", "Dance", "Medium", "보통", coverForSongTitle("LOVE DIVE"), "2022-04-05"),
+        Song(568L, "스테이디스웨이", "Stay This Way", "프로미스나인 (하영)", "fromis_9 (Hayoung)", "Female", "Dance", "Medium", "보통", coverForSongTitle("Stay This Way"), "2022-06-27"),
+        Song(569L, "스테이디스웨이", "Stay This Way", "프로미스나인 (지헌)", "fromis_9 (Jiheon)", "Female", "Dance", "Medium", "보통", coverForSongTitle("Stay This Way"), "2022-06-27"),
+        Song(571L, "스니커즈", "SNEAKERS", "있지 (채령)", "ITZY (Chaeryeong)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("SNEAKERS"), "2022-07-15"),
+        Song(572L, "스니커즈", "SNEAKERS", "있지 (예지)", "ITZY (Yeji)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("SNEAKERS"), "2022-07-15"),
+        Song(573L, "스니커즈", "SNEAKERS", "있지 (유나)", "ITZY (Yuna)", "Female", "Dance", "Fast", "어려움", coverForSongTitle("SNEAKERS"), "2022-07-15")
 
     )
 
