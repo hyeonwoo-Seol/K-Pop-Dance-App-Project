@@ -97,30 +97,19 @@ class AppRepository(
             userDao.insertUser(newUser)
         }
 
-        // 3. 초기 업적 데이터 세팅
-        val initialAchievements = listOf(
-            UserAchievementProgress(userUuid = userId, achievementCode = "PERFECTIONIST", currentStep = 0, goalStep = 5, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "PRACTICE_BUG", currentStep = 0, goalStep = 100, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "BTS_MASTER", currentStep = 0, goalStep = 10, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "CHALLENGE_HUNTER", currentStep = 0, goalStep = 10, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "NEW_DANCER", currentStep = 1, goalStep = 1, isCompleted = true, achievedDate = getCurrentTime())
-        )
+        // 3. 초기 업적/보상 메타데이터 세팅
+        achievementDao.insertAchievements(RealDataSource.getRealAchievements)
+        achievementDao.insertLightSticks(RealDataSource.getRealLightSticks)
+
+        // 4. 사용자별 업적 진행도 초기화
+        val initialAchievements = RealDataSource.getInitialAchievementProgress(userId)
         achievementDao.insertProgress(initialAchievements)
 
-        // 4. 초기 배지 세팅
+        // 5. 사용자별 배지 초기화
         if (existingStats == null) {
-            achievementDao.insertBadge(
-                Badge(
-                    id = "badge_new_dancer_$userId",
-                    userUuid = userId,
-                    name = "신입 댄서",
-                    description = "첫 연습 영상 업로드",
-                    iconResName = "ic_badge_default",
-                    category = "초보자",
-                    isUnlocked = true,
-                    obtainedAt = System.currentTimeMillis()
-                )
-            )
+            RealDataSource.getInitialBadges(userId).forEach { badge ->
+                achievementDao.insertBadge(badge)
+            }
         }
     }
 
