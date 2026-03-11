@@ -2,6 +2,10 @@ package com.example.kpopdancepracticeai.data
 
 import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.data.entity.SongPart
+import com.example.kpopdancepracticeai.data.entity.Achievement
+import com.example.kpopdancepracticeai.data.entity.Badge
+import com.example.kpopdancepracticeai.data.entity.LightStick
+import com.example.kpopdancepracticeai.data.entity.UserAchievementProgress
 
 object RealDataSource {
     private const val EXPERT_VIDEO_BASE_PATH =
@@ -119,4 +123,67 @@ object RealDataSource {
 
 
     )
+
+    val getRealAchievements = listOf(
+        Achievement(
+            id = "itzy_complete_01",
+            title = "ITZY 첫 시작",
+            description = "ITZY 노래 파트 하나 완료하기",
+            goalCount = 1,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "badge",
+            rewardId = "badge_itzy_complete_01"
+        ),
+        Achievement(
+            id = "itzy_complete_50",
+            title = "ITZY 50회 달성",
+            description = "ITZY 노래 파트 50회 완료",
+            goalCount = 50,
+            currentCount = 0,
+            isUnlocked = false,
+            isCompleted = false,
+            achievedAt = null,
+            rewardType = "icon",
+            rewardId = "icon_itzy_complete_50"
+        )
+    )
+
+    val getRealLightSticks = listOf(
+        LightStick(
+            id = "icon_ive_complete_50",
+            name = "IVE 응원봉",
+            localImagePath = "",
+            artist = "IVE",
+            isOwned = false,
+            obtainedAt = null
+        )
+    )
+
+    fun getInitialBadges(userId: String): List<Badge> = listOf(
+        Badge(
+            id = "badge_itzy_complete_01_$userId",
+            userUuid = userId,
+            name = "ITZY 초보자",
+            description = "ITZY 파트 하나라도 플레이",
+            iconResName = "ic_badge_itzy_starter",
+            category = "starter",
+            isUnlocked = false,
+            obtainedAt = null
+        )
+    )
+
+    fun getInitialAchievementProgress(userId: String): List<UserAchievementProgress> =
+        getRealAchievements.map { achievement ->
+            UserAchievementProgress(
+                userUuid = userId,
+                achievementCode = achievement.id,
+                currentStep = achievement.currentCount,
+                goalStep = achievement.goalCount,
+                isCompleted = achievement.isCompleted,
+                achievedDate = null
+            )
+        }
 }

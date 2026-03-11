@@ -4,7 +4,9 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import com.example.kpopdancepracticeai.data.entity.Achievement
 import com.example.kpopdancepracticeai.data.entity.Badge
+import com.example.kpopdancepracticeai.data.entity.LightStick
 import com.example.kpopdancepracticeai.data.entity.UserAchievementProgress
 import kotlinx.coroutines.flow.Flow
 
@@ -18,9 +20,17 @@ interface AchievementDao {
     @Query("SELECT * FROM badges WHERE user_uuid = :userId")
     fun getUserBadges(userId: String): Flow<List<Badge>>
 
+    // 초기 데이터 세팅용: 업적 메타 데이터 삽입
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertAchievements(achievements: List<Achievement>)
+
     // 초기 데이터 세팅용: 업적 진행도 삽입
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertProgress(progress: List<UserAchievementProgress>)
+
+    // 초기 데이터 세팅용: 응원봉 메타 데이터 삽입
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertLightSticks(lightSticks: List<LightStick>)
 
     // 배지 획득 처리
     @Insert(onConflict = OnConflictStrategy.IGNORE)
