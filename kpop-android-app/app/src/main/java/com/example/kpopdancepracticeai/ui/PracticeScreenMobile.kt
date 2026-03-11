@@ -102,15 +102,13 @@ fun PracticeScreenMobile(
         onDispose { exoPlayer.release() }
     }
 
-    // 💡 [핵심 수정] URL이 변경될 때마다 플레이어 재설정 (Toast 디버깅 포함)
+    // URL이 변경될 때마다 플레이어 재설정
     LaunchedEffect(videoUrl) {
         if (videoUrl.isNotBlank()) {
             // "asset:///" 경로 보장
             val finalUrl = if (!videoUrl.startsWith("asset:///")) {
                 videoUrl.replace("file:///android_asset/", "asset:///")
             } else videoUrl
-
-            Toast.makeText(context, "재생 시도: $finalUrl", Toast.LENGTH_SHORT).show()
 
             try {
                 val mediaItem = MediaItem.fromUri(Uri.parse(finalUrl))
