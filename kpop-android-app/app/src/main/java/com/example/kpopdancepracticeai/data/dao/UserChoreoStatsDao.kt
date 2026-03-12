@@ -46,4 +46,5 @@ interface UserChoreoStatsDao {
         """
     )
     fun getRecentChoreoRows(userId: String): Flow<List<RecentChoreoRow>>
+
 }

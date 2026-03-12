@@ -382,6 +382,7 @@ class AppRepository(
 
     fun getRecentHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getRecentHistory(userId)
     fun getAllHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getAllHistory(userId)
+    fun getTopPracticedHistoryRows(userId: String) = historyDao.getTopPracticedHistoryRows(userId)
 
     // 💡 [추가됨] DB에서 전체 곡 데이터를 한 번만 읽어오는 동기식 메서드
     suspend fun getAllSongsSync(): List<Song> {

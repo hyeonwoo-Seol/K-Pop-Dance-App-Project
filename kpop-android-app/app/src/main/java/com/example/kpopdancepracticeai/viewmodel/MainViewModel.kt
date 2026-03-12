@@ -5,10 +5,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.kpopdancepracticeai.data.RealDataSource
+import com.example.kpopdancepracticeai.data.dao.TopPracticedHistoryRow
 import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 // UI용 업적 데이터 클래스
 data class AchievementUiModel(
@@ -38,6 +40,12 @@ data class RecentChoreoUiModel(
     val coverUrl: String?,
     val practiceCount: Int,
     val lastPracticedAt: String
+)
+
+data class TopPracticedChoreoUiModel(
+    val title: String,
+    val artist: String,
+    val partName: String
 )
 
 // 로그인 상태 정의
@@ -78,6 +86,11 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     private val _recentChoreo = MutableStateFlow<List<RecentChoreoUiModel>>(emptyList())
     val recentChoreo: StateFlow<List<RecentChoreoUiModel>> = _recentChoreo.asStateFlow()
+
+    private val _topPracticedChoreos = MutableStateFlow<List<TopPracticedChoreoUiModel>>(emptyList())
+    val topPracticedChoreos: StateFlow<List<TopPracticedChoreoUiModel>> = _topPracticedChoreos.asStateFlow()
+
+    private var topPracticedHistoryRowsCache: List<TopPracticedHistoryRow> = emptyList()
 
     // --- 계산된 레벨 및 경험치 정보 ---
     val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
@@ -138,7 +151,12 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 // 구독 설정
                 launch { repository.getUserStats(userId).collect { _userStats.value = it } }
                 launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
-                launch { repository.allSongs.collect { _songs.value = it } }
+                launch {
+                    repository.allSongs.collect {
+                        _songs.value = it
+                        remapTopPracticedChoreos()
+                    }
+                }
                 launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
                 launch {
                     repository.getRecentChoreoRows(userId).collect { rows ->
@@ -153,6 +171,12 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                                 lastPracticedAt = row.lastPracticedAt
                             )
                         }
+                    }
+                }
+                launch {
+                    repository.getTopPracticedHistoryRows(userId).collect { rows ->
+                        topPracticedHistoryRowsCache = rows
+                        remapTopPracticedChoreos()
                     }
                 }
 
@@ -290,6 +314,52 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     fun clearSyncMessage() { _syncMessage.value = null }
+
+    private fun remapTopPracticedChoreos() {
+        val songs = _songs.value
+        _topPracticedChoreos.value = topPracticedHistoryRowsCache.map { row ->
+            val resolvedSong = resolveSongForTopChoreo(
+                songs = songs,
+                historySongId = row.songId,
+                historyArtistName = row.artistName
+            )
+            val partName = resolvePartNameForTopChoreo(
+                songId = resolvedSong?.songId ?: row.songId,
+                partNumber = row.partNumber
+            )
+
+            TopPracticedChoreoUiModel(
+                title = resolvedSong?.titleKr ?: "곡 ${row.songId}",
+                artist = resolvedSong?.artistKr ?: row.artistName.ifBlank { "Unknown" },
+                partName = partName
+            )
+        }
+    }
+
+    private fun resolveSongForTopChoreo(
+        songs: List<Song>,
+        historySongId: Long,
+        historyArtistName: String
+    ): Song? {
+        val candidates = songs.filter { it.songId in historySongId..(historySongId + 2) }
+        if (candidates.isEmpty()) return songs.firstOrNull { it.songId == historySongId }
+
+        val normalizedArtist = historyArtistName.trim().lowercase(Locale.getDefault())
+        if (normalizedArtist.isNotBlank()) {
+            candidates.firstOrNull { candidate ->
+                candidate.artistKr.lowercase(Locale.getDefault()).contains(normalizedArtist)
+            }?.let { return it }
+        }
+
+        return candidates.firstOrNull { it.songId == historySongId } ?: candidates.firstOrNull()
+    }
+
+    private fun resolvePartNameForTopChoreo(songId: Long, partNumber: Int): String {
+        return RealDataSource.getRealSongParts
+            .firstOrNull { it.songId == songId && it.partNumber == partNumber }
+            ?.partName
+            ?: "파트$partNumber"
+    }
 
     companion object {
         fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {

@@ -37,6 +37,7 @@ import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
 import com.example.kpopdancepracticeai.viewmodel.BadgeUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.viewmodel.TopPracticedChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
 val BorderLight = Color(0xFFE0E0E0)
@@ -63,6 +64,7 @@ fun ProfileScreen(
     val levelInfo by viewModel.userLevelInfo.collectAsState()
     val achievements by viewModel.achievementProgress.collectAsState()
     val badges by viewModel.userBadges.collectAsState()
+    val topPracticedChoreos by viewModel.topPracticedChoreos.collectAsState()
 
     val context = LocalContext.current
 
@@ -99,7 +101,7 @@ fun ProfileScreen(
         when (selectedTab) {
             "통계" -> {
                 item { StatisticsRow(userStats = userStats) }
-                item { AchievementsSummaryCard(achievements = achievements) }
+                item { AchievementsSummaryCard(achievements = achievements, topPracticedChoreos = topPracticedChoreos) }
                 item { AcquiredBadgesCard(badges = badges) }
             }
             "업적" -> {
@@ -362,7 +364,10 @@ fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
 }
 
 @Composable
-fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
+fun AchievementsSummaryCard(
+    achievements: List<AchievementUiModel>,
+    topPracticedChoreos: List<TopPracticedChoreoUiModel>
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -373,6 +378,7 @@ fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            TopPracticedChoreosSection(topPracticedChoreos = topPracticedChoreos)
             Text("진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             if (achievements.isEmpty()) {
                 Text("진행 중인 업적이 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
@@ -382,6 +388,23 @@ fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TopPracticedChoreosSection(topPracticedChoreos: List<TopPracticedChoreoUiModel>) {
+    Text("가장 많이 연습한 안무 TOP 3", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    if (topPracticedChoreos.isEmpty()) {
+        Text("아직 연습 기록이 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+        return
+    }
+
+    topPracticedChoreos.forEachIndexed { index, choreo ->
+        Text(
+            text = "${index + 1}. ${choreo.title} (${choreo.artist}) - ${choreo.partName}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.DarkGray
+        )
     }
 }
 
