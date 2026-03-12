@@ -77,6 +77,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object Login : Screen("login", "로그인", Icons.Default.Home)
     object SignUp : Screen("signUp", "회원가입", Icons.Default.Person)
     object SignUpSecond : Screen("signUpSecond", "회원가입2", Icons.Default.Person)
+    object LoginAttempt : Screen("loginAttempt/{email}/{password}", "로그인 시도", Icons.Default.Home)
 
     object Home : Screen("home", "홈", Icons.Default.Home)
 
@@ -173,6 +174,7 @@ fun AppNavigation(
         Screen.Login.route,
         Screen.SignUp.route,
         Screen.SignUpSecond.route,
+        Screen.LoginAttempt.route.substringBefore("/{"),
         Screen.ProfileEdit.route,
         Screen.PracticeSettings.route,
         Screen.NotificationSettings.route,
@@ -346,6 +348,11 @@ fun AppNavHost(
         composable(Screen.Login.route) {
             LoginScreen(
                 viewModel = viewModel,
+                onEmailLoginAttempt = { email, password ->
+                    val encodedEmail = Screen.encodeArg(email)
+                    val encodedPassword = Screen.encodeArg(password)
+                    navController.navigate("loginAttempt/$encodedEmail/$encodedPassword")
+                },
                 onLoginSuccess = {
                     navController.navigate(Screen.VideoDownload.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
@@ -357,6 +364,38 @@ fun AppNavHost(
                 onGoogleLoginSuccess = {
                     val dummyArg = Screen.encodeArg("GOOGLE_LOGIN")
                     navController.navigate("${Screen.SignUpSecond.route}/$dummyArg/$dummyArg")
+                }
+            )
+        }
+
+        composable(
+            route = Screen.LoginAttempt.route,
+            arguments = listOf(
+                navArgument("email") { type = NavType.StringType },
+                navArgument("password") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
+            val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
+
+            LoginAttemptScreen(
+                viewModel = viewModel,
+                email = email,
+                password = password,
+                onLoginSuccess = {
+                    navController.navigate(Screen.VideoDownload.route) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onNeedProfile = { signupEmail, signupPassword ->
+                    val encodedEmail = Screen.encodeArg(signupEmail)
+                    val encodedPassword = Screen.encodeArg(signupPassword)
+                    navController.navigate("${Screen.SignUpSecond.route}/$encodedEmail/$encodedPassword") {
+                        popUpTo(Screen.Login.route) { inclusive = false }
+                    }
+                },
+                onBackToLogin = {
+                    navController.popBackStack(Screen.Login.route, false)
                 }
             )
         }

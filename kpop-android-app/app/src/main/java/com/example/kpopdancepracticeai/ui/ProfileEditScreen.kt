@@ -9,7 +9,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -37,6 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
@@ -73,8 +75,8 @@ fun ProfileEditScreen(
     viewModel: MainViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val currentUser by viewModel.currentUserProfile.collectAsState()
-    val userStats by viewModel.userStats.collectAsState()
+    val currentUser by viewModel.currentUserProfile.collectAsStateWithLifecycle()
+    val userStats by viewModel.userStats.collectAsStateWithLifecycle()
 
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
@@ -173,76 +175,65 @@ fun ProfileEditScreen(
                 }
             }
         ) { innerPadding ->
-            LazyColumn(
-                contentPadding = innerPadding,
+            Column(
                 modifier = Modifier
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                item {
-                    TopAppBar(
-                        title = { Text("프로필 설정", fontWeight = FontWeight.Bold) },
-                        navigationIcon = {
-                            IconButton(onClick = onBackClick) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                    contentDescription = "뒤로가기"
-                                )
-                            }
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(
-                            containerColor = Color.Transparent
-                        ),
-                        windowInsets = WindowInsets(0.dp)
+                TopAppBar(
+                    title = { Text("프로필 설정", fontWeight = FontWeight.Bold) },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "뒤로가기"
+                            )
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = Color.Transparent
+                    ),
+                    windowInsets = WindowInsets(0.dp)
+                )
+
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    ProfileImageCard(
+                        profileImageUrl = profileImageUrl,
+                        onClick = { galleryLauncher.launch("image/*") }
                     )
                 }
 
-                // --- 1. 프로필 사진 변경 ---
-                item {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ProfileImageCard(
-                            profileImageUrl = profileImageUrl,
-                            onClick = { galleryLauncher.launch("image/*") } // 이미지 선택 트리거
-                        )
-                    }
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    BasicInfoCard(
+                        name = name, onNameChange = { name = it },
+                        email = email, onEmailChange = { email = it },
+                        password = password, onPasswordChange = { password = it },
+                        birthdate = birthdate, onBirthdateChange = { birthdate = it }
+                    )
                 }
-                // --- 2. 기본 정보 ---
-                item {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        BasicInfoCard(
-                            name = name, onNameChange = { name = it },
-                            email = email, onEmailChange = { email = it },
-                            password = password, onPasswordChange = { password = it },
-                            birthdate = birthdate, onBirthdateChange = { birthdate = it }
-                        )
-                    }
+
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    DanceInfoCard(
+                        bio = bio,
+                        onBioChange = { bio = it },
+                        currentLevel = danceSkill,
+                        onLevelChange = { danceSkill = it },
+                        currentGenres = favoriteGenres,
+                        onGenresChange = { favoriteGenres = it }
+                    )
                 }
-                // --- 3. 댄스 정보 ---
-                item {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        DanceInfoCard(
-                            bio = bio,
-                            onBioChange = { bio = it },
-                            currentLevel = danceSkill,
-                            onLevelChange = { danceSkill = it },
-                            currentGenres = favoriteGenres,
-                            onGenresChange = { favoriteGenres = it }
-                        )
-                    }
+
+                Box(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    ActivityStatsCard(
+                        completedSongs = userStats?.completedParts?.toString() ?: "0",
+                        playTime = "${(userStats?.totalPlayTime ?: 0) / 60}",
+                        badgeCount = userStats?.badgeCount?.toString() ?: "0"
+                    )
                 }
-                // --- 4. 활동 통계 ---
-                item {
-                    Box(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        ActivityStatsCard(
-                            completedSongs = userStats?.completedParts?.toString() ?: "0",
-                            playTime = "${(userStats?.totalPlayTime ?: 0) / 60}",
-                            badgeCount = userStats?.badgeCount?.toString() ?: "0"
-                        )
-                    }
-                }
-                item {
-                    Spacer(modifier = Modifier.height(16.dp))
-                }
+
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
@@ -372,8 +363,8 @@ fun DanceInfoCard(
     currentGenres: Set<String>, onGenresChange: (Set<String>) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
-    val levels = listOf("초급", "중급 - 기본기를 다지는 단계", "고급")
-    val genres = listOf("K-POP", "힙합", "재즈", "발레", "현대무용", "비보잉", "하우스", "왁킹")
+    val levels = remember { listOf("초급", "중급 - 기본기를 다지는 단계", "고급") }
+    val genres = remember { listOf("K-POP", "힙합", "재즈", "발레", "현대무용", "비보잉", "하우스", "왁킹") }
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
