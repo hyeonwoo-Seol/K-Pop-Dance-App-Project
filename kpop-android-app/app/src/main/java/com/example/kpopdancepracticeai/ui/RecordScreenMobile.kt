@@ -28,7 +28,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +42,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -171,6 +169,7 @@ fun RecordScreen(
     var isCountdownVisible by remember { mutableStateOf(false) }
     var showAnalysisLoading by remember { mutableStateOf(false) }
     var hasAutoStoppedRecording by remember { mutableStateOf(false) }
+    var hasTriggeredAutoRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
         lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
@@ -379,6 +378,19 @@ fun RecordScreen(
         }
     }
 
+    LaunchedEffect(hasPermissions, videoCaptureState.value) {
+        if (
+            hasPermissions &&
+            videoCaptureState.value != null &&
+            !hasTriggeredAutoRecording &&
+            !isRecording &&
+            !isCountdownVisible
+        ) {
+            hasTriggeredAutoRecording = true
+            startRecordingWithCountdown()
+        }
+    }
+
     if (showAnalysisLoading) {
         AnalysisWaitingScreen(
             onAnalysisComplete = { }
@@ -491,14 +503,12 @@ fun RecordScreen(
                     Icon(Icons.Default.Refresh, contentDescription = "Switch Camera", tint = Color.White)
                 }
             } else {
-                Button(
-                    onClick = { startRecordingWithCountdown() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFB2C36)),
-                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
+                Text(
+                    text = "녹화를 준비 중입니다...",
+                    color = Color.White,
+                    fontSize = 16.sp,
                     modifier = Modifier.align(Alignment.Center)
-                ) {
-                    Text("따라하기", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-                }
+                )
             }
         }
     }
