@@ -208,7 +208,7 @@ fun SongPartSelectContent(
     onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
-    val screenBg = MaterialTheme.colorScheme.background
+    val screenBg = Color.Transparent
     val songCardBg = Color.White
 
     val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
@@ -354,15 +354,13 @@ fun PartCard(
                     Text(time, style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(
+                    OutlinedButton(
                         onClick = onPracticeClick,
                         modifier = Modifier.defaultMinSize(minHeight = 30.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         shape = MaterialTheme.shapes.small,
-                        colors = ButtonDefaults.buttonColors(
-                            containerColor = Color.White,
-                            contentColor = Color.Black
-                        )
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
                     ) {
                         Text(
                             text = "연습",
