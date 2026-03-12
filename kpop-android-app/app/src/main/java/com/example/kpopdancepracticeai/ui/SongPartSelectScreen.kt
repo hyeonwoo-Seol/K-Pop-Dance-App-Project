@@ -208,7 +208,7 @@ fun SongPartSelectContent(
     onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
-    val screenBg = Color(0xFFF8FAFC)
+    val screenBg = MaterialTheme.colorScheme.background
     val songCardBg = Color.White
 
     val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
@@ -359,8 +359,6 @@ fun PartCard(
                         modifier = Modifier.defaultMinSize(minHeight = 30.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         shape = MaterialTheme.shapes.small,
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33000000)),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = Color.White,
                             contentColor = Color.Black
@@ -378,9 +376,8 @@ fun PartCard(
                         modifier = Modifier.defaultMinSize(minHeight = 30.dp),
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
                         shape = MaterialTheme.shapes.small,
-                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 3.dp),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x33000000))
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
                     ) {
                         Text(
                             text = "동영상 업로드",
