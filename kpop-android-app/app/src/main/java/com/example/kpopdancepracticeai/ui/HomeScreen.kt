@@ -19,7 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
@@ -52,6 +54,8 @@ fun HomeScreen(
     }
 
     val layoutDirection = LocalLayoutDirection.current
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
@@ -100,7 +104,11 @@ fun HomeScreen(
                     ),
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                     keyboardActions = KeyboardActions(
-                        onSearch = { onSearch(searchText) }
+                        onSearch = {
+                            keyboardController?.hide()
+                            focusManager.clearFocus(force = true)
+                            onSearch(searchText)
+                        }
                     )
                 )
             }
