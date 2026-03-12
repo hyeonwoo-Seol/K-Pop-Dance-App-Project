@@ -378,14 +378,14 @@ fun RecordScreen(
         }
     }
 
-    LaunchedEffect(hasPermissions, videoCaptureState.value) {
-        if (
-            hasPermissions &&
-            videoCaptureState.value != null &&
-            !hasTriggeredAutoRecording &&
-            !isRecording &&
-            !isCountdownVisible
-        ) {
+    LaunchedEffect(hasPermissions) {
+        if (!hasPermissions || hasTriggeredAutoRecording) return@LaunchedEffect
+
+        while (videoCaptureState.value == null && !hasTriggeredAutoRecording) {
+            delay(100)
+        }
+
+        if (!hasTriggeredAutoRecording && !isRecording && !isCountdownVisible) {
             hasTriggeredAutoRecording = true
             startRecordingWithCountdown()
         }
@@ -502,13 +502,6 @@ fun RecordScreen(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = "Switch Camera", tint = Color.White)
                 }
-            } else {
-                Text(
-                    text = "녹화를 준비 중입니다...",
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    modifier = Modifier.align(Alignment.Center)
-                )
             }
         }
     }
