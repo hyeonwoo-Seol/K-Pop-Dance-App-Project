@@ -7,9 +7,19 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
@@ -97,61 +107,144 @@ fun ProfileScreen(
             )
         }
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
-
-        when (selectedTab) {
-            "통계" -> {
-                item { StatisticsRow(userStats = userStats) }
-                item { AchievementsSummaryCard(achievements = achievements, topPracticedChoreos = topPracticedChoreos) }
-                item { AcquiredBadgesCard(badges = badges) }
-            }
-            "업적" -> {
-                item {
-                    Text(
-                        text = "업적 및 성과",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    )
-                }
-                if (achievements.isEmpty()) {
-                    item {
-                        Text(
-                            "아직 진행중인 업적이 없습니다.",
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
-                            textAlign = TextAlign.Center,
-                            color = Color.Gray
-                        )
-                    }
-                } else {
-                    items(achievements) { item ->
-                        AchievementCard(
-                            title = item.title,
-                            description = item.description,
-                            progressDetail = item.progressText,
-                            progress = item.progress,
-                            progressText = "${(item.progress * 100).toInt()}%"
-                        )
-                    }
-                }
-            }
-            "설정" -> {
-                item {
-                    SettingsContent(
-                        onNavigateToProfileEdit,
-                        onNavigateToPracticeSettings,
-                        onNavigateToNotificationSettings,
-                        onNavigateToPrivacySettings,
-                        onNavigateToAppInfo,
-                        onNavigateToWithdrawal,
-                        onSyncClick = { viewModel.refreshData() },
-                        isSyncing = isSyncing
-                    )
-                }
-            }
+        item {
+            ProfileTabContent(
+                selectedTab = selectedTab,
+                userStats = userStats,
+                achievements = achievements,
+                badges = badges,
+                topPracticedChoreos = topPracticedChoreos,
+                onNavigateToProfileEdit = onNavigateToProfileEdit,
+                onNavigateToPracticeSettings = onNavigateToPracticeSettings,
+                onNavigateToNotificationSettings = onNavigateToNotificationSettings,
+                onNavigateToPrivacySettings = onNavigateToPrivacySettings,
+                onNavigateToAppInfo = onNavigateToAppInfo,
+                onNavigateToWithdrawal = onNavigateToWithdrawal,
+                isSyncing = isSyncing,
+                onSyncClick = { viewModel.refreshData() }
+            )
         }
         item { Spacer(modifier = Modifier.height(16.dp)) }
     }
+}
+
+@Composable
+private fun ProfileTabContent(
+    selectedTab: String,
+    userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
+    achievements: List<AchievementUiModel>,
+    badges: List<BadgeUiModel>,
+    topPracticedChoreos: List<TopPracticedChoreoUiModel>,
+    onNavigateToProfileEdit: () -> Unit,
+    onNavigateToPracticeSettings: () -> Unit,
+    onNavigateToNotificationSettings: () -> Unit,
+    onNavigateToPrivacySettings: () -> Unit,
+    onNavigateToAppInfo: () -> Unit,
+    onNavigateToWithdrawal: () -> Unit,
+    isSyncing: Boolean,
+    onSyncClick: () -> Unit
+) {
+    AnimatedContent(
+        targetState = selectedTab,
+        transitionSpec = {
+            (fadeIn(animationSpec = tween(180)) +
+                slideInVertically(animationSpec = tween(220), initialOffsetY = { it / 4 })) togetherWith
+                (fadeOut(animationSpec = tween(120)) +
+                    slideOutVertically(animationSpec = tween(120), targetOffsetY = { -it / 8 }))
+        },
+        label = "profileTabContentAnimation"
+    ) { tab ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when (tab) {
+                "통계" -> {
+                    AnimatedTabEntry(index = 0) { StatisticsRow(userStats = userStats) }
+                    AnimatedTabEntry(index = 1) {
+                        AchievementsSummaryCard(
+                            achievements = achievements,
+                            topPracticedChoreos = topPracticedChoreos
+                        )
+                    }
+                    AnimatedTabEntry(index = 2) { AcquiredBadgesCard(badges = badges) }
+                }
+
+                "업적" -> {
+                    AnimatedTabEntry(index = 0) {
+                        Text(
+                            text = "업적 및 성과",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        )
+                    }
+                    if (achievements.isEmpty()) {
+                        AnimatedTabEntry(index = 1) {
+                            Text(
+                                "아직 진행중인 업적이 없습니다.",
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                textAlign = TextAlign.Center,
+                                color = Color.Gray
+                            )
+                        }
+                    } else {
+                        achievements.forEachIndexed { index, item ->
+                            AnimatedTabEntry(index = index + 1) {
+                                AchievementCard(
+                                    title = item.title,
+                                    description = item.description,
+                                    progressDetail = item.progressText,
+                                    progress = item.progress,
+                                    progressText = "${(item.progress * 100).toInt()}%"
+                                )
+                            }
+                        }
+                    }
+                }
+
+                "설정" -> {
+                    AnimatedTabEntry(index = 0) {
+                        SettingsContent(
+                            onNavigateToProfileEdit,
+                            onNavigateToPracticeSettings,
+                            onNavigateToNotificationSettings,
+                            onNavigateToPrivacySettings,
+                            onNavigateToAppInfo,
+                            onNavigateToWithdrawal,
+                            onSyncClick = onSyncClick,
+                            isSyncing = isSyncing
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedTabEntry(
+    index: Int,
+    content: @Composable () -> Unit
+) {
+    val delay = (index * 35).coerceAtMost(180)
+    AnimatedVisibility(
+        visible = true,
+        enter = tabEnterTransition(delay),
+        exit = ExitTransition.None,
+        label = "profileTabEntryAnimation"
+    ) {
+        content()
+    }
+}
+
+private fun tabEnterTransition(delay: Int): EnterTransition {
+    return fadeIn(animationSpec = tween(durationMillis = 170, delayMillis = delay)) +
+        slideInVertically(
+            animationSpec = tween(durationMillis = 230, delayMillis = delay),
+            initialOffsetY = { it / 3 }
+        )
 }
 
 @Composable
