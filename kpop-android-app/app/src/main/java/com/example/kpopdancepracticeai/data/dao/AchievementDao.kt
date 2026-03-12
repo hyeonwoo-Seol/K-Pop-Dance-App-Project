@@ -13,11 +13,36 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface AchievementDao {
     // 사용자의 모든 업적 진행도 조회
-    @Query("SELECT * FROM user_achievement_progress WHERE user_uuid = :userId")
+    @Query(
+        """
+        SELECT
+            MIN(progress_id) AS progress_id,
+            user_uuid,
+            achievement_code,
+            MAX(current_step) AS current_step,
+            MAX(goal_step) AS goal_step,
+            MAX(is_completed) AS is_completed,
+            MAX(achieved_date) AS achieved_date
+        FROM user_achievement_progress
+        WHERE user_uuid = :userId
+        GROUP BY user_uuid, achievement_code
+        """
+    )
     fun getUserAchievementProgress(userId: String): Flow<List<UserAchievementProgress>>
 
-    @Query("SELECT * FROM user_achievement_progress WHERE user_uuid = :userId AND achievement_code = :code LIMIT 1")
+    @Query(
+        """
+        SELECT *
+        FROM user_achievement_progress
+        WHERE user_uuid = :userId AND achievement_code = :code
+        ORDER BY is_completed DESC, current_step DESC, progress_id DESC
+        LIMIT 1
+        """
+    )
     suspend fun getUserAchievementProgressOneShot(userId: String, code: String): UserAchievementProgress?
+
+    @Query("SELECT COUNT(*) FROM user_achievement_progress WHERE user_uuid = :userId")
+    suspend fun getUserAchievementProgressCount(userId: String): Int
 
     @Query("SELECT * FROM achievements WHERE id = :code LIMIT 1")
     suspend fun getAchievementByCode(code: String): Achievement?
