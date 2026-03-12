@@ -32,6 +32,7 @@ import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
+import java.util.Locale
 
 @Composable
 fun SongPartSelectScreen(
@@ -200,6 +201,9 @@ fun SongPartSelectContent(
     onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
+    val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
+    val songArtist = currentSong?.artistKr?.ifBlank { currentSong.artistEn }.orEmpty()
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -218,8 +222,8 @@ fun SongPartSelectContent(
                     shape = MaterialTheme.shapes.medium
                 ) {
                     Column(modifier = Modifier.padding(16.dp)) {
-                        Text(currentSong.titleKr, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(currentSong.artistKr, style = MaterialTheme.typography.bodyMedium)
+                        Text(songTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(songArtist, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
             }
@@ -230,15 +234,15 @@ fun SongPartSelectContent(
                 } else {
                     items(dbParts) { part ->
                         PartCard(
-                            title = part.partName,
-                            time = "${part.startTimeMs/1000}초 - ${part.endTimeMs/1000}초",
+                            title = "Part ${part.partNumber}: ${part.partName}",
+                            time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
                             onPracticeClick = {
                                 onNavigateToPractice(
                                     currentSong?.songId ?: 0L,
-                                    currentSong?.titleKr ?: "",
-                                    "${currentSong?.artistKr} · ${part.partName}",
-                                    "Normal",
-                                    "${(part.endTimeMs - part.startTimeMs)/1000}s",
+                                    songTitle,
+                                    "$songArtist · ${part.partName}",
+                                    currentSong?.difficulty.orEmpty(),
+                                    "${(part.endTimeMs - part.startTimeMs).toTimeLabel()}",
                                     part.videoUrl ?: "" // 💡 [오류 해결] 값이 비어있을 경우 안전하게 넘기도록 처리
                                 )
                             },
@@ -272,15 +276,22 @@ fun PartCard(
                 Text(time, style = MaterialTheme.typography.bodySmall)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onUploadClick) {
-                    Text("동영상 업로드")
-                }
                 Button(onClick = onPracticeClick) {
                     Text("연습")
+                }
+                OutlinedButton(onClick = onUploadClick) {
+                    Text("동영상 업로드")
                 }
             }
         }
     }
+}
+
+private fun Long.toTimeLabel(): String {
+    val totalSeconds = this / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 }
 
 @Preview(showBackground = true)
