@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
@@ -28,6 +32,8 @@ import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.util.FilenameParser
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import java.io.File
@@ -205,9 +211,11 @@ fun SongPartSelectContent(
     val songArtist = currentSong?.artistKr?.ifBlank { currentSong.artistEn }.orEmpty()
 
     Scaffold(
+        containerColor = Color(0xFFF8FAFC),
         topBar = {
             TopAppBar(
                 title = { Text("파트 선택") },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8FAFC)),
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -225,7 +233,10 @@ fun SongPartSelectContent(
         ) {
             if (currentSong != null) {
                 item {
-                    ElevatedCard {
+                    Card(
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
+                    ) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -233,27 +244,44 @@ fun SongPartSelectContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Surface(
-                                shape = MaterialTheme.shapes.medium,
-                                color = MaterialTheme.colorScheme.secondaryContainer,
-                                modifier = Modifier.size(64.dp)
-                            ) {
-                                Box(contentAlignment = Alignment.Center) {
+                            val coverUrl = currentSong.coverUrl.orEmpty()
+                            if (coverUrl.isNotBlank()) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(coverUrl)
+                                        .crossfade(true)
+                                        .build(),
+                                    contentDescription = "${songTitle} cover",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(MaterialTheme.shapes.medium)
+                                )
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .size(72.dp)
+                                        .clip(MaterialTheme.shapes.medium)
+                                        .background(Color(0xFFE2E8F0)),
+                                    contentAlignment = Alignment.Center
+                                ) {
                                     Text("🎵", style = MaterialTheme.typography.headlineSmall)
                                 }
                             }
+
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
                                     text = songTitle,
                                     style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF1E293B)
                                 )
-                                Text(text = songArtist, style = MaterialTheme.typography.bodyMedium)
+                                Text(
+                                    text = songArtist,
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFF475569)
+                                )
                             }
-                            AssistChip(
-                                onClick = {},
-                                label = { Text(currentSong.difficulty.ifBlank { "난이도 미정" }) }
-                            )
                         }
                     }
                 }
@@ -273,8 +301,6 @@ fun SongPartSelectContent(
                     PartCard(
                         title = "Part ${part.partNumber}: ${part.partName}",
                         time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
-                        duration = (part.endTimeMs - part.startTimeMs).toTimeLabel(),
-                        difficulty = currentSong?.difficulty.orEmpty(),
                         onPracticeClick = {
                             onNavigateToPractice(
                                 currentSong?.songId ?: 0L,
@@ -297,12 +323,14 @@ fun SongPartSelectContent(
 fun PartCard(
     title: String,
     time: String,
-    duration: String,
-    difficulty: String,
     onPracticeClick: () -> Unit,
     onUploadClick: () -> Unit
 ) {
-    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -322,15 +350,15 @@ fun PartCard(
                     Text(time, style = MaterialTheme.typography.bodyMedium)
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = onPracticeClick) { Text("연습") }
-                    OutlinedButton(onClick = onUploadClick) { Text("동영상 업로드") }
-                }
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                AssistChip(onClick = {}, label = { Text("길이 $duration") })
-                if (difficulty.isNotBlank()) {
-                    AssistChip(onClick = {}, label = { Text(difficulty) })
+                    Button(
+                        onClick = onPracticeClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED), contentColor = Color.White)
+                    ) { Text("연습") }
+                    OutlinedButton(
+                        onClick = onUploadClick,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF7C3AED)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7C3AED))
+                    ) { Text("동영상 업로드") }
                 }
             }
         }
