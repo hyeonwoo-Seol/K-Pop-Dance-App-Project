@@ -17,11 +17,6 @@ data class RecentChoreoRow(
     val coverUrl: String?
 )
 
-data class TopPracticedChoreoRow(
-    val titleKr: String,
-    val totalPracticeCount: Int
-)
-
 @Dao
 interface UserChoreoStatsDao {
 
@@ -52,18 +47,4 @@ interface UserChoreoStatsDao {
     )
     fun getRecentChoreoRows(userId: String): Flow<List<RecentChoreoRow>>
 
-    @Query(
-        """
-        SELECT
-            s.title_kr AS titleKr,
-            SUM(u.practice_count) AS totalPracticeCount
-        FROM user_choreo_stats u
-        INNER JOIN songs s ON s.song_id = u.song_id
-        WHERE u.user_uuid = :userId
-        GROUP BY s.song_id, s.title_kr
-        ORDER BY totalPracticeCount DESC, s.title_kr ASC
-        LIMIT 3
-        """
-    )
-    fun getTopPracticedChoreoRows(userId: String): Flow<List<TopPracticedChoreoRow>>
 }

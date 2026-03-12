@@ -37,6 +37,7 @@ import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
 import com.example.kpopdancepracticeai.viewmodel.BadgeUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.viewmodel.TopPracticedChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
 val BorderLight = Color(0xFFE0E0E0)
@@ -365,7 +366,7 @@ fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
 @Composable
 fun AchievementsSummaryCard(
     achievements: List<AchievementUiModel>,
-    topPracticedChoreos: List<String>
+    topPracticedChoreos: List<TopPracticedChoreoUiModel>
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -391,16 +392,16 @@ fun AchievementsSummaryCard(
 }
 
 @Composable
-private fun TopPracticedChoreosSection(topPracticedChoreos: List<String>) {
+private fun TopPracticedChoreosSection(topPracticedChoreos: List<TopPracticedChoreoUiModel>) {
     Text("가장 많이 연습한 안무 TOP 3", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
     if (topPracticedChoreos.isEmpty()) {
         Text("아직 연습 기록이 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
         return
     }
 
-    topPracticedChoreos.forEachIndexed { index, title ->
+    topPracticedChoreos.forEachIndexed { index, choreo ->
         Text(
-            text = "${index + 1}. $title",
+            text = "${index + 1}. ${choreo.title} (${choreo.artist}) - ${choreo.partName}",
             style = MaterialTheme.typography.bodyMedium,
             color = Color.DarkGray
         )
