@@ -79,6 +79,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _recentChoreo = MutableStateFlow<List<RecentChoreoUiModel>>(emptyList())
     val recentChoreo: StateFlow<List<RecentChoreoUiModel>> = _recentChoreo.asStateFlow()
 
+    private val _topPracticedChoreos = MutableStateFlow<List<String>>(emptyList())
+    val topPracticedChoreos: StateFlow<List<String>> = _topPracticedChoreos.asStateFlow()
+
     // --- 계산된 레벨 및 경험치 정보 ---
     val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
         if (stats == null) Pair(1, Pair(0L, 1000L))
@@ -153,6 +156,11 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                                 lastPracticedAt = row.lastPracticedAt
                             )
                         }
+                    }
+                }
+                launch {
+                    repository.getTopPracticedChoreoRows(userId).collect { rows ->
+                        _topPracticedChoreos.value = rows.map { it.titleKr }
                     }
                 }
 

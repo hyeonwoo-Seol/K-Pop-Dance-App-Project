@@ -305,6 +305,7 @@ class AppRepository(
     }
 
     fun getRecentChoreoRows(userId: String) = userChoreoStatsDao.getRecentChoreoRows(userId)
+    fun getTopPracticedChoreoRows(userId: String) = userChoreoStatsDao.getTopPracticedChoreoRows(userId)
 
     suspend fun markPracticePartCompleted(userId: String, songId: Long, partNumber: Int, artistName: String) {
         upsertLocalPracticeStats(userId, songId, partNumber)
