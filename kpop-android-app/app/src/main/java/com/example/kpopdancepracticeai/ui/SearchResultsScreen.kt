@@ -45,8 +45,7 @@ import com.example.kpopdancepracticeai.viewmodel.SearchFilters
 import com.example.kpopdancepracticeai.viewmodel.SearchUiState
 import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 
-@OptIn(ExperimentalAnimationApi::class)
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun SearchResultsScreen(
     query: String,
@@ -110,7 +109,7 @@ fun SearchResultsScreen(
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             state.songs.forEachIndexed { index, song ->
                                 AnimatedContent(
-                                    targetState = song.songId,
+                                    targetState = song,
                                     transitionSpec = {
                                         fadeIn(tween(240, delayMillis = index * 35)) +
                                             slideInVertically(
@@ -119,9 +118,9 @@ fun SearchResultsScreen(
                                             ) togetherWith fadeOut(tween(120))
                                     },
                                     label = "song_item_entrance"
-                                ) {
-                                    SearchSongItem(song = song) {
-                                        navController.navigate("songPartSelect/${song.songId}")
+                                ) { animatedSong ->
+                                    SearchSongItem(song = animatedSong) {
+                                        navController.navigate("songPartSelect/${animatedSong.songId}")
                                     }
                                 }
                             }
