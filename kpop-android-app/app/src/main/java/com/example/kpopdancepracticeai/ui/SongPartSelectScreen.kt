@@ -209,46 +209,84 @@ fun SongPartSelectContent(
             TopAppBar(
                 title = { Text("파트 선택") },
                 navigationIcon = {
-                    IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
+                    IconButton(onClick = onBackClick) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
                 }
             )
         }
     ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(innerPadding),
+            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
             if (currentSong != null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(songTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(songArtist, style = MaterialTheme.typography.bodyMedium)
+                item {
+                    ElevatedCard {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.secondaryContainer,
+                                modifier = Modifier.size(64.dp)
+                            ) {
+                                Box(contentAlignment = Alignment.Center) {
+                                    Text("🎵", style = MaterialTheme.typography.headlineSmall)
+                                }
+                            }
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = songTitle,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(text = songArtist, style = MaterialTheme.typography.bodyMedium)
+                            }
+                            AssistChip(
+                                onClick = {},
+                                label = { Text(currentSong.difficulty.ifBlank { "난이도 미정" }) }
+                            )
+                        }
                     }
+                }
+                item {
+                    Text(
+                        text = "연습할 파트를 선택하세요",
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                 }
             }
 
-            LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                if (dbParts.isEmpty()) {
-                    item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
-                } else {
-                    items(dbParts) { part ->
-                        PartCard(
-                            title = "Part ${part.partNumber}: ${part.partName}",
-                            time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
-                            onPracticeClick = {
-                                onNavigateToPractice(
-                                    currentSong?.songId ?: 0L,
-                                    songTitle,
-                                    "$songArtist · ${part.partName}",
-                                    currentSong?.difficulty.orEmpty(),
-                                    "${(part.endTimeMs - part.startTimeMs).toTimeLabel()}",
-                                    part.videoUrl ?: "" // 💡 [오류 해결] 값이 비어있을 경우 안전하게 넘기도록 처리
-                                )
-                            },
-                            onUploadClick = { onUploadClick(part) }
-                        )
-                    }
+            if (dbParts.isEmpty()) {
+                item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
+            } else {
+                items(dbParts) { part ->
+                    PartCard(
+                        title = "Part ${part.partNumber}: ${part.partName}",
+                        time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
+                        duration = (part.endTimeMs - part.startTimeMs).toTimeLabel(),
+                        difficulty = currentSong?.difficulty.orEmpty(),
+                        onPracticeClick = {
+                            onNavigateToPractice(
+                                currentSong?.songId ?: 0L,
+                                songTitle,
+                                "$songArtist · ${part.partName}",
+                                currentSong?.difficulty.orEmpty(),
+                                (part.endTimeMs - part.startTimeMs).toTimeLabel(),
+                                part.videoUrl.orEmpty()
+                            )
+                        },
+                        onUploadClick = { onUploadClick(part) }
+                    )
                 }
             }
         }
@@ -259,28 +297,40 @@ fun SongPartSelectContent(
 fun PartCard(
     title: String,
     time: String,
+    duration: String,
+    difficulty: String,
     onPracticeClick: () -> Unit,
     onUploadClick: () -> Unit
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+    ElevatedCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold)
-                Text(time, style = MaterialTheme.typography.bodySmall)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onPracticeClick) {
-                    Text("연습")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(time, style = MaterialTheme.typography.bodyMedium)
                 }
-                OutlinedButton(onClick = onUploadClick) {
-                    Text("동영상 업로드")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = onPracticeClick) { Text("연습") }
+                    OutlinedButton(onClick = onUploadClick) { Text("동영상 업로드") }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                AssistChip(onClick = {}, label = { Text("길이 $duration") })
+                if (difficulty.isNotBlank()) {
+                    AssistChip(onClick = {}, label = { Text(difficulty) })
                 }
             }
         }
@@ -288,7 +338,7 @@ fun PartCard(
 }
 
 private fun Long.toTimeLabel(): String {
-    val totalSeconds = this / 1000
+    val totalSeconds = (this / 1000).coerceAtLeast(0)
     val minutes = totalSeconds / 60
     val seconds = totalSeconds % 60
     return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
