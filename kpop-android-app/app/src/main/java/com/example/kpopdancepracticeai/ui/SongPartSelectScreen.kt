@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -210,113 +211,125 @@ fun SongPartSelectContent(
 ) {
     val screenBg = Color.Transparent
     val songCardBg = Color.White
+    val pageGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFC7D2FE),
+            Color(0xFFE0E7FF)
+        )
+    )
 
     val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
     val songArtist = currentSong?.artistKr?.ifBlank { currentSong.artistEn }.orEmpty()
 
-    Scaffold(
-        containerColor = screenBg,
-        topBar = {
-            TopAppBar(
-                title = { Text("파트 선택") },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = screenBg),
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(pageGradient)
+    ) {
+        Scaffold(
+            containerColor = screenBg,
+            topBar = {
+                TopAppBar(
+                    title = { Text("파트 선택") },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = screenBg),
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
-                }
-            )
-        }
-    ) { innerPadding ->
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            if (currentSong != null) {
-                item {
-                    Card(
-                        colors = CardDefaults.cardColors(containerColor = songCardBg),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x12000000))
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                )
+            }
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (currentSong != null) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = songCardBg),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x12000000))
                         ) {
-                            val coverUrl = currentSong.coverUrl.orEmpty()
-                            if (coverUrl.isNotBlank()) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(coverUrl)
-                                        .crossfade(true)
-                                        .build(),
-                                    contentDescription = "${songTitle} cover",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier
-                                        .size(72.dp)
-                                        .clip(MaterialTheme.shapes.medium)
-                                )
-                            } else {
-                                Box(
-                                    modifier = Modifier
-                                        .size(72.dp)
-                                        .clip(MaterialTheme.shapes.medium)
-                                        .background(Color(0xFFD0D2DB)),
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Text("🎵", style = MaterialTheme.typography.headlineSmall)
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                val coverUrl = currentSong.coverUrl.orEmpty()
+                                if (coverUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(coverUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "${songTitle} cover",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(MaterialTheme.shapes.medium)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(MaterialTheme.shapes.medium)
+                                            .background(Color(0xFFD0D2DB)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🎵", style = MaterialTheme.typography.headlineSmall)
+                                    }
                                 }
-                            }
 
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = songTitle,
-                                    style = MaterialTheme.typography.titleMedium,
-                                    fontWeight = FontWeight.Bold,
-                                    color = Color(0xFF1E293B)
-                                )
-                                Text(
-                                    text = songArtist,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    color = Color(0xFF475569)
-                                )
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = songTitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1E293B)
+                                    )
+                                    Text(
+                                        text = songArtist,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF475569)
+                                    )
+                                }
                             }
                         }
                     }
+                    item {
+                        Text(
+                            text = "연습할 파트를 선택하세요",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color(0xFF4A4E67)
+                        )
+                    }
                 }
-                item {
-                    Text(
-                        text = "연습할 파트를 선택하세요",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFF4A4E67)
-                    )
-                }
-            }
 
-            if (dbParts.isEmpty()) {
-                item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
-            } else {
-                items(dbParts) { part ->
-                    PartCard(
-                        title = "Part ${part.partNumber}: ${part.partName}",
-                        time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
-                        onPracticeClick = {
-                            onNavigateToPractice(
-                                currentSong?.songId ?: 0L,
-                                songTitle,
-                                "$songArtist · ${part.partName}",
-                                currentSong?.difficulty.orEmpty(),
-                                (part.endTimeMs - part.startTimeMs).toTimeLabel(),
-                                part.videoUrl.orEmpty()
-                            )
-                        },
-                        onUploadClick = { onUploadClick(part) }
-                    )
+                if (dbParts.isEmpty()) {
+                    item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
+                } else {
+                    items(dbParts) { part ->
+                        PartCard(
+                            title = "Part ${part.partNumber}: ${part.partName}",
+                            time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
+                            onPracticeClick = {
+                                onNavigateToPractice(
+                                    currentSong?.songId ?: 0L,
+                                    songTitle,
+                                    "$songArtist · ${part.partName}",
+                                    currentSong?.difficulty.orEmpty(),
+                                    (part.endTimeMs - part.startTimeMs).toTimeLabel(),
+                                    part.videoUrl.orEmpty()
+                                )
+                            },
+                            onUploadClick = { onUploadClick(part) }
+                        )
+                    }
                 }
             }
         }
