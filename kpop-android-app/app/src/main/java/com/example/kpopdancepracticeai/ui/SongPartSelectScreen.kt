@@ -19,6 +19,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -207,15 +208,18 @@ fun SongPartSelectContent(
     onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
+    val screenBg = Color(0xFFDCD3F5)
+    val songCardBg = Color(0xFFE7E7EC)
+
     val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
     val songArtist = currentSong?.artistKr?.ifBlank { currentSong.artistEn }.orEmpty()
 
     Scaffold(
-        containerColor = Color(0xFFF8FAFC),
+        containerColor = screenBg,
         topBar = {
             TopAppBar(
                 title = { Text("파트 선택") },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color(0xFFF8FAFC)),
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = screenBg),
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
@@ -234,8 +238,8 @@ fun SongPartSelectContent(
             if (currentSong != null) {
                 item {
                     Card(
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
+                        colors = CardDefaults.cardColors(containerColor = songCardBg),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x12000000))
                     ) {
                         Row(
                             modifier = Modifier
@@ -262,7 +266,7 @@ fun SongPartSelectContent(
                                     modifier = Modifier
                                         .size(72.dp)
                                         .clip(MaterialTheme.shapes.medium)
-                                        .background(Color(0xFFE2E8F0)),
+                                        .background(Color(0xFFD0D2DB)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text("🎵", style = MaterialTheme.typography.headlineSmall)
@@ -289,7 +293,7 @@ fun SongPartSelectContent(
                     Text(
                         text = "연습할 파트를 선택하세요",
                         style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        color = Color(0xFF4A4E67)
                     )
                 }
             }
@@ -328,8 +332,8 @@ fun PartCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF3F4F8)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1F000000))
     ) {
         Column(
             modifier = Modifier
@@ -352,13 +356,36 @@ fun PartCard(
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Button(
                         onClick = onPracticeClick,
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7C3AED), contentColor = Color.White)
-                    ) { Text("연습") }
+                        modifier = Modifier.defaultMinSize(minHeight = 30.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = MaterialTheme.shapes.small,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF8B5CF6),
+                            contentColor = Color.White
+                        )
+                    ) {
+                        Text(
+                            text = "연습",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                     OutlinedButton(
                         onClick = onUploadClick,
-                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF7C3AED)),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7C3AED))
-                    ) { Text("동영상 업로드") }
+                        modifier = Modifier.defaultMinSize(minHeight = 30.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = MaterialTheme.shapes.small,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color(0xFF8B5CF6)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF8B5CF6))
+                    ) {
+                        Text(
+                            text = "동영상 업로드",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
