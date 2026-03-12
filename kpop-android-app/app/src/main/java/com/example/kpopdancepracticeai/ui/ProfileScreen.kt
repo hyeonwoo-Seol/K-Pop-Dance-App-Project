@@ -3,9 +3,16 @@ package com.example.kpopdancepracticeai.ui
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -47,7 +54,7 @@ import com.example.kpopdancepracticeai.ui.theme.*
 val BorderLight = Color(0xFFE0E0E0)
 val TextGray = Color(0xFF757575)
 
-@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class, ExperimentalAnimationApi::class)
 @Composable
 fun ProfileScreen(
     paddingValues: PaddingValues,
@@ -106,7 +113,13 @@ fun ProfileScreen(
             AnimatedContent(
                 targetState = selectedTab,
                 transitionSpec = {
-                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
+                    (fadeIn(animationSpec = tween(260)) +
+                        slideInVertically(animationSpec = tween(260), initialOffsetY = { it / 8 }) +
+                        scaleIn(animationSpec = tween(260), initialScale = 0.98f)) togetherWith
+                        (fadeOut(animationSpec = tween(180)) +
+                            slideOutVertically(animationSpec = tween(180), targetOffsetY = { -it / 10 }) +
+                            scaleOut(animationSpec = tween(180), targetScale = 0.98f)) using
+                        SizeTransform(clip = false)
                 },
                 label = "profile_tab_transition"
             ) { tab ->
@@ -273,15 +286,22 @@ fun ProfileTabRow(selectedTab: String, onTabSelected: (String) -> Unit) {
     ) {
         listOf("통계", "업적", "설정").forEach { tabName ->
             val isSelected = selectedTab == tabName
+            val backgroundColor by animateColorAsState(
+                targetValue = if (isSelected) Color(0xFF4C5E8A) else Color.White,
+                animationSpec = tween(durationMillis = 220),
+                label = "profileTabBg"
+            )
+            val textColor by animateColorAsState(
+                targetValue = if (isSelected) Color.White else TextGray,
+                animationSpec = tween(durationMillis = 180),
+                label = "profileTabText"
+            )
             Box(
                 modifier = Modifier
                     .weight(1f)
                     .height(40.dp)
                     .shadow(2.dp, RoundedCornerShape(50.dp))
-                    .background(
-                        if (isSelected) Color(0xFF4C5E8A) else Color.White,
-                        RoundedCornerShape(50.dp)
-                    )
+                    .background(backgroundColor, RoundedCornerShape(50.dp))
                     .then(if (!isSelected) Modifier.border(1.dp, BorderLight, RoundedCornerShape(50.dp)) else Modifier)
                     .clip(RoundedCornerShape(50.dp))
                     .clickable { onTabSelected(tabName) },
@@ -292,7 +312,7 @@ fun ProfileTabRow(selectedTab: String, onTabSelected: (String) -> Unit) {
                     style = TextStyle(
                         fontSize = 14.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
-                        color = if (isSelected) Color.White else TextGray
+                        color = textColor
                     )
                 )
             }

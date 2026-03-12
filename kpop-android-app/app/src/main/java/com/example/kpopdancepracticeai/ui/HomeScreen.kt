@@ -20,6 +20,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -33,7 +35,9 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.animateDpAsState
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.data.entity.Song
@@ -257,18 +261,23 @@ fun SongCard(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
-        animationSpec = tween(durationMillis = 140),
+        targetValue = if (pressed) 0.93f else 1f,
+        animationSpec = spring(dampingRatio = 0.65f, stiffness = 420f),
         label = "songCardPress"
+    )
+    val pressElevation by animateDpAsState(
+        targetValue = if (pressed) 1.dp else 6.dp,
+        animationSpec = tween(durationMillis = 120),
+        label = "songCardPressElevation"
     )
 
     Column(
         modifier = Modifier
             .width(140.dp) // 카드 너비 조정
             .scale(scale)
+            .graphicsLayer { translationY = if (pressed) 6f else 0f }
             .clickable(
                 interactionSource = interactionSource,
-                indication = null,
                 onClick = onClick
             )
     ) {
@@ -277,6 +286,7 @@ fun SongCard(
             modifier = Modifier
                 .size(140.dp)
                 .clip(RoundedCornerShape(12.dp))
+                .shadow(pressElevation, RoundedCornerShape(12.dp))
                 .background(MaterialTheme.colorScheme.surfaceVariant), // 로딩 중 배경색
             contentAlignment = Alignment.Center
         ) {

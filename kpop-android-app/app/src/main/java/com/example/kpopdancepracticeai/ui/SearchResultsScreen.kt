@@ -14,14 +14,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.togetherWith
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Card
@@ -33,6 +33,9 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -44,6 +47,7 @@ import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.viewmodel.SearchFilters
 import com.example.kpopdancepracticeai.viewmodel.SearchUiState
 import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
+import kotlinx.coroutines.delay
 
 @OptIn(ExperimentalAnimationApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -108,19 +112,27 @@ fun SearchResultsScreen(
                     is SearchUiState.Success -> {
                         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             state.songs.forEachIndexed { index, song ->
-                                AnimatedContent(
-                                    targetState = song,
-                                    transitionSpec = {
-                                        fadeIn(tween(240, delayMillis = index * 35)) +
-                                            slideInVertically(
-                                                initialOffsetY = { it / 3 },
-                                                animationSpec = tween(240, delayMillis = index * 35)
-                                            ) togetherWith fadeOut(tween(120))
-                                    },
-                                    label = "song_item_entrance"
-                                ) { animatedSong ->
-                                    SearchSongItem(song = animatedSong) {
-                                        navController.navigate("songPartSelect/${animatedSong.songId}")
+                                var isVisible by remember(song.songId) { mutableStateOf(false) }
+
+                                LaunchedEffect(song.songId, text) {
+                                    isVisible = false
+                                    delay(index * 45L)
+                                    isVisible = true
+                                }
+
+                                AnimatedVisibility(
+                                    visible = isVisible,
+                                    enter = fadeIn(tween(280)) + slideInVertically(
+                                        initialOffsetY = { it / 2 },
+                                        animationSpec = tween(280)
+                                    ),
+                                    exit = fadeOut(tween(140)) + slideOutVertically(
+                                        targetOffsetY = { -it / 8 },
+                                        animationSpec = tween(140)
+                                    )
+                                ) {
+                                    SearchSongItem(song = song) {
+                                        navController.navigate("songPartSelect/${song.songId}")
                                     }
                                 }
                             }
