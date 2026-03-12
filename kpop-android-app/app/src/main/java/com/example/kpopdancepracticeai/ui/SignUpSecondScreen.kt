@@ -120,10 +120,17 @@ fun SignUpSecondScreen(
                                 var uid: String? = null
                                 var finalEmail = email
 
-                                // 1. 인증 처리 (구글 로그인 된 상태 vs 이메일 가입 필요)
-                                if (password == "GOOGLE_LOGIN") {
-                                    // 이미 Firebase 인증됨. 현재 유저 정보 가져오기
-                                    val currentUser = authRepository.getCurrentUser()
+                                // 1. 인증 처리
+                                // - GOOGLE_LOGIN: 이미 인증된 구글 유저
+                                // - 이메일 로그인 후 추가정보 진입: 이미 Firebase 인증된 유저일 수 있음
+                                // - 진짜 회원가입 플로우: Firebase 신규 가입 필요
+                                val currentUser = authRepository.getCurrentUser()
+                                val isAlreadyAuthenticatedEmailUser =
+                                    password != "GOOGLE_LOGIN" &&
+                                            currentUser?.email?.equals(email, ignoreCase = true) == true
+
+                                if (password == "GOOGLE_LOGIN" || isAlreadyAuthenticatedEmailUser) {
+                                    // 이미 Firebase 인증됨. 현재 유저 정보 사용
                                     uid = currentUser?.uid
                                     finalEmail = currentUser?.email ?: email
                                 } else {
