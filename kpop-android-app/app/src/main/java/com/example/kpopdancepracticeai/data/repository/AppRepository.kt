@@ -107,8 +107,12 @@ class AppRepository(
         achievementDao.insertLightSticks(RealDataSource.getRealLightSticks)
 
         // 4. 사용자별 업적 진행도 초기화
-        val initialAchievements = RealDataSource.getInitialAchievementProgress(userId)
-        achievementDao.insertProgress(initialAchievements)
+        // 기존 스키마에서는 progress_id(autoGenerate)가 PK라 동일 사용자/업적코드라도 중복 삽입될 수 있으므로,
+        // 최초 1회만 시드 데이터를 넣습니다.
+        if (achievementDao.getUserAchievementProgressCount(userId) == 0) {
+            val initialAchievements = RealDataSource.getInitialAchievementProgress(userId)
+            achievementDao.insertProgress(initialAchievements)
+        }
 
         // 5. 사용자별 배지 초기화
         if (existingStats == null) {
