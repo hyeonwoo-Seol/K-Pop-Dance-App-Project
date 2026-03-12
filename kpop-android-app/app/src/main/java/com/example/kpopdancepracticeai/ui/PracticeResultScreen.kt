@@ -18,6 +18,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -175,6 +178,20 @@ fun PracticeResultScreen(
     }
 
     // --- 3. UI 렌더링 ---
+    val animatedScore by animateIntAsState(
+        targetValue = totalScore,
+        animationSpec = tween(durationMillis = 1200),
+        label = "animated_total_score"
+    )
+    val chartProgress by animateFloatAsState(
+        targetValue = if (partScores.all { it == 0f }) 0f else 1f,
+        animationSpec = tween(durationMillis = 1000),
+        label = "chart_progress"
+    )
+    val animatedPartScores = remember(partScores, chartProgress) {
+        partScores.map { it * chartProgress }
+    }
+
     if (showOverlay && exoPlayer != null) {
         // [오버레이 영상 렌더링 화면]
         Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
@@ -266,7 +283,7 @@ fun PracticeResultScreen(
                         Text("평가 등급", style = TextStyle(fontSize = 14.sp, color = Color(0xff717182)))
                     }
                     ResultCard(modifier = Modifier.weight(1f), borderColor = Color(0xffe9d4ff)) {
-                        val displayScore = if (totalScore == 0 && !isPreview) 0 else totalScore
+                        val displayScore = if (totalScore == 0 && !isPreview) 0 else animatedScore
                         Text(text = "${displayScore}%", style = TextStyle(fontWeight = FontWeight.ExtraBold, fontSize = 42.sp), color = Color(0xff9810fa))
                         Text("전체 정확도", style = TextStyle(fontSize = 14.sp, color = Color(0xff717182)))
                         Spacer(modifier = Modifier.height(16.dp))
@@ -286,7 +303,7 @@ fun PracticeResultScreen(
                     Spacer(modifier = Modifier.height(32.dp))
 
                     Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                        PentagonRadarChart(scores = partScores, modifier = Modifier.size(200.dp))
+                        PentagonRadarChart(scores = animatedPartScores, modifier = Modifier.size(200.dp))
                     }
                     Spacer(modifier = Modifier.height(32.dp))
 
@@ -296,15 +313,15 @@ fun PracticeResultScreen(
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            StatItem("왼팔", "${partScores[4].toInt()}점", Color(0xff9810fa))
-                            StatItem("오른팔", "${partScores[1].toInt()}점", Color(0xff9810fa))
+                            StatItem("왼팔", "${animatedPartScores[4].toInt()}점", Color(0xff9810fa))
+                            StatItem("오른팔", "${animatedPartScores[1].toInt()}점", Color(0xff9810fa))
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                            StatItem("왼다리", "${partScores[3].toInt()}점", Color(0xff9810fa))
-                            StatItem("오른다리", "${partScores[2].toInt()}점", Color(0xff9810fa))
+                            StatItem("왼다리", "${animatedPartScores[3].toInt()}점", Color(0xff9810fa))
+                            StatItem("오른다리", "${animatedPartScores[2].toInt()}점", Color(0xff9810fa))
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
-                            StatItem("몸통", "${partScores[0].toInt()}점", Color(0xff9810fa))
+                            StatItem("몸통", "${animatedPartScores[0].toInt()}점", Color(0xff9810fa))
                         }
                     }
                 }

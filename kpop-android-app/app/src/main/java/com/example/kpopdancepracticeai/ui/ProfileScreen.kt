@@ -2,12 +2,16 @@ package com.example.kpopdancepracticeai.ui
 
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -98,55 +102,68 @@ fun ProfileScreen(
         }
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
 
-        when (selectedTab) {
-            "통계" -> {
-                item { StatisticsRow(userStats = userStats) }
-                item { AchievementsSummaryCard(achievements = achievements, topPracticedChoreos = topPracticedChoreos) }
-                item { AcquiredBadgesCard(badges = badges) }
-            }
-            "업적" -> {
-                item {
-                    Text(
-                        text = "업적 및 성과",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    )
-                }
-                if (achievements.isEmpty()) {
-                    item {
-                        Text(
-                            "아직 진행중인 업적이 없습니다.",
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
-                            textAlign = TextAlign.Center,
-                            color = Color.Gray
+        item {
+            AnimatedContent(
+                targetState = selectedTab,
+                transitionSpec = {
+                    fadeIn(animationSpec = tween(220)) togetherWith fadeOut(animationSpec = tween(180))
+                },
+                label = "profile_tab_transition"
+            ) { tab ->
+                when (tab) {
+                    "통계" -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            StatisticsRow(userStats = userStats)
+                            AchievementsSummaryCard(achievements = achievements, topPracticedChoreos = topPracticedChoreos)
+                            AcquiredBadgesCard(badges = badges)
+                        }
+                    }
+
+                    "업적" -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Text(
+                                text = "업적 및 성과",
+                                style = MaterialTheme.typography.headlineMedium,
+                                fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                            )
+
+                            if (achievements.isEmpty()) {
+                                Text(
+                                    "아직 진행중인 업적이 없습니다.",
+                                    modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                    textAlign = TextAlign.Center,
+                                    color = Color.Gray
+                                )
+                            } else {
+                                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    achievements.forEach { item ->
+                                        AchievementCard(
+                                            title = item.title,
+                                            description = item.description,
+                                            progressDetail = item.progressText,
+                                            progress = item.progress,
+                                            progressText = "${(item.progress * 100).toInt()}%"
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    else -> {
+                        SettingsContent(
+                            onNavigateToProfileEdit,
+                            onNavigateToPracticeSettings,
+                            onNavigateToNotificationSettings,
+                            onNavigateToPrivacySettings,
+                            onNavigateToAppInfo,
+                            onNavigateToWithdrawal,
+                            onSyncClick = { viewModel.refreshData() },
+                            isSyncing = isSyncing
                         )
                     }
-                } else {
-                    items(achievements) { item ->
-                        AchievementCard(
-                            title = item.title,
-                            description = item.description,
-                            progressDetail = item.progressText,
-                            progress = item.progress,
-                            progressText = "${(item.progress * 100).toInt()}%"
-                        )
-                    }
-                }
-            }
-            "설정" -> {
-                item {
-                    SettingsContent(
-                        onNavigateToProfileEdit,
-                        onNavigateToPracticeSettings,
-                        onNavigateToNotificationSettings,
-                        onNavigateToPrivacySettings,
-                        onNavigateToAppInfo,
-                        onNavigateToWithdrawal,
-                        onSyncClick = { viewModel.refreshData() },
-                        isSyncing = isSyncing
-                    )
                 }
             }
         }

@@ -13,8 +13,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SearchOff
 import androidx.compose.material3.Card
@@ -38,6 +45,7 @@ import com.example.kpopdancepracticeai.viewmodel.SearchFilters
 import com.example.kpopdancepracticeai.viewmodel.SearchUiState
 import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 
+@OptIn(ExperimentalAnimationApi::class)
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchResultsScreen(
@@ -89,15 +97,35 @@ fun SearchResultsScreen(
             )
         }
 
-        when (val state = uiState) {
-            SearchUiState.Idle -> item { Spacer(modifier = Modifier.height(8.dp)) }
-            SearchUiState.Empty -> item {
-                EmptySearchResult()
-            }
-            is SearchUiState.Success -> {
-                items(state.songs, key = { it.songId }) { song ->
-                    SearchSongItem(song = song) {
-                        navController.navigate("songPartSelect/${song.songId}")
+        item {
+            Crossfade(
+                targetState = uiState,
+                animationSpec = tween(durationMillis = 300),
+                label = "search_result_state"
+            ) { state ->
+                when (state) {
+                    SearchUiState.Idle -> Spacer(modifier = Modifier.height(8.dp))
+                    SearchUiState.Empty -> EmptySearchResult()
+                    is SearchUiState.Success -> {
+                        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                            state.songs.forEachIndexed { index, song ->
+                                AnimatedContent(
+                                    targetState = song.songId,
+                                    transitionSpec = {
+                                        fadeIn(tween(240, delayMillis = index * 35)) +
+                                            slideInVertically(
+                                                initialOffsetY = { it / 3 },
+                                                animationSpec = tween(240, delayMillis = index * 35)
+                                            ) togetherWith fadeOut(tween(120))
+                                    },
+                                    label = "song_item_entrance"
+                                ) {
+                                    SearchSongItem(song = song) {
+                                        navController.navigate("songPartSelect/${song.songId}")
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
