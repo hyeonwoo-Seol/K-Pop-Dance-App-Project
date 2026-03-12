@@ -120,7 +120,13 @@ fun AnalysisScreen(
 
             // [수정] 실제 데이터 전달
             item { StatisticsOverviewSection(uiState) }
-            item { GrowthGraphSection(uiState) }
+            item {
+                GrowthGraphSection(
+                    uiState = uiState,
+                    onSelectChoreo = viewModel::selectChoreoFilter,
+                    onRangeChange = viewModel::updateTrendRange
+                )
+            }
         }
     }
 }
@@ -214,11 +220,16 @@ fun StatInfoCard(
 }
 
 @Composable
-fun GrowthGraphSection(uiState: AnalysisViewModel.StatisticsUiState) {
+fun GrowthGraphSection(
+    uiState: AnalysisViewModel.StatisticsUiState,
+    onSelectChoreo: (String) -> Unit,
+    onRangeChange: (AnalysisViewModel.TrendRange) -> Unit
+) {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         SectionTitle(title = "성장 그래프")
         HeatmapCard(uiState.heatmapData)
         AccuracyTrendCard(uiState.graphData, uiState.graphLabels)
+        ChoreoInsightCard(uiState, onSelectChoreo, onRangeChange)
         // SongMasteryCard는 데이터가 있으면 표시
         if (uiState.graphData.isNotEmpty()) {
             SongMasteryCard(uiState.graphData, uiState.graphLabels)
@@ -298,6 +309,113 @@ fun AccuracyTrendCard(dataPoints: List<Float>, labels: List<String>) {
                 Text("아직 데이터가 충분하지 않습니다.", color = TextGray, fontSize = 12.sp)
             }
         }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ChoreoInsightCard(
+    uiState: AnalysisViewModel.StatisticsUiState,
+    onSelectChoreo: (String) -> Unit,
+    onRangeChange: (AnalysisViewModel.TrendRange) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    val selectedOption = uiState.choreoOptions.firstOrNull { it.key == uiState.selectedChoreoKey }
+
+    CardContainer {
+        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("안무별 상세 통계", style = TextStyle(fontWeight = FontWeight(500), fontSize = 16.sp), color = TextDark)
+
+            ExposedDropdownMenuBox(
+                expanded = expanded,
+                onExpandedChange = { expanded = !expanded }
+            ) {
+                OutlinedTextField(
+                    value = selectedOption?.label ?: "안무를 선택하세요",
+                    onValueChange = {},
+                    readOnly = true,
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth(),
+                    trailingIcon = {
+                        Icon(Icons.Default.ArrowDropDown, contentDescription = "안무 선택")
+                    }
+                )
+
+                ExposedDropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false }
+                ) {
+                    uiState.choreoOptions.forEach { option ->
+                        DropdownMenuItem(
+                            text = { Text(option.label) },
+                            onClick = {
+                                onSelectChoreo(option.key)
+                                expanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterToggleButton(
+                    text = "최근 7일",
+                    isSelected = uiState.selectedRange == AnalysisViewModel.TrendRange.RECENT_7_DAYS,
+                    onClick = { onRangeChange(AnalysisViewModel.TrendRange.RECENT_7_DAYS) }
+                )
+                FilterToggleButton(
+                    text = "전체(1달)",
+                    isSelected = uiState.selectedRange == AnalysisViewModel.TrendRange.FULL_1_MONTH,
+                    onClick = { onRangeChange(AnalysisViewModel.TrendRange.FULL_1_MONTH) }
+                )
+            }
+
+            if (uiState.filteredTrendData.isNotEmpty()) {
+                SimpleLineChart(uiState.filteredTrendData, uiState.filteredTrendLabels, PointBlue, 0.0f)
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                InsightStat("최고 등급", uiState.bestGrade)
+                InsightStat("연습 횟수", "${uiState.filteredPracticeCount}회")
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("누적 worst points TOP 3", color = TextGray, fontSize = 13.sp)
+                if (uiState.topWorstPoints.isEmpty()) {
+                    Text("데이터가 없습니다.", color = TextLightGray, fontSize = 12.sp)
+                } else {
+                    uiState.topWorstPoints.forEachIndexed { index, pair ->
+                        Text("${index + 1}. ${pair.first} (${pair.second}회)", color = TextDark, fontSize = 13.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun FilterToggleButton(text: String, isSelected: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) PointBlue else Color(0xffe2e8f0),
+            contentColor = if (isSelected) Color.White else Color(0xff314158)
+        ),
+        contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+    ) {
+        Text(text = text, fontSize = 13.sp)
+    }
+}
+
+@Composable
+fun InsightStat(label: String, value: String) {
+    Column(horizontalAlignment = Alignment.Start) {
+        Text(label, color = TextGray, fontSize = 12.sp)
+        Text(value, color = TextDark, fontSize = 18.sp, fontWeight = FontWeight.Bold)
     }
 }
 

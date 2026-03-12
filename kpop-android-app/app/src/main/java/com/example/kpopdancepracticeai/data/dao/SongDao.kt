@@ -24,6 +24,9 @@ interface SongDao {
     @Query("SELECT * FROM song_parts WHERE song_id = :songId ORDER BY part_id ASC")
     fun getPartsBySongId(songId: Long): Flow<List<SongPart>>
 
+    @Query("SELECT * FROM song_parts WHERE part_id IN (:partIds)")
+    suspend fun getSongPartsByPartIds(partIds: List<Long>): List<SongPart>
+
     // 검색 쿼리 강화: 한국어/영어 제목 및 아티스트 모두 검색
     @Query("""
         SELECT * FROM songs 
