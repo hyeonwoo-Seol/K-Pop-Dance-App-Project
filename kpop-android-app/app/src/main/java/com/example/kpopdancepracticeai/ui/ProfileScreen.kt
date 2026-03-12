@@ -13,6 +13,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -53,6 +55,18 @@ import com.example.kpopdancepracticeai.ui.theme.*
 val BorderLight = Color(0xFFE0E0E0)
 val TextGray = Color(0xFF757575)
 
+private data class ProfileTabAnimationSpec(
+    val contentEnterDurationMs: Int = 250,
+    val contentExitDurationMs: Int = 180,
+    val itemFadeDurationMs: Int = 210,
+    val itemSlideDurationMs: Int = 280,
+    val itemStaggerDelayMs: Int = 55,
+    val maxItemDelayMs: Int = 260,
+    val enterOffsetDivisor: Int = 5,
+    val exitOffsetDivisor: Int = 12,
+    val itemOffsetDivisor: Int = 4
+)
+
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -90,6 +104,7 @@ fun ProfileScreen(
     }
 
     var selectedTab by rememberSaveable { mutableStateOf("통계") }
+    val animationSpec = remember { ProfileTabAnimationSpec() }
 
     LazyColumn(
         modifier = Modifier
@@ -121,7 +136,8 @@ fun ProfileScreen(
                 onNavigateToAppInfo = onNavigateToAppInfo,
                 onNavigateToWithdrawal = onNavigateToWithdrawal,
                 isSyncing = isSyncing,
-                onSyncClick = { viewModel.refreshData() }
+                onSyncClick = { viewModel.refreshData() },
+                animationSpec = animationSpec
             )
         }
         item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -142,15 +158,38 @@ private fun ProfileTabContent(
     onNavigateToAppInfo: () -> Unit,
     onNavigateToWithdrawal: () -> Unit,
     isSyncing: Boolean,
-    onSyncClick: () -> Unit
+    onSyncClick: () -> Unit,
+    animationSpec: ProfileTabAnimationSpec
 ) {
     AnimatedContent(
         targetState = selectedTab,
         transitionSpec = {
-            (fadeIn(animationSpec = tween(180)) +
-                slideInVertically(animationSpec = tween(220), initialOffsetY = { it / 4 })) togetherWith
-                (fadeOut(animationSpec = tween(120)) +
-                    slideOutVertically(animationSpec = tween(120), targetOffsetY = { -it / 8 }))
+            (fadeIn(
+                animationSpec = tween(
+                    durationMillis = animationSpec.contentEnterDurationMs,
+                    easing = LinearOutSlowInEasing
+                )
+            ) +
+                slideInVertically(
+                    animationSpec = tween(
+                        durationMillis = animationSpec.contentEnterDurationMs,
+                        easing = FastOutSlowInEasing
+                    ),
+                    initialOffsetY = { it / animationSpec.enterOffsetDivisor }
+                )) togetherWith
+                (fadeOut(
+                    animationSpec = tween(
+                        durationMillis = animationSpec.contentExitDurationMs,
+                        easing = FastOutSlowInEasing
+                    )
+                ) +
+                    slideOutVertically(
+                        animationSpec = tween(
+                            durationMillis = animationSpec.contentExitDurationMs,
+                            easing = FastOutSlowInEasing
+                        ),
+                        targetOffsetY = { -it / animationSpec.exitOffsetDivisor }
+                    ))
         },
         label = "profileTabContentAnimation"
     ) { tab ->
@@ -160,18 +199,18 @@ private fun ProfileTabContent(
         ) {
             when (tab) {
                 "통계" -> {
-                    AnimatedTabEntry(index = 0) { StatisticsRow(userStats = userStats) }
-                    AnimatedTabEntry(index = 1) {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec) { StatisticsRow(userStats = userStats) }
+                    AnimatedTabEntry(index = 1, animationSpec = animationSpec) {
                         AchievementsSummaryCard(
                             achievements = achievements,
                             topPracticedChoreos = topPracticedChoreos
                         )
                     }
-                    AnimatedTabEntry(index = 2) { AcquiredBadgesCard(badges = badges) }
+                    AnimatedTabEntry(index = 2, animationSpec = animationSpec) { AcquiredBadgesCard(badges = badges) }
                 }
 
                 "업적" -> {
-                    AnimatedTabEntry(index = 0) {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec) {
                         Text(
                             text = "업적 및 성과",
                             style = MaterialTheme.typography.headlineMedium,
@@ -181,7 +220,7 @@ private fun ProfileTabContent(
                         )
                     }
                     if (achievements.isEmpty()) {
-                        AnimatedTabEntry(index = 1) {
+                        AnimatedTabEntry(index = 1, animationSpec = animationSpec) {
                             Text(
                                 "아직 진행중인 업적이 없습니다.",
                                 modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -191,7 +230,7 @@ private fun ProfileTabContent(
                         }
                     } else {
                         achievements.forEachIndexed { index, item ->
-                            AnimatedTabEntry(index = index + 1) {
+                            AnimatedTabEntry(index = index + 1, animationSpec = animationSpec) {
                                 AchievementCard(
                                     title = item.title,
                                     description = item.description,
@@ -205,7 +244,7 @@ private fun ProfileTabContent(
                 }
 
                 "설정" -> {
-                    AnimatedTabEntry(index = 0) {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec) {
                         SettingsContent(
                             onNavigateToProfileEdit,
                             onNavigateToPracticeSettings,
@@ -226,12 +265,13 @@ private fun ProfileTabContent(
 @Composable
 private fun AnimatedTabEntry(
     index: Int,
+    animationSpec: ProfileTabAnimationSpec,
     content: @Composable () -> Unit
 ) {
-    val delay = (index * 35).coerceAtMost(180)
+    val delay = (index * animationSpec.itemStaggerDelayMs).coerceAtMost(animationSpec.maxItemDelayMs)
     AnimatedVisibility(
         visible = true,
-        enter = tabEnterTransition(delay),
+        enter = tabEnterTransition(delay, animationSpec),
         exit = ExitTransition.None,
         label = "profileTabEntryAnimation"
     ) {
@@ -239,11 +279,24 @@ private fun AnimatedTabEntry(
     }
 }
 
-private fun tabEnterTransition(delay: Int): EnterTransition {
-    return fadeIn(animationSpec = tween(durationMillis = 170, delayMillis = delay)) +
+private fun tabEnterTransition(
+    delay: Int,
+    animationSpec: ProfileTabAnimationSpec
+): EnterTransition {
+    return fadeIn(
+        animationSpec = tween(
+            durationMillis = animationSpec.itemFadeDurationMs,
+            delayMillis = delay,
+            easing = LinearOutSlowInEasing
+        )
+    ) +
         slideInVertically(
-            animationSpec = tween(durationMillis = 230, delayMillis = delay),
-            initialOffsetY = { it / 3 }
+            animationSpec = tween(
+                durationMillis = animationSpec.itemSlideDurationMs,
+                delayMillis = delay,
+                easing = FastOutSlowInEasing
+            ),
+            initialOffsetY = { it / animationSpec.itemOffsetDivisor }
         )
 }
 
