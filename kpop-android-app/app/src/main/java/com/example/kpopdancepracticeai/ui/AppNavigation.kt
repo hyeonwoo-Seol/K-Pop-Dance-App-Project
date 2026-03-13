@@ -142,7 +142,11 @@ val bottomNavItems = listOf(
 
 // 프로필 > 설정 상세 화면 전환 속도(ms). 값이 클수록 느리고 부드럽게 전환됩니다.
 private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
-private const val MAIN_NAV_FADE_DURATION = 220
+
+// 메인 화면 전환 속도(ms).
+// 홈/검색/프로필 탭 이동 + 홈에서 안무(곡) 상세 화면으로 이동할 때 동일하게 적용됩니다.
+// 테스트하면서 이 값 하나만 조절하면 전환 속도를 함께 맞출 수 있습니다.
+private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 360
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
@@ -373,16 +377,16 @@ fun AppNavHost(
         startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
-            fadeIn(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+            fadeIn(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+            fadeOut(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+            fadeIn(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+            fadeOut(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
         }
     ) {
         composable(Screen.Login.route) {
