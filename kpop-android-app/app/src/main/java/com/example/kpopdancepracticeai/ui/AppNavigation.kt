@@ -655,6 +655,8 @@ fun AppNavHost(
         }
         composable(Screen.AnalysisLoading.route) {
             AnalysisWaitingScreen(
+                progress = 0f,
+                statusMessage = "분석 준비 중입니다...",
                 onAnalysisComplete = { }
             )
         }
