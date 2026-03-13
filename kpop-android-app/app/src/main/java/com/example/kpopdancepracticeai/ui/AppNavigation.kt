@@ -310,6 +310,10 @@ fun AppBottomNavigationBar(navController: NavController) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
+                            if (selected) {
+                                return@clickable
+                            }
+
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
