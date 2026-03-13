@@ -57,14 +57,14 @@ val TextGray = Color(0xFF757575)
 
 private data class ProfileTabAnimationSpec(
     val contentEnterDurationMs: Int = 250,
-    val contentExitDurationMs: Int = 180,
-    val itemFadeDurationMs: Int = 210,
-    val itemSlideDurationMs: Int = 280,
-    val itemStaggerDelayMs: Int = 55,
-    val maxItemDelayMs: Int = 260,
-    val enterOffsetDivisor: Int = 5,
-    val exitOffsetDivisor: Int = 12,
-    val itemOffsetDivisor: Int = 4
+    val contentExitDurationMs: Int = 250, // 전체 탭 전환 속도
+    val itemFadeDurationMs: Int = 200,  // 아이템 등장 속도
+    val itemSlideDurationMs: Int = 260, // 아이템 등장 속도
+    val itemStaggerDelayMs: Int = 55,  // 순차 등장 간격
+    val maxItemDelayMs: Int = 260,  // 순차 등장 간격
+    val enterOffsetDivisor: Int = 10, // 이동거리
+    val exitOffsetDivisor: Int = 20,
+    val itemOffsetDivisor: Int = 10
 )
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
