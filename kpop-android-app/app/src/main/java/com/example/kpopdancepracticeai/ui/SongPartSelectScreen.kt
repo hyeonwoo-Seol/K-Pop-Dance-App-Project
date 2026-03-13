@@ -45,6 +45,8 @@ fun SongPartSelectScreen(
     val scope = rememberCoroutineScope()
     val uploader = remember { PresignedUrlUploader(context) }
     var showAnalysisLoading by remember { mutableStateOf(false) }
+    var analysisProgress by remember { mutableStateOf(0f) }
+    var analysisStatusMessage by remember { mutableStateOf("업로드 준비 중...") }
 
     var selectedPartForUpload by remember { mutableStateOf<SongPart?>(null) }
 
@@ -70,19 +72,28 @@ fun SongPartSelectScreen(
             scope.launch {
                 Toast.makeText(context, "동영상 업로드 시작...", Toast.LENGTH_SHORT).show()
                 showAnalysisLoading = true
+                analysisProgress = 0f
+                analysisStatusMessage = "영상을 클라우드로 전송 중..."
                 uploader.uploadVideo(
                     fileUri = uri,
                     filename = filename,
+                    onUploadProgress = { uploadProgress ->
+                        analysisProgress = (uploadProgress * 0.7f).coerceIn(0f, 0.7f)
+                        analysisStatusMessage = "영상을 클라우드로 전송 중... ${(uploadProgress * 100).toInt()}%"
+                    },
                     onComplete = { s3Key ->
                         Log.d("SongPartSelect", "Upload Success Key: $s3Key")
                         Toast.makeText(context, "업로드 완료! 분석을 기다립니다...", Toast.LENGTH_SHORT).show()
+                        analysisProgress = 0.75f
+                        analysisStatusMessage = "서버에서 AI 분석 준비 중..."
 
                         scope.launch {
                             uploader.pollAnalysisResult(
                                 userId = userId,
                                 timestamp = timestamp,
                                 onProgress = { msg ->
-                                    Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                                    analysisStatusMessage = msg
+                                    analysisProgress = (analysisProgress + 0.03f).coerceAtMost(0.95f)
                                 },
                                 onComplete = { resultS3Key ->
                                     scope.launch {
@@ -115,6 +126,8 @@ fun SongPartSelectScreen(
                                             )
                                             viewModel.savePracticeResult(historyEntity)
 
+                                            analysisProgress = 1f
+                                            analysisStatusMessage = "분석 완료!"
                                             showAnalysisLoading = false
                                             Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
                                             onNavigateToResult(jsonFileName, uri.toString())
@@ -152,8 +165,8 @@ fun SongPartSelectScreen(
 
     if (showAnalysisLoading) {
         AnalysisWaitingScreen(
-            progress = 0.5f,
-            statusMessage = "AI가 분석 중입니다...",
+            progress = analysisProgress,
+            statusMessage = analysisStatusMessage,
             onAnalysisComplete = { }
         )
     } else {
