@@ -139,7 +139,8 @@ val bottomNavItems = listOf(
     Screen.Profile,
 )
 
-private const val SETTINGS_SCREEN_TRANSITION_DURATION = 280
+// 프로필 > 설정 상세 화면 전환 속도(ms). 값이 클수록 느리고 부드럽게 전환됩니다.
+private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 460
 private const val MAIN_NAV_FADE_DURATION = 220
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
@@ -517,7 +518,7 @@ fun AppNavHost(
                 if (initialState.isProfileRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             },
@@ -525,7 +526,7 @@ fun AppNavHost(
                 if (targetState.isProfileRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             }
@@ -542,7 +543,7 @@ fun AppNavHost(
                 if (initialState.isProfileRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             },
@@ -550,7 +551,7 @@ fun AppNavHost(
                 if (targetState.isProfileRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             }
@@ -563,7 +564,7 @@ fun AppNavHost(
                 if (initialState.isProfileRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             },
@@ -571,7 +572,7 @@ fun AppNavHost(
                 if (targetState.isProfileRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             }
@@ -584,7 +585,7 @@ fun AppNavHost(
                 if (initialState.isProfileRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             },
@@ -592,7 +593,7 @@ fun AppNavHost(
                 if (targetState.isProfileRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             }
@@ -606,7 +607,7 @@ fun AppNavHost(
                 if (initialState.isProfileRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             },
@@ -614,7 +615,7 @@ fun AppNavHost(
                 if (targetState.isProfileRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
                     )
                 } else null
             }
@@ -652,7 +653,25 @@ fun AppNavHost(
             )
         }
 
-        composable(Screen.Withdrawal.route) {
+        composable(
+            route = Screen.Withdrawal.route,
+            enterTransition = {
+                if (initialState.isProfileRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                    )
+                } else null
+            }
+        ) {
             WithdrawalScreen(
                 onBackClick = { navController.popBackStack() },
                 onWithdrawConfirm = {
