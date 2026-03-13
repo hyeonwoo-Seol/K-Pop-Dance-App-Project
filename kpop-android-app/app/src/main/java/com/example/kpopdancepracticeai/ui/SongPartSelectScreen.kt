@@ -7,6 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.MutableTransitionState
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -285,19 +286,6 @@ fun SongPartSelectContent(
         "0:00"
     }
     val animationSpec = remember { PartSelectAnimationSpec() }
-    val partAnimationKey = remember(dbParts) { dbParts.joinToString(separator = ",") { it.partId.toString() } }
-    var showPartItems by remember(currentSong?.songId) { mutableStateOf(false) }
-
-    LaunchedEffect(currentSong?.songId, partAnimationKey) {
-        if (dbParts.isEmpty()) {
-            showPartItems = false
-            return@LaunchedEffect
-        }
-
-        showPartItems = false
-        withFrameNanos { }
-        showPartItems = true
-    }
 
     Box(
         modifier = Modifier
@@ -353,11 +341,9 @@ fun SongPartSelectContent(
                     } else {
                         items(dbParts.size, key = { dbParts[it].partId }) { index ->
                             val part = dbParts[index]
-                            AnimatedVisibility(
-                                visible = showPartItems,
-                                enter = partEnterTransition(index = index, animationSpec = animationSpec),
-                                exit = ExitTransition.None,
-                                label = "partItemAnimation"
+                            AnimatedPartEntry(
+                                index = index,
+                                animationSpec = animationSpec
                             ) {
                                 PartCard(
                                     title = "Part ${part.partNumber}: ${part.partName}",
@@ -380,6 +366,27 @@ fun SongPartSelectContent(
                 }
             }
         }
+    }
+}
+
+
+@Composable
+private fun AnimatedPartEntry(
+    index: Int,
+    animationSpec: PartSelectAnimationSpec,
+    content: @Composable () -> Unit
+) {
+    val visibleState = remember {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = partEnterTransition(index = index, animationSpec = animationSpec),
+        exit = ExitTransition.None,
+        label = "partItemAnimation"
+    ) {
+        content()
     }
 }
 
