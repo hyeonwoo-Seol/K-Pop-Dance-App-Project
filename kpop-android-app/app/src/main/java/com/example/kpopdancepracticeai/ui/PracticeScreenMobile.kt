@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -77,6 +78,7 @@ fun PracticeScreenMobile(
     val context = LocalContext.current
     val settings by settingsViewModel.settings.collectAsStateWithLifecycle()
     var isPlaying by remember { mutableStateOf(false) }
+    var isMuted by remember { mutableStateOf(false) }
     var selectedSpeed by remember { mutableStateOf(1.0f) }
 
     LaunchedEffect(settings) {
@@ -131,6 +133,10 @@ fun PracticeScreenMobile(
 
     LaunchedEffect(selectedSpeed) {
         exoPlayer.setPlaybackSpeed(selectedSpeed)
+    }
+
+    LaunchedEffect(isMuted) {
+        exoPlayer.volume = if (isMuted) 0f else 1f
     }
 
     // 진행 바 업데이트 루프
@@ -229,7 +235,10 @@ fun PracticeScreenMobile(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RoundIconButton(icon = Icons.Default.CameraAlt, onClick = { /* TODO */ })
-                    RoundIconButton(icon = Icons.Default.VolumeUp, onClick = { /* TODO */ })
+                    RoundIconButton(
+                        icon = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                        onClick = { isMuted = !isMuted }
+                    )
                     RoundIconButton(icon = Icons.Default.Settings, onClick = onSettingsClick)
                 }
             }
