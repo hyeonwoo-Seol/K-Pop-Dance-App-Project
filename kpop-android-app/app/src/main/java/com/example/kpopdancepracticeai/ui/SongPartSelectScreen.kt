@@ -111,10 +111,10 @@ fun SongPartSelectScreen(
 
                         progressRampJob?.cancel()
                         progressRampJob = scope.launch {
-                            repeat(12) {
+                            repeat(24) {
                                 delay(1000)
                                 if (analysisProgress >= 0.92f) return@launch
-                                analysisProgress = (analysisProgress + 0.06f).coerceAtMost(0.92f)
+                                analysisProgress = (analysisProgress + 0.03f).coerceAtMost(0.92f)
                             }
                         }
 
