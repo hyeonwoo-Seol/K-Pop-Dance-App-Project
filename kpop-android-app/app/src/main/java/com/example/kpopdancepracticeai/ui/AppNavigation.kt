@@ -140,6 +140,7 @@ val bottomNavItems = listOf(
 )
 
 private const val SETTINGS_SCREEN_TRANSITION_DURATION = 280
+private const val MAIN_NAV_FADE_DURATION = 220
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
@@ -352,7 +353,19 @@ fun AppNavHost(
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = {
+            fadeIn(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+        },
+        exitTransition = {
+            fadeOut(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+        },
+        popEnterTransition = {
+            fadeIn(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+        },
+        popExitTransition = {
+            fadeOut(animationSpec = tween(MAIN_NAV_FADE_DURATION))
+        }
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
