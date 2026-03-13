@@ -285,10 +285,17 @@ fun SongPartSelectContent(
         "0:00"
     }
     val animationSpec = remember { PartSelectAnimationSpec() }
-    var showPartItems by remember(songTitle, dbParts.size) { mutableStateOf(false) }
+    val partAnimationKey = remember(dbParts) { dbParts.joinToString(separator = ",") { it.partId.toString() } }
+    var showPartItems by remember(currentSong?.songId) { mutableStateOf(false) }
 
-    LaunchedEffect(songTitle, dbParts.size) {
+    LaunchedEffect(currentSong?.songId, partAnimationKey) {
+        if (dbParts.isEmpty()) {
+            showPartItems = false
+            return@LaunchedEffect
+        }
+
         showPartItems = false
+        withFrameNanos { }
         showPartItems = true
     }
 
