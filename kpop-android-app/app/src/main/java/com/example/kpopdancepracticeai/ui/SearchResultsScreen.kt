@@ -30,7 +30,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.MutableTransitionState
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -116,7 +116,9 @@ fun SearchResultsScreen(
 @Composable
 private fun SearchSongItem(song: Song, index: Int, onClick: () -> Unit) {
     val visibleState = remember(song.songId) {
-        MutableTransitionState(false).apply { targetState = true }
+        MutableTransitionState<Boolean>(false).apply {
+            targetState = true
+        }
     }
 
     AnimatedVisibility(
