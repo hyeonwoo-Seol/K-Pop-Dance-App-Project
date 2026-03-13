@@ -140,6 +140,7 @@ val bottomNavItems = listOf(
 )
 
 private const val SETTINGS_SCREEN_TRANSITION_DURATION = 280
+private const val SEARCH_RESULTS_TRANSITION_DURATION = 320
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
@@ -652,7 +653,19 @@ fun AppNavHost(
                 navArgument("difficulty") { type = NavType.StringType },
                 navArgument("artistGender") { type = NavType.StringType },
                 navArgument("tempo") { type = NavType.StringType }
-            )
+            ),
+            enterTransition = {
+                slideIntoContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Up,
+                    animationSpec = tween(SEARCH_RESULTS_TRANSITION_DURATION)
+                )
+            },
+            popExitTransition = {
+                slideOutOfContainer(
+                    AnimatedContentTransitionScope.SlideDirection.Down,
+                    animationSpec = tween(SEARCH_RESULTS_TRANSITION_DURATION)
+                )
+            }
         ) { backStackEntry ->
             val queryArg = backStackEntry.arguments?.getString("query")?.let { Screen.decodeArg(it) } ?: "all"
             val difficultyArg = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: "all"
