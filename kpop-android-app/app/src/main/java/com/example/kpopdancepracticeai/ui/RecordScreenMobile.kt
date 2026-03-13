@@ -28,7 +28,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +42,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -173,6 +171,7 @@ fun RecordScreen(
     var analysisProgress by remember { mutableStateOf(0f) }
     var analysisStatusMessage by remember { mutableStateOf("업로드 준비 중...") }
     var hasAutoStoppedRecording by remember { mutableStateOf(false) }
+    var hasTriggeredAutoRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
         lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
@@ -190,7 +189,8 @@ fun RecordScreen(
                 exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(expertVideoUrl)))
                 exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                 exoPlayer.prepare()
-                exoPlayer.playWhenReady = true
+                exoPlayer.seekTo(0)
+                exoPlayer.playWhenReady = false
             } catch (e: Exception) {
                 Log.e("RecordScreen", "영상 로드 실패: $expertVideoUrl", e)
             }
@@ -356,6 +356,9 @@ fun RecordScreen(
         if (isRecording || isCountdownVisible) return
 
         scope.launch {
+            exoPlayer.seekTo(0)
+            exoPlayer.pause()
+
             val startCount = settings.countdownSeconds
             if (startCount > 0) {
                 countdownNumber = startCount
@@ -391,6 +394,19 @@ fun RecordScreen(
                         handleRecordingFinalize(event)
                     }
                 }
+        }
+    }
+
+    LaunchedEffect(hasPermissions) {
+        if (!hasPermissions || hasTriggeredAutoRecording) return@LaunchedEffect
+
+        while (videoCaptureState.value == null && !hasTriggeredAutoRecording) {
+            delay(100)
+        }
+
+        if (!hasTriggeredAutoRecording && !isRecording && !isCountdownVisible) {
+            hasTriggeredAutoRecording = true
+            startRecordingWithCountdown()
         }
     }
 
@@ -506,15 +522,6 @@ fun RecordScreen(
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 32.dp).size(56.dp).background(Color(0x33FFFFFF), CircleShape)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = "Switch Camera", tint = Color.White)
-                }
-            } else {
-                Button(
-                    onClick = { startRecordingWithCountdown() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFB2C36)),
-                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
-                    modifier = Modifier.align(Alignment.Center)
-                ) {
-                    Text("따라하기", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

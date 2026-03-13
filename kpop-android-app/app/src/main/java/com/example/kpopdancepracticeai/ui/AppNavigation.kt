@@ -648,7 +648,9 @@ fun AppNavHost(
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
                     val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
-                    navController.navigate("record/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl")
+                    navController.navigate("record/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl") {
+                        popUpTo(Screen.DancePractice.route) { inclusive = true }
+                    }
                 },
                 onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
             )
