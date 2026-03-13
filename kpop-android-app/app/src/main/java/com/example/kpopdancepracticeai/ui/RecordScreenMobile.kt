@@ -82,6 +82,7 @@ import com.example.kpopdancepracticeai.util.NetworkUtils
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 import com.google.gson.Gson
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -171,6 +172,7 @@ fun RecordScreen(
     var analysisProgress by remember { mutableStateOf(0f) }
     var analysisStatusMessage by remember { mutableStateOf("업로드 준비 중...") }
     var hasAutoStoppedRecording by remember { mutableStateOf(false) }
+    var progressRampJob by remember { mutableStateOf<Job?>(null) }
     var hasTriggeredAutoRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
@@ -279,13 +281,26 @@ fun RecordScreen(
                 fileUri = uri,
                 filename = filename,
                 onUploadProgress = { uploadProgress ->
-                    analysisProgress = (uploadProgress * 0.7f).coerceIn(0f, 0.7f)
+                    val cappedUploadProgress = (uploadProgress * 0.2f).coerceIn(0f, 0.2f)
+                    if (analysisProgress < 0.2f) {
+                        analysisProgress = cappedUploadProgress.coerceAtLeast(analysisProgress)
+                    }
                     analysisStatusMessage = "영상을 클라우드로 전송 중... ${(uploadProgress * 100).toInt()}%"
                 },
                 onComplete = {
                     Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
-                    analysisProgress = 0.75f
-                    analysisStatusMessage = "서버에서 AI 분석 준비 중..."
+                    analysisProgress = 0.2f
+                    analysisStatusMessage = "서버에서 AI 분석 중..."
+
+                    progressRampJob?.cancel()
+                    progressRampJob = scope.launch {
+                        repeat(12) {
+                            delay(1000)
+                            if (analysisProgress >= 0.92f) return@launch
+                            analysisProgress = (analysisProgress + 0.06f).coerceAtMost(0.92f)
+                        }
+                    }
+
                     scope.launch {
                         uploader.pollAnalysisResult(
                             userId = userId,
@@ -297,6 +312,13 @@ fun RecordScreen(
                             onComplete = { resultS3Key ->
                                 scope.launch {
                                     try {
+                                        progressRampJob?.cancel()
+
+                                        while (analysisProgress < 1f) {
+                                            analysisProgress = (analysisProgress + 0.04f).coerceAtMost(1f)
+                                            delay(60)
+                                        }
+
                                         val jsonString = uploader.downloadResultJson(resultS3Key)
                                         val jsonFileName = uploader.extractResultFileName(resultS3Key)
                                         val response = Gson().fromJson(
@@ -324,12 +346,12 @@ fun RecordScreen(
                                         )
                                         mainViewModel.savePracticeResult(historyEntity)
 
-                                        analysisProgress = 1f
                                         analysisStatusMessage = "분석 완료!"
                                         showAnalysisLoading = false
                                         Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
                                         onRecordingComplete("$jsonFileName|${uri}")
                                     } catch (e: Exception) {
+                                        progressRampJob?.cancel()
                                         showAnalysisLoading = false
                                         Toast.makeText(context, "결과 처리 실패: ${e.message}", Toast.LENGTH_LONG).show()
                                         Log.e("RecordScreen", "결과 처리 실패", e)
@@ -337,6 +359,7 @@ fun RecordScreen(
                                 }
                             },
                             onError = { e ->
+                                progressRampJob?.cancel()
                                 showAnalysisLoading = false
                                 Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show()
                             }
@@ -344,6 +367,7 @@ fun RecordScreen(
                     }
                 },
                 onError = { e ->
+                    progressRampJob?.cancel()
                     showAnalysisLoading = false
                     Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
                 }

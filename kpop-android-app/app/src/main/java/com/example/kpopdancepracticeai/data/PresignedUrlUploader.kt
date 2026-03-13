@@ -166,10 +166,7 @@ class PresignedUrlUploader(private val context: Context) {
         withContext(Dispatchers.IO) {
             try {
                 var attempts = 0
-                val maxAttempts = 60 // 최대 5분 대기
-
-                // 업로드 직후 서버 처리를 기다리기 위한 초기 지연 시간
-                delay(5000)
+                val maxAttempts = 300 // 최대 5분 대기 (1초 간격)
 
                 while (attempts < maxAttempts) {
                     val response = apiService.checkAnalysisStatus(AnalysisStatusRequest(userId, timestamp))
@@ -188,15 +185,15 @@ class PresignedUrlUploader(private val context: Context) {
                             }
                             "failed" -> throw Exception("분석 실패: ${status.errorMessage}")
                             "processing", "uploaded" -> {
-                                withContext(Dispatchers.Main) { onProgress("분석 중... (${attempts * 5}초 경과)") }
+                                withContext(Dispatchers.Main) { onProgress("분석 중... (${attempts}초 경과)") }
                             }
                         }
                     } else {
                         throw Exception("서버 에러 발생: ${response.code()}")
                     }
 
-                    // 5초 간격으로 재시도
-                    delay(5000)
+                    // 1초 간격으로 재시도
+                    delay(1000)
                     attempts++
                 }
                 throw Exception("타임아웃: 분석이 너무 오래 걸립니다")
