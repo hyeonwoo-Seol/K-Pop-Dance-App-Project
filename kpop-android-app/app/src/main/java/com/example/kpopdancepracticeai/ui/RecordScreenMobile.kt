@@ -187,7 +187,8 @@ fun RecordScreen(
                 exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(expertVideoUrl)))
                 exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                 exoPlayer.prepare()
-                exoPlayer.playWhenReady = true
+                exoPlayer.seekTo(0)
+                exoPlayer.playWhenReady = false
             } catch (e: Exception) {
                 Log.e("RecordScreen", "영상 로드 실패: $expertVideoUrl", e)
             }
@@ -340,6 +341,9 @@ fun RecordScreen(
         if (isRecording || isCountdownVisible) return
 
         scope.launch {
+            exoPlayer.seekTo(0)
+            exoPlayer.pause()
+
             val startCount = settings.countdownSeconds
             if (startCount > 0) {
                 countdownNumber = startCount
