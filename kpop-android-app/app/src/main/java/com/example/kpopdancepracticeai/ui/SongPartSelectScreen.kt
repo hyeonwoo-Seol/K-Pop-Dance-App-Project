@@ -7,7 +7,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.MutableTransitionState
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
@@ -376,7 +376,7 @@ private fun AnimatedPartEntry(
     animationSpec: PartSelectAnimationSpec,
     content: @Composable () -> Unit
 ) {
-    val visibleState = remember {
+    val visibleState: MutableTransitionState<Boolean> = remember {
         MutableTransitionState(false).apply { targetState = true }
     }
 
