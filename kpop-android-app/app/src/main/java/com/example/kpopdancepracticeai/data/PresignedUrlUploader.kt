@@ -11,8 +11,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.Request
+import okio.Buffer
+import okio.BufferedSink
+import okio.ForwardingSink
+import okio.buffer
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.ByteArrayInputStream
@@ -53,6 +58,7 @@ class PresignedUrlUploader(private val context: Context) {
     suspend fun uploadVideo(
         fileUri: Uri,
         filename: String,
+        onUploadProgress: (Float) -> Unit = {},
         onComplete: (String) -> Unit,
         onError: (Exception) -> Unit
     ) {
@@ -74,7 +80,7 @@ class PresignedUrlUploader(private val context: Context) {
                 val s3Key = responseBody.s3Key // 나중에 DB 조회 시 기준이 되는 키값
 
                 // [Step 3] 발급받은 URL을 이용해 S3로 직접 파일 전송
-                uploadFileToS3(uploadUrl, file)
+                uploadFileToS3(uploadUrl, file, onUploadProgress)
 
                 // 업로드 성공 후 캐시 파일 삭제
                 file.delete()
@@ -93,10 +99,11 @@ class PresignedUrlUploader(private val context: Context) {
     /**
      * OkHttp를 사용하여 S3에 바이너리 데이터(영상)를 직접 PUT 방식으로 전송
      */
-    private fun uploadFileToS3(url: String, file: File) {
+    private fun uploadFileToS3(url: String, file: File, onProgress: (Float) -> Unit) {
         val client = OkHttpClient()
         val mediaType = "video/mp4".toMediaTypeOrNull()
-        val requestBody = file.asRequestBody(mediaType)
+        val baseBody = file.asRequestBody(mediaType)
+        val requestBody = ProgressRequestBody(baseBody, onProgress)
 
         val request = Request.Builder()
             .url(url)
@@ -106,6 +113,30 @@ class PresignedUrlUploader(private val context: Context) {
 
         val response = client.newCall(request).execute()
         if (!response.isSuccessful) throw Exception("S3 전송 실패: ${response.code}")
+    }
+
+    private class ProgressRequestBody(
+        private val delegate: RequestBody,
+        private val onProgress: (Float) -> Unit
+    ) : RequestBody() {
+        override fun contentType() = delegate.contentType()
+
+        override fun contentLength() = delegate.contentLength()
+
+        override fun writeTo(sink: BufferedSink) {
+            val contentLength = contentLength().toFloat().takeIf { it > 0f } ?: 1f
+            var uploaded = 0L
+            val countingSink = object : ForwardingSink(sink) {
+                override fun write(source: Buffer, byteCount: Long) {
+                    super.write(source, byteCount)
+                    uploaded += byteCount
+                    onProgress((uploaded / contentLength).coerceIn(0f, 1f))
+                }
+            }
+            val bufferedSink = countingSink.buffer()
+            delegate.writeTo(bufferedSink)
+            bufferedSink.flush()
+        }
     }
 
     /**

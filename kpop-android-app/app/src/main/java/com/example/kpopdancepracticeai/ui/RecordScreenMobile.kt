@@ -170,6 +170,8 @@ fun RecordScreen(
     var countdownNumber by remember { mutableIntStateOf(0) }
     var isCountdownVisible by remember { mutableStateOf(false) }
     var showAnalysisLoading by remember { mutableStateOf(false) }
+    var analysisProgress by remember { mutableStateOf(0f) }
+    var analysisStatusMessage by remember { mutableStateOf("업로드 준비 중...") }
     var hasAutoStoppedRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
@@ -271,16 +273,27 @@ fun RecordScreen(
 
             Toast.makeText(context, "녹화 완료. 업로드 시작...", Toast.LENGTH_SHORT).show()
             showAnalysisLoading = true
+            analysisProgress = 0f
+            analysisStatusMessage = "영상을 클라우드로 전송 중..."
             uploader.uploadVideo(
                 fileUri = uri,
                 filename = filename,
+                onUploadProgress = { uploadProgress ->
+                    analysisProgress = (uploadProgress * 0.7f).coerceIn(0f, 0.7f)
+                    analysisStatusMessage = "영상을 클라우드로 전송 중... ${(uploadProgress * 100).toInt()}%"
+                },
                 onComplete = {
                     Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
+                    analysisProgress = 0.75f
+                    analysisStatusMessage = "서버에서 AI 분석 준비 중..."
                     scope.launch {
                         uploader.pollAnalysisResult(
                             userId = userId,
                             timestamp = timestamp,
-                            onProgress = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() },
+                            onProgress = { msg ->
+                                analysisStatusMessage = msg
+                                analysisProgress = (analysisProgress + 0.03f).coerceAtMost(0.95f)
+                            },
                             onComplete = { resultS3Key ->
                                 scope.launch {
                                     try {
@@ -311,6 +324,8 @@ fun RecordScreen(
                                         )
                                         mainViewModel.savePracticeResult(historyEntity)
 
+                                        analysisProgress = 1f
+                                        analysisStatusMessage = "분석 완료!"
                                         showAnalysisLoading = false
                                         Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
                                         onRecordingComplete("$jsonFileName|${uri}")
@@ -381,6 +396,8 @@ fun RecordScreen(
 
     if (showAnalysisLoading) {
         AnalysisWaitingScreen(
+            progress = analysisProgress,
+            statusMessage = analysisStatusMessage,
             onAnalysisComplete = { }
         )
         return
