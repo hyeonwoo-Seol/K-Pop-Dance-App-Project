@@ -3,6 +3,7 @@ package com.example.kpopdancepracticeai.ui
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -140,11 +141,23 @@ val bottomNavItems = listOf(
 )
 
 // 프로필 > 설정 상세 화면 전환 속도(ms). 값이 클수록 느리고 부드럽게 전환됩니다.
-private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 460
+private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
 private const val MAIN_NAV_FADE_DURATION = 220
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
+}
+
+private fun NavBackStackEntry.isProfileSettingsRoute(): Boolean {
+    return when (destination.route) {
+        Screen.ProfileEdit.route,
+        Screen.PracticeSettings.route,
+        Screen.NotificationSettings.route,
+        Screen.PrivacySettings.route,
+        Screen.AppInfo.route,
+        Screen.Withdrawal.route -> true
+        else -> false
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -515,18 +528,46 @@ fun AppNavHost(
         composable(
             route = Screen.ProfileEdit.route,
             enterTransition = {
-                if (initialState.isProfileRoute()) {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             },
             popExitTransition = {
-                if (targetState.isProfileRoute()) {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             }
@@ -540,18 +581,46 @@ fun AppNavHost(
         composable(
             route = Screen.PracticeSettings.route,
             enterTransition = {
-                if (initialState.isProfileRoute()) {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             },
             popExitTransition = {
-                if (targetState.isProfileRoute()) {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             }
@@ -561,18 +630,46 @@ fun AppNavHost(
         composable(
             route = Screen.NotificationSettings.route,
             enterTransition = {
-                if (initialState.isProfileRoute()) {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             },
             popExitTransition = {
-                if (targetState.isProfileRoute()) {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             }
@@ -582,18 +679,46 @@ fun AppNavHost(
         composable(
             route = Screen.PrivacySettings.route,
             enterTransition = {
-                if (initialState.isProfileRoute()) {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             },
             popExitTransition = {
-                if (targetState.isProfileRoute()) {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             }
@@ -604,18 +729,46 @@ fun AppNavHost(
         composable(
             route = Screen.AppInfo.route,
             enterTransition = {
-                if (initialState.isProfileRoute()) {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             },
             popExitTransition = {
-                if (targetState.isProfileRoute()) {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             }
@@ -656,18 +809,46 @@ fun AppNavHost(
         composable(
             route = Screen.Withdrawal.route,
             enterTransition = {
-                if (initialState.isProfileRoute()) {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
                     slideIntoContainer(
                         AnimatedContentTransitionScope.SlideDirection.Left,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             },
             popExitTransition = {
-                if (targetState.isProfileRoute()) {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
                     slideOutOfContainer(
                         AnimatedContentTransitionScope.SlideDirection.Right,
-                        animationSpec = tween(PROFILE_SETTINGS_SLIDE_DURATION_MS)
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = FastOutSlowInEasing
+                        )
                     )
                 } else null
             }
