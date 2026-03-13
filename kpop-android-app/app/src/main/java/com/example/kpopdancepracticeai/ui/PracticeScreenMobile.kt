@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VolumeOff
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -234,7 +235,10 @@ fun PracticeScreenMobile(
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RoundIconButton(icon = Icons.Default.CameraAlt, onClick = { /* TODO */ })
-                    RoundIconButton(icon = Icons.Default.VolumeUp, onClick = { isMuted = true })
+                    RoundIconButton(
+                        icon = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                        onClick = { isMuted = !isMuted }
+                    )
                     RoundIconButton(icon = Icons.Default.Settings, onClick = onSettingsClick)
                 }
             }
