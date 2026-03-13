@@ -5,15 +5,22 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Schedule
@@ -27,7 +34,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -50,6 +56,14 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
 import java.util.Locale
+
+private data class PartSelectAnimationSpec(
+    val itemFadeDurationMs: Int = 200,
+    val itemSlideDurationMs: Int = 260,
+    val itemStaggerDelayMs: Int = 55,
+    val maxItemDelayMs: Int = 260,
+    val itemOffsetDivisor: Int = 10
+)
 
 @Composable
 fun SongPartSelectScreen(
@@ -271,6 +285,7 @@ fun SongPartSelectContent(
     } else {
         "0:00"
     }
+    val animationSpec = remember { PartSelectAnimationSpec() }
 
     Box(
         modifier = Modifier
@@ -291,119 +306,187 @@ fun SongPartSelectContent(
                 )
             }
         ) { innerPadding ->
-            LazyColumn(
+            Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(innerPadding),
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(innerPadding)
             ) {
                 if (currentSong != null) {
-                    item {
-                        // 곡 정보 카드
-                        Card(
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = songCardBg),
-                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                val coverUrl = currentSong.coverUrl.orEmpty()
-                                if (coverUrl.isNotBlank()) {
-                                    AsyncImage(
-                                        model = ImageRequest.Builder(LocalContext.current)
-                                            .data(coverUrl)
-                                            .crossfade(true)
-                                            .build(),
-                                        contentDescription = "${songTitle} cover",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                    )
-                                } else {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(80.dp)
-                                            .clip(RoundedCornerShape(12.dp))
-                                            .background(Color(0xFFE2E8F0)),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color.Gray)
-                                    }
-                                }
-
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = songTitle,
-                                        style = MaterialTheme.typography.titleLarge,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF1E293B)
-                                    )
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = songArtist,
-                                        style = MaterialTheme.typography.bodyLarge,
-                                        color = Color(0xFF64748B)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(
-                                            imageVector = Icons.Default.MusicNote,
-                                            contentDescription = "Total Time",
-                                            tint = Color(0xFF9C27B0), // 보라색 아이콘
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text(
-                                            text = totalTimeLabel,
-                                            style = MaterialTheme.typography.bodyMedium,
-                                            color = Color(0xFF64748B)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    item {
-                        Text(
-                            text = "연습할 파트를 선택하세요",
-                            style = MaterialTheme.typography.titleSmall,
-                            color = Color(0xFF4A4E67),
-                            modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 4.dp)
-                        )
-                    }
+                    SongInfoCard(
+                        currentSong = currentSong,
+                        songTitle = songTitle,
+                        songArtist = songArtist,
+                        totalTimeLabel = totalTimeLabel,
+                        songCardBg = songCardBg,
+                        modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp)
+                    )
                 }
 
-                if (dbParts.isEmpty()) {
-                    item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
-                } else {
-                    items(dbParts) { part ->
-                        PartCard(
-                            title = "Part ${part.partNumber}: ${part.partName}",
-                            time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
-                            onPracticeClick = {
-                                onNavigateToPractice(
-                                    currentSong?.songId ?: 0L,
-                                    songTitle,
-                                    "$songArtist · ${part.partName}",
-                                    currentSong?.difficulty.orEmpty(),
-                                    (part.endTimeMs - part.startTimeMs).toTimeLabel(),
-                                    part.videoUrl.orEmpty()
+                Text(
+                    text = "연습할 파트를 선택하세요",
+                    style = MaterialTheme.typography.titleSmall,
+                    color = Color(0xFF4A4E67),
+                    modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 8.dp)
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    if (dbParts.isEmpty()) {
+                        item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
+                    } else {
+                        items(dbParts.size, key = { dbParts[it].partId }) { index ->
+                            val part = dbParts[index]
+                            AnimatedPartEntry(
+                                index = index,
+                                animationSpec = animationSpec
+                            ) {
+                                PartCard(
+                                    title = "Part ${part.partNumber}: ${part.partName}",
+                                    time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
+                                    onPracticeClick = {
+                                        onNavigateToPractice(
+                                            currentSong?.songId ?: 0L,
+                                            songTitle,
+                                            "$songArtist · ${part.partName}",
+                                            currentSong?.difficulty.orEmpty(),
+                                            (part.endTimeMs - part.startTimeMs).toTimeLabel(),
+                                            part.videoUrl.orEmpty()
+                                        )
+                                    },
+                                    onUploadClick = { onUploadClick(part) }
                                 )
-                            },
-                            onUploadClick = { onUploadClick(part) }
-                        )
+                            }
+                        }
                     }
                 }
             }
         }
     }
+}
+
+
+@Composable
+private fun AnimatedPartEntry(
+    index: Int,
+    animationSpec: PartSelectAnimationSpec,
+    content: @Composable () -> Unit
+) {
+    val visibleState: MutableTransitionState<Boolean> = remember {
+        MutableTransitionState(false).apply { targetState = true }
+    }
+
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = partEnterTransition(index = index, animationSpec = animationSpec),
+        exit = ExitTransition.None,
+        label = "partItemAnimation"
+    ) {
+        content()
+    }
+}
+
+@Composable
+private fun SongInfoCard(
+    currentSong: Song,
+    songTitle: String,
+    songArtist: String,
+    totalTimeLabel: String,
+    songCardBg: Color,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = songCardBg),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            val coverUrl = currentSong.coverUrl.orEmpty()
+            if (coverUrl.isNotBlank()) {
+                AsyncImage(
+                    model = ImageRequest.Builder(LocalContext.current)
+                        .data(coverUrl)
+                        .crossfade(true)
+                        .build(),
+                    contentDescription = "$songTitle cover",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(80.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFE2E8F0)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(Icons.Default.MusicNote, contentDescription = null, tint = Color.Gray)
+                }
+            }
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = songTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF1E293B)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = songArtist,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color(0xFF64748B)
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = "Total Time",
+                        tint = Color(0xFF9C27B0),
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text(
+                        text = totalTimeLabel,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color(0xFF64748B)
+                    )
+                }
+            }
+        }
+    }
+}
+
+private fun partEnterTransition(index: Int, animationSpec: PartSelectAnimationSpec): EnterTransition {
+    val delay = (index * animationSpec.itemStaggerDelayMs).coerceAtMost(animationSpec.maxItemDelayMs)
+    return fadeIn(
+        animationSpec = tween(
+            durationMillis = animationSpec.itemFadeDurationMs,
+            delayMillis = delay,
+            easing = LinearOutSlowInEasing
+        )
+    ) +
+        slideInVertically(
+            animationSpec = tween(
+                durationMillis = animationSpec.itemSlideDurationMs,
+                delayMillis = delay,
+                easing = FastOutSlowInEasing
+            ),
+            initialOffsetY = { it / animationSpec.itemOffsetDivisor }
+        )
 }
 
 @Composable
