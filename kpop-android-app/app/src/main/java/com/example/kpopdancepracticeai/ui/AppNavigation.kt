@@ -146,7 +146,7 @@ private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
 // 메인 화면 전환 속도(ms).
 // 홈/검색/프로필 탭 이동 + 홈에서 안무(곡) 상세 화면으로 이동할 때 동일하게 적용됩니다.
 // 테스트하면서 이 값 하나만 조절하면 전환 속도를 함께 맞출 수 있습니다.
-private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 360
+private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 550
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
