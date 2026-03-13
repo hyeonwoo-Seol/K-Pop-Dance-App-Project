@@ -140,7 +140,7 @@ val bottomNavItems = listOf(
 )
 
 // 프로필 > 설정 상세 화면 전환 속도(ms). 값이 클수록 느리고 부드럽게 전환됩니다.
-private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 420
+private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 460
 private const val MAIN_NAV_FADE_DURATION = 220
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
