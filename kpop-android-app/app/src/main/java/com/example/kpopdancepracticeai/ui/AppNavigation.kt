@@ -2,10 +2,12 @@ package com.example.kpopdancepracticeai.ui
 
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -55,6 +57,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -135,6 +138,12 @@ val bottomNavItems = listOf(
     Screen.Search,
     Screen.Profile,
 )
+
+private const val SETTINGS_SCREEN_TRANSITION_DURATION = 280
+
+private fun NavBackStackEntry.isProfileRoute(): Boolean {
+    return destination.route == Screen.Profile.route
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -485,24 +494,114 @@ fun AppNavHost(
         }
 
 
-        composable(Screen.ProfileEdit.route) {
+        composable(
+            route = Screen.ProfileEdit.route,
+            enterTransition = {
+                if (initialState.isProfileRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            }
+        ) {
             ProfileEditScreen(
                 onBackClick = { navController.popBackStack() },
                 viewModel = viewModel
             )
         }
 
-        composable(Screen.PracticeSettings.route) {
+        composable(
+            route = Screen.PracticeSettings.route,
+            enterTransition = {
+                if (initialState.isProfileRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            }
+        ) {
             PracticeSettingsScreen(onBackClick = { navController.popBackStack() })
         }
-        composable(Screen.NotificationSettings.route) {
+        composable(
+            route = Screen.NotificationSettings.route,
+            enterTransition = {
+                if (initialState.isProfileRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            }
+        ) {
             NotificationSettingsScreen(onBackClick = { navController.popBackStack() })
         }
-        composable(Screen.PrivacySettings.route) {
+        composable(
+            route = Screen.PrivacySettings.route,
+            enterTransition = {
+                if (initialState.isProfileRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            }
+        ) {
             PrivacySettingsScreen(onBackClick = { navController.popBackStack() })
         }
 
-        composable(Screen.AppInfo.route) {
+        composable(
+            route = Screen.AppInfo.route,
+            enterTransition = {
+                if (initialState.isProfileRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(SETTINGS_SCREEN_TRANSITION_DURATION)
+                    )
+                } else null
+            }
+        ) {
             AppInfoScreen(
                 onBackClick = { navController.popBackStack() },
                 onNavigateToFaq = { navController.navigate("faq") },
