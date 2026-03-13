@@ -48,6 +48,12 @@ data class TopPracticedChoreoUiModel(
     val partName: String
 )
 
+data class PracticeResultSummaryUiModel(
+    val songTitle: String,
+    val bestScore: Int,
+    val achievements: List<AchievementUiModel>
+)
+
 // 로그인 상태 정의
 sealed interface LoginState {
     object Idle : LoginState
@@ -311,6 +317,23 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     fun markPracticePartCompleted(userId: String, songId: Long, partNumber: Int, artistName: String) {
         viewModelScope.launch { repository.markPracticePartCompleted(userId, songId, partNumber, artistName) }
+    }
+
+    suspend fun getPracticeResultSummary(userId: String, jsonFileName: String): PracticeResultSummaryUiModel? {
+        val history = repository.getHistoryByJsonFileName(userId, jsonFileName) ?: return null
+        val song = repository.getAllSongsSync().firstOrNull { it.songId == history.songId }
+        val songTitle = song?.titleKr ?: "곡 ${history.songId}"
+        val bestScore = repository.getBestScore(userId, history.songId) ?: history.totalScore
+        val achievements = _achievementProgress.value.sortedWith(
+            compareByDescending<AchievementUiModel> { it.isUnlocked }
+                .thenByDescending { it.progress }
+        ).take(3)
+
+        return PracticeResultSummaryUiModel(
+            songTitle = songTitle,
+            bestScore = bestScore,
+            achievements = achievements
+        )
     }
 
     fun clearSyncMessage() { _syncMessage.value = null }

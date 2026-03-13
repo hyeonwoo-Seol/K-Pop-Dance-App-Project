@@ -51,4 +51,16 @@ interface HistoryDao {
         """
     )
     fun getTopPracticedHistoryRows(userId: String): Flow<List<TopPracticedHistoryRow>>
+
+    @Query(
+        """
+        SELECT * FROM PracticeResults
+        WHERE user_uuid = :userId
+          AND full_json_path LIKE '%' || :jsonFileName
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getHistoryByJsonFileName(userId: String, jsonFileName: String): PracticeHistory?
+
 }
