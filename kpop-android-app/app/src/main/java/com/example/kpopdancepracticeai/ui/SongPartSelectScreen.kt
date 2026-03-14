@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -14,7 +15,12 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -28,10 +34,13 @@ import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.util.FilenameParser
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.google.gson.Gson
 import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
+import java.util.Locale
 
 @Composable
 fun SongPartSelectScreen(
@@ -200,46 +209,128 @@ fun SongPartSelectContent(
     onNavigateToPractice: (Long, String, String, String, String, String) -> Unit,
     onUploadClick: (SongPart) -> Unit
 ) {
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("파트 선택") },
-                navigationIcon = {
-                    IconButton(onClick = onBackClick) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back") }
-                }
-            )
-        }
-    ) { innerPadding ->
-        Column(modifier = Modifier.padding(innerPadding)) {
-            if (currentSong != null) {
-                Surface(
-                    color = MaterialTheme.colorScheme.primaryContainer,
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    shape = MaterialTheme.shapes.medium
-                ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text(currentSong.titleKr, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(currentSong.artistKr, style = MaterialTheme.typography.bodyMedium)
+    val screenBg = Color.Transparent
+    val songCardBg = Color.White
+    val pageGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFC7D2FE),
+            Color(0xFFE0E7FF)
+        )
+    )
+
+    val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
+    val songArtist = currentSong?.artistKr?.ifBlank { currentSong.artistEn }.orEmpty()
+    val totalSongLengthMs = dbParts.sumOf { (it.endTimeMs - it.startTimeMs).coerceAtLeast(0L) }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(pageGradient)
+    ) {
+        Scaffold(
+            containerColor = screenBg,
+            topBar = {
+                TopAppBar(
+                    title = { Text("파트 선택") },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = screenBg),
+                    navigationIcon = {
+                        IconButton(onClick = onBackClick) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
+                    }
+                )
+            }
+        ) { innerPadding ->
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (currentSong != null) {
+                    item {
+                        Card(
+                            colors = CardDefaults.cardColors(containerColor = songCardBg),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x12000000))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                val coverUrl = currentSong.coverUrl.orEmpty()
+                                if (coverUrl.isNotBlank()) {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(coverUrl)
+                                            .crossfade(true)
+                                            .build(),
+                                        contentDescription = "${songTitle} cover",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(MaterialTheme.shapes.medium)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(72.dp)
+                                            .clip(MaterialTheme.shapes.medium)
+                                            .background(Color(0xFFD0D2DB)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text("🎵", style = MaterialTheme.typography.headlineSmall)
+                                    }
+                                }
+
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = songTitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF1E293B)
+                                    )
+                                    Text(
+                                        text = songArtist,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = Color(0xFF475569)
+                                    )
+                                    Text(
+                                        text = "⏱ ${totalSongLengthMs.toTimeLabel()}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = Color(0xFF6B7280)
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    item {
+                        Text(
+                            text = "연습할 파트를 선택하세요",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = Color(0xFF4A4E67)
+                        )
                     }
                 }
-            }
 
-            LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (dbParts.isEmpty()) {
                     item { Text("등록된 파트가 없습니다.", modifier = Modifier.padding(16.dp)) }
                 } else {
                     items(dbParts) { part ->
                         PartCard(
-                            title = part.partName,
-                            time = "${part.startTimeMs/1000}초 - ${part.endTimeMs/1000}초",
+                            title = "Part ${part.partNumber}: ${part.partName}",
+                            time = "${part.startTimeMs.toTimeLabel()} - ${part.endTimeMs.toTimeLabel()}",
                             onPracticeClick = {
                                 onNavigateToPractice(
                                     currentSong?.songId ?: 0L,
-                                    currentSong?.titleKr ?: "",
-                                    "${currentSong?.artistKr} · ${part.partName}",
-                                    "Normal",
-                                    "${(part.endTimeMs - part.startTimeMs)/1000}s",
-                                    part.videoUrl ?: "" // 💡 [오류 해결] 값이 비어있을 경우 안전하게 넘기도록 처리
+                                    songTitle,
+                                    "$songArtist · ${part.partName}",
+                                    currentSong?.difficulty.orEmpty(),
+                                    (part.endTimeMs - part.startTimeMs).toTimeLabel(),
+                                    part.videoUrl.orEmpty()
                                 )
                             },
                             onUploadClick = { onUploadClick(part) }
@@ -260,27 +351,69 @@ fun PartCard(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1F000000))
     ) {
-        Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold)
-                Text(time, style = MaterialTheme.typography.bodySmall)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = onUploadClick) {
-                    Text("동영상 업로드")
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.Top
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(time, style = MaterialTheme.typography.bodyMedium)
                 }
-                Button(onClick = onPracticeClick) {
-                    Text("연습")
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onPracticeClick,
+                        modifier = Modifier.defaultMinSize(minHeight = 30.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = MaterialTheme.shapes.small,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
+                    ) {
+                        Text(
+                            text = "연습",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    OutlinedButton(
+                        onClick = onUploadClick,
+                        modifier = Modifier.defaultMinSize(minHeight = 30.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                        shape = MaterialTheme.shapes.small,
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = Color.Black),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x1A000000))
+                    ) {
+                        Text(
+                            text = "동영상 업로드",
+                            style = MaterialTheme.typography.labelMedium,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }
     }
+}
+
+private fun Long.toTimeLabel(): String {
+    val totalSeconds = (this / 1000).coerceAtLeast(0)
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
 }
 
 @Preview(showBackground = true)
