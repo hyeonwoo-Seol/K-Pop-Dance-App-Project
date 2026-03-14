@@ -41,6 +41,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
+import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
 import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.data.entity.SongPart
@@ -280,10 +281,22 @@ fun SongPartSelectContent(
 
     val songTitle = currentSong?.titleKr?.ifBlank { currentSong.titleEn }.orEmpty()
     val songArtist = currentSong?.artistKr?.ifBlank { currentSong.artistEn }.orEmpty()
-    val totalTimeLabel = if (dbParts.isNotEmpty()) {
-        (dbParts.last().endTimeMs).toTimeLabel()
-    } else {
-        "0:00"
+    val totalTimeLabel = remember(currentSong?.songId, dbParts) {
+        val totalDurationMsFromSource = currentSong
+            ?.songId
+            ?.let { songId ->
+                RealDataSource.getRealSongParts
+                    .filter { it.songId == songId }
+                    .sumOf { it.durationSec.toLong() * 1000L }
+            }
+            ?.takeIf { it > 0L }
+
+        val totalDurationMs = totalDurationMsFromSource ?: dbParts.sumOf { part ->
+            val explicitRange = (part.endTimeMs - part.startTimeMs).coerceAtLeast(0L)
+            if (explicitRange > 0L) explicitRange else part.durationSec.toLong() * 1000L
+        }
+
+        totalDurationMs.toTimeLabel()
     }
     val animationSpec = remember { PartSelectAnimationSpec() }
 
