@@ -171,7 +171,6 @@ class AiPracticeTipViewModel(
             [선택 안무]
             - 곡: ${summary.title}
             - 아티스트: ${summary.artist}
-            - 파트: ${summary.partNumber}
             
             [사용자 연습 통계]
             - 총 연습 횟수: ${summary.practiceCount}회
@@ -184,9 +183,9 @@ class AiPracticeTipViewModel(
             $weakPointStr
             
             [요청]
-            1) 다음 1주일 연습 루틴(하루 단위)을 제안해줘.
+            1) 이 안무를 출 때 알면 좋은 팁을 알려줘.
             2) 가장 효과적인 교정 포인트 3가지를 우선순위와 함께 알려줘.
-            3) 바로 적용 가능한 체크리스트(워밍업/메인 연습/마무리)로 정리해줘.
+            3) 이 안무를 연습할 때 어떻게 해야 할지 설명해줘.
         """.trimIndent()
     }
 
