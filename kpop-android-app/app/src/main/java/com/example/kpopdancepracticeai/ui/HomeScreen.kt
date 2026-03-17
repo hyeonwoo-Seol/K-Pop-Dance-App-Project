@@ -379,7 +379,6 @@ fun HomeScreenPreview() {
         HomeScreen(
             onSearch = {},
             onSongClick = {},
-            onAiTipClick = {},
             paddingValues = PaddingValues()
         )
     }
