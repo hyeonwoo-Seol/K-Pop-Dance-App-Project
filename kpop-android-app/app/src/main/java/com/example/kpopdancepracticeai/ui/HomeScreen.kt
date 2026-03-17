@@ -344,8 +344,6 @@ fun SongCard(
         Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant) // 로딩 중 배경색
                 .graphicsLayer {
                     rotationZ = thumbnailRotation.value
                 }
@@ -373,24 +371,31 @@ fun SongCard(
                         isAnimating = false
                         onClick()
                     }
-                },
-            contentAlignment = Alignment.Center
+                }
         ) {
-            if (!imageUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = "$title cover",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // 이미지가 없을 때 아이콘 표시
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(48.dp)
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant), // 로딩 중 배경색
+                contentAlignment = Alignment.Center
+            ) {
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "$title cover",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // 이미지가 없을 때 아이콘 표시
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
         }
 
