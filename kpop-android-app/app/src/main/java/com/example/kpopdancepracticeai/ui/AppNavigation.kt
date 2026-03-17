@@ -498,9 +498,6 @@ fun AppNavHost(
                 onSongClick = { songId ->
                     navController.navigate("songDetail/$songId")
                 },
-                onAiTipClick = {
-                    navController.navigate(Screen.AiPracticeTip.route)
-                },
                 paddingValues = innerPadding
             )
         }

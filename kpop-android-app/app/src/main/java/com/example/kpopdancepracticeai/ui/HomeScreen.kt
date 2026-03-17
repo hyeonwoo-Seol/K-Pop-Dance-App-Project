@@ -9,6 +9,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MusicNote
@@ -42,7 +49,6 @@ fun HomeScreen(
     viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
     onSongClick: (String) -> Unit,
-    onAiTipClick: () -> Unit,
     paddingValues: PaddingValues
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
@@ -58,6 +64,7 @@ fun HomeScreen(
     val layoutDirection = LocalLayoutDirection.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    var showAiTipOverlay by remember { mutableStateOf(false) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -231,7 +238,7 @@ fun HomeScreen(
         }
 
         FloatingActionButton(
-            onClick = onAiTipClick,
+            onClick = { showAiTipOverlay = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = paddingValues.calculateBottomPadding() + 20.dp),
@@ -239,6 +246,47 @@ fun HomeScreen(
             contentColor = Color.White
         ) {
             Icon(Icons.Default.AutoAwesome, contentDescription = "AI 연습 팁")
+        }
+
+        AnimatedVisibility(
+            visible = showAiTipOverlay,
+            enter = fadeIn(animationSpec = tween(durationMillis = 220)),
+            exit = fadeOut(animationSpec = tween(durationMillis = 180))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f))
+                    .clickable { showAiTipOverlay = false }
+            )
+        }
+
+        AnimatedVisibility(
+            visible = showAiTipOverlay,
+            enter = slideInVertically(
+                initialOffsetY = { it },
+                animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing)
+            ) + fadeIn(animationSpec = tween(durationMillis = 280)),
+            exit = slideOutVertically(
+                targetOffsetY = { it },
+                animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
+            ) + fadeOut(animationSpec = tween(durationMillis = 180))
+        ) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.9f),
+                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                tonalElevation = 8.dp,
+                shadowElevation = 8.dp,
+                color = MaterialTheme.colorScheme.surface
+            ) {
+                AiPracticeTipScreen(
+                    paddingValues = PaddingValues(0.dp),
+                    onBackClick = { showAiTipOverlay = false }
+                )
+            }
         }
     }
 }
