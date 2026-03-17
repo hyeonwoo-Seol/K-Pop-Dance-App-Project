@@ -5,15 +5,18 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.repository.AppRepository
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.math.floor
 
 class AnalysisViewModel(
     private val repository: AppRepository
@@ -46,7 +49,8 @@ class AnalysisViewModel(
         val filteredTrendLabels: List<String> = emptyList(),
         val bestGrade: String = "-",
         val topWorstPoints: List<Pair<String, Int>> = emptyList(),
-        val filteredPracticeCount: Int = 0
+        val filteredPracticeCount: Int = 0,
+        val mostErrorJointSummary: String = "-"
     )
 
     private val _uiState = MutableStateFlow(StatisticsUiState())
@@ -55,6 +59,12 @@ class AnalysisViewModel(
     private var currentUserId: String? = null
     private var allHistoryCache: List<PracticeHistory> = emptyList()
     private var songsCache: List<SongMeta> = emptyList()
+    private val historyErrorInsightCache = mutableMapOf<Long, ParsedErrorInsight?>()
+
+    private data class ParsedErrorInsight(
+        val jointTotalErrorCounts: Map<Int, Int>,
+        val jointWindowErrorCounts: Map<Pair<Int, Int>, Int>
+    )
 
     private data class SongMeta(
         val songId: Long,
@@ -166,6 +176,8 @@ class AnalysisViewModel(
             .sortedByDescending { it.second }
             .take(3)
 
+        val mostErrorJointSummary = buildMostErrorJointSummary(selectedHistory)
+
         val days = when (_uiState.value.selectedRange) {
             TrendRange.RECENT_7_DAYS -> 7
             TrendRange.FULL_1_MONTH -> 30
@@ -180,8 +192,89 @@ class AnalysisViewModel(
             filteredTrendLabels = trendLabels,
             bestGrade = bestGrade,
             topWorstPoints = topWorstPoints,
-            filteredPracticeCount = selectedHistory.size
+            filteredPracticeCount = selectedHistory.size,
+            mostErrorJointSummary = mostErrorJointSummary
         )
+    }
+
+    private fun buildMostErrorJointSummary(history: List<PracticeHistory>): String {
+        if (history.isEmpty()) return "-"
+
+        val totalJointCounts = mutableMapOf<Int, Int>()
+        val windowCountsByJoint = mutableMapOf<Pair<Int, Int>, Int>()
+
+        history.forEach { item ->
+            val insight = loadHistoryErrorInsight(item) ?: return@forEach
+
+            insight.jointTotalErrorCounts.forEach { (jointIndex, count) ->
+                totalJointCounts[jointIndex] = (totalJointCounts[jointIndex] ?: 0) + count
+            }
+            insight.jointWindowErrorCounts.forEach { (key, count) ->
+                windowCountsByJoint[key] = (windowCountsByJoint[key] ?: 0) + count
+            }
+        }
+
+        val topJoint = totalJointCounts.maxByOrNull { it.value }?.key ?: return "-"
+        val topWindow = windowCountsByJoint
+            .filterKeys { (jointIndex, _) -> jointIndex == topJoint }
+            .maxByOrNull { it.value }
+            ?: return "-"
+
+        val windowStartSec = topWindow.key.second
+        val windowEndSec = windowStartSec + 5
+        val jointName = getJointNameKorean(topJoint)
+        return "$jointName ($windowStartSec~$windowEndSec초, ${topWindow.value}회)"
+    }
+
+    private fun loadHistoryErrorInsight(history: PracticeHistory): ParsedErrorInsight? {
+        historyErrorInsightCache[history.resultId]?.let { return it }
+
+        val parsed = runCatching {
+            val jsonFile = File(history.fullJsonPath)
+            if (!jsonFile.exists()) return@runCatching null
+
+            val result = Gson().fromJson(jsonFile.readText(), com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse::class.java)
+            val majorJoints = (5..16).toSet()
+            val totalCounts = mutableMapOf<Int, Int>()
+            val windowCounts = mutableMapOf<Pair<Int, Int>, Int>()
+
+            result.frames.forEach { frame ->
+                val windowStartSec = (floor(frame.timestamp / 5.0) * 5).toInt()
+                frame.errors.forEachIndexed { index, isError ->
+                    if (isError == 1 && index in majorJoints) {
+                        totalCounts[index] = (totalCounts[index] ?: 0) + 1
+                        val key = index to windowStartSec
+                        windowCounts[key] = (windowCounts[key] ?: 0) + 1
+                    }
+                }
+            }
+
+            ParsedErrorInsight(
+                jointTotalErrorCounts = totalCounts,
+                jointWindowErrorCounts = windowCounts
+            )
+        }.getOrNull()
+
+        historyErrorInsightCache[history.resultId] = parsed
+        return parsed
+    }
+
+    private fun getJointNameKorean(index: Int): String {
+        return when (index) {
+            5 -> "왼쪽 어깨"
+            6 -> "오른쪽 어깨"
+            7 -> "왼쪽 팔꿈치"
+            8 -> "오른쪽 팔꿈치"
+            9 -> "왼쪽 손목"
+            10 -> "오른쪽 손목"
+            11 -> "왼쪽 골반"
+            12 -> "오른쪽 골반"
+            13 -> "왼쪽 무릎"
+            14 -> "오른쪽 무릎"
+            15 -> "왼쪽 발목"
+            16 -> "오른쪽 발목"
+            else -> "관절"
+        }
     }
 
     private fun buildDailyAverageTrend(history: List<PracticeHistory>, days: Int): Pair<List<Float>, List<String>> {
