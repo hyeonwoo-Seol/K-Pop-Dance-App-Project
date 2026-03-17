@@ -1,5 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -69,6 +70,10 @@ fun HomeScreen(
 
     LaunchedEffect(showAiTipOverlay) {
         onAiTipOverlayVisibilityChanged(showAiTipOverlay)
+    }
+
+    BackHandler(enabled = showAiTipOverlay) {
+        showAiTipOverlay = false
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
