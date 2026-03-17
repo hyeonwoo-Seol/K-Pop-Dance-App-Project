@@ -8,6 +8,8 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -52,6 +54,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -103,7 +106,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object OpenSourceLicense : Screen("openSourceLicense", "오픈소스 라이선스", Icons.Outlined.Code)
 
     object SearchResults : Screen("searchResults/{query}/{difficulty}/{artistGender}/{tempo}", "검색 결과", Icons.Default.Search)
-    object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
+    object SongDetail : Screen("songDetail/{songId}?originX={originX}&originY={originY}", "곡 상세", Icons.Default.MusicNote)
 
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
     object AiPracticeTip : Screen("aiPracticeTip", "AI 팁", Icons.Default.Analytics)
@@ -502,8 +505,8 @@ fun AppNavHost(
                         navController.navigate("searchResults/$encodedQuery/all/all/all")
                     }
                 },
-                onSongClick = { songId ->
-                    navController.navigate("songDetail/$songId")
+                onSongClick = { songId, originX, originY ->
+                    navController.navigate("songDetail/$songId?originX=$originX&originY=$originY")
                 },
                 paddingValues = innerPadding,
                 onAiTipOverlayVisibilityChanged = onAiTipOverlayVisibilityChanged
@@ -918,7 +921,35 @@ fun AppNavHost(
         }
         composable(
             route = Screen.SongDetail.route,
-            arguments = listOf(navArgument("songId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("songId") { type = NavType.StringType },
+                navArgument("originX") {
+                    type = NavType.FloatType
+                    defaultValue = 0.5f
+                },
+                navArgument("originY") {
+                    type = NavType.FloatType
+                    defaultValue = 0.5f
+                }
+            ),
+            enterTransition = {
+                val originX = targetState.arguments?.getFloat("originX") ?: 0.5f
+                val originY = targetState.arguments?.getFloat("originY") ?: 0.5f
+                scaleIn(
+                    initialScale = 0.75f,
+                    transformOrigin = TransformOrigin(originX, originY),
+                    animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS))
+            },
+            popExitTransition = {
+                val originX = initialState.arguments?.getFloat("originX") ?: 0.5f
+                val originY = initialState.arguments?.getFloat("originY") ?: 0.5f
+                scaleOut(
+                    targetScale = 0.75f,
+                    transformOrigin = TransformOrigin(originX, originY),
+                    animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS))
+            }
         ) { backStackEntry ->
             val songId = backStackEntry.arguments?.getString("songId") ?: ""
             SongDetailScreen(
