@@ -30,6 +30,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -52,7 +55,7 @@ import kotlinx.coroutines.launch
 fun HomeScreen(
     viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
-    onSongClick: (String) -> Unit,
+    onSongClick: (songId: String, originX: Float, originY: Float) -> Unit,
     paddingValues: PaddingValues,
     onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
 ) {
@@ -162,7 +165,9 @@ fun HomeScreen(
                                 title = "${item.title} (파트 ${item.partNumber})",
                                 views = "마지막 연습 ${item.lastPracticedAt}",
                                 imageUrl = item.coverUrl,
-                                onClick = { onSongClick(item.songId.toString()) }
+                                onClick = { originX, originY ->
+                                    onSongClick(item.songId.toString(), originX, originY)
+                                }
                             )
                         }
                     }
@@ -206,7 +211,9 @@ fun HomeScreen(
                                 title = song.titleKr ?: "Unknown Title",
                                 views = "난이도 ${song.difficulty}", // 조회수 대신 난이도 표시 (DB 필드 활용)
                                 imageUrl = song.coverUrl,
-                                onClick = { onSongClick(song.songId.toString()) }
+                                onClick = { originX, originY ->
+                                    onSongClick(song.songId.toString(), originX, originY)
+                                }
                             )
                         }
                     }
@@ -234,7 +241,9 @@ fun HomeScreen(
                                 title = song.titleKr ?: "",
                                 views = "인기",
                                 imageUrl = song.coverUrl,
-                                onClick = { onSongClick(song.songId.toString()) }
+                                onClick = { originX, originY ->
+                                    onSongClick(song.songId.toString(), originX, originY)
+                                }
                             )
                         }
                     }
@@ -330,11 +339,12 @@ fun SongCard(
     title: String,
     views: String,
     imageUrl: String?,
-    onClick: () -> Unit
+    onClick: (originX: Float, originY: Float) -> Unit
 ) {
     val thumbnailRotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var isAnimating by remember { mutableStateOf(false) }
+    var clickOrigin by remember { mutableStateOf(0.5f to 0.5f) }
 
     Column(
         modifier = Modifier
@@ -346,6 +356,20 @@ fun SongCard(
                 .size(140.dp)
                 .graphicsLayer {
                     rotationZ = thumbnailRotation.value
+                }
+                .onGloballyPositioned { coordinates ->
+                    val bounds = coordinates.boundsInRoot()
+                    val rootSize = coordinates.findRootCoordinates().size
+
+                    if (rootSize.width > 0 && rootSize.height > 0) {
+                        val centerX = bounds.left + bounds.width / 2f
+                        val centerY = bounds.top + bounds.height / 2f
+
+                        clickOrigin = (
+                            (centerX / rootSize.width.toFloat()).coerceIn(0f, 1f) to
+                                (centerY / rootSize.height.toFloat()).coerceIn(0f, 1f)
+                            )
+                    }
                 }
                 .clickable(enabled = !isAnimating) {
                     if (isAnimating) return@clickable
@@ -369,7 +393,7 @@ fun SongCard(
                             animationSpec = tween(durationMillis = 100)
                         )
                         isAnimating = false
-                        onClick()
+                        onClick(clickOrigin.first, clickOrigin.second)
                     }
                 }
         ) {
@@ -434,7 +458,7 @@ fun HomeScreenPreview() {
         // Preview를 위한 더미 데이터 구성은 실제 런타임에는 영향을 주지 않습니다.
         HomeScreen(
             onSearch = {},
-            onSongClick = {},
+            onSongClick = { _, _, _ -> },
             paddingValues = PaddingValues()
         )
     }
