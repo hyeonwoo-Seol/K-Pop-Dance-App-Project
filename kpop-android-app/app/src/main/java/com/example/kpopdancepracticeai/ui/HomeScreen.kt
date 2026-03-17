@@ -353,20 +353,20 @@ fun SongCard(
                     scope.launch {
                         isAnimating = true
                         thumbnailRotation.animateTo(
-                            targetValue = 20f,
+                            targetValue = 15f,
                             animationSpec = tween(durationMillis = 120)
                         )
                         thumbnailRotation.animateTo(
-                            targetValue = -30f,
+                            targetValue = -5f,
                             animationSpec = tween(durationMillis = 180)
                         )
-                        thumbnailRotation.animateTo(
-                            targetValue = 10f,
-                            animationSpec = tween(durationMillis = 130)
-                        )
+                        //thumbnailRotation.animateTo(
+                        //    targetValue = 5f,
+                        //    animationSpec = tween(durationMillis = 130)
+                        //)
                         thumbnailRotation.animateTo(
                             targetValue = 0f,
-                            animationSpec = tween(durationMillis = 120)
+                            animationSpec = tween(durationMillis = 100)
                         )
                         isAnimating = false
                         onClick()
