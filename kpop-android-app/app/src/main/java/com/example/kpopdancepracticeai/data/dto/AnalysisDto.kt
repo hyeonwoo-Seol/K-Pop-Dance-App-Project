@@ -38,5 +38,5 @@ data class FrameData(
     @SerializedName("keypoints") val keypoints: List<List<Float>>,
 
     // Errors: 각 관절별 오류 여부 (0: 정상, 1: 오류)
-    @SerializedName("errors") val errors: List<Int>
+    @SerializedName(value = "errors", alternate = ["Error", "error"]) val errors: List<Int>
 )
