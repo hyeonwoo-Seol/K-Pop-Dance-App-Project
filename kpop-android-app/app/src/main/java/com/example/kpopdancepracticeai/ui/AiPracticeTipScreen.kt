@@ -1,5 +1,8 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
@@ -56,6 +59,22 @@ private enum class AiAppTarget(val label: String) {
     CHAT_GPT("ChatGPT"),
     GEMINI("Gemini")
 }
+
+private data class AiAppIntentSpec(
+    val packages: List<String>,
+    val deepLink: (String) -> Uri
+)
+
+private val chatGptSpec = AiAppIntentSpec(
+    packages = listOf("com.openai.chatgpt"),
+    deepLink = { encodedPrompt -> Uri.parse("https://chatgpt.com/?q=$encodedPrompt") }
+)
+
+private val geminiSpec = AiAppIntentSpec(
+    // 일부 디바이스/배포 채널에서 패키지명이 달라질 수 있어 후보를 순차 탐색
+    packages = listOf("com.google.android.apps.bard", "com.google.android.apps.gemini"),
+    deepLink = { encodedPrompt -> Uri.parse("https://gemini.google.com/app?prompt=$encodedPrompt") }
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -220,48 +239,62 @@ private fun AppPicker(selected: AiAppTarget, onSelected: (AiAppTarget) -> Unit) 
     }
 }
 
-private fun openExternalAiApp(target: AiAppTarget, prompt: String, context: android.content.Context) {
+private fun openExternalAiApp(target: AiAppTarget, prompt: String, context: Context) {
     if (prompt.isBlank()) {
         Toast.makeText(context, "보낼 데이터가 없습니다.", Toast.LENGTH_SHORT).show()
         return
     }
 
     val encodedPrompt = URLEncoder.encode(prompt, StandardCharsets.UTF_8.toString())
-
-    val deepLinkIntent = when (target) {
-        AiAppTarget.CHAT_GPT -> {
-            Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://chatgpt.com/?q=$encodedPrompt")
-            ).setPackage("com.openai.chatgpt")
-        }
-
-        AiAppTarget.GEMINI -> {
-            Intent(
-                Intent.ACTION_VIEW,
-                Uri.parse("https://gemini.google.com/app?prompt=$encodedPrompt")
-            ).setPackage("com.google.android.apps.bard")
-        }
-    }
-
     val packageManager = context.packageManager
-    val launchIntent = if (deepLinkIntent.resolveActivity(packageManager) != null) {
-        deepLinkIntent
-    } else {
-        val fallbackPackage = when (target) {
-            AiAppTarget.CHAT_GPT -> "com.openai.chatgpt"
-            AiAppTarget.GEMINI -> "com.google.android.apps.bard"
-        }
-        Intent(Intent.ACTION_SEND).apply {
-            type = "text/plain"
-            putExtra(Intent.EXTRA_TEXT, prompt)
-            setPackage(fallbackPackage)
-        }
+
+    val spec = when (target) {
+        AiAppTarget.CHAT_GPT -> chatGptSpec
+        AiAppTarget.GEMINI -> geminiSpec
     }
 
-    if (launchIntent.resolveActivity(packageManager) != null) {
-        context.startActivity(launchIntent)
-    } else {
-        Toast.makeText(context, "선택한 앱이 설치되어 있지 않습니다.", Toast.LENGTH_SHORT).show()
+    val installedPackage = spec.packages.firstOrNull { packageName ->
+        runCatching {
+            packageManager.getPackageInfo(packageName, 0)
+        }.isSuccess
     }
+
+    if (installedPackage == null) {
+        Toast.makeText(context, "선택한 앱이 설치되어 있지 않습니다.", Toast.LENGTH_SHORT).show()
+        return
+    }
+
+    // 1) 딥링크 실행 시도
+    val deepLinkIntent = Intent(Intent.ACTION_VIEW, spec.deepLink(encodedPrompt)).apply {
+        setPackage(installedPackage)
+    }
+
+    if (deepLinkIntent.resolveActivity(packageManager) != null) {
+        context.startActivity(deepLinkIntent)
+        return
+    }
+
+    // 2) 텍스트 공유 인텐트 실행 시도
+    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+        type = "text/plain"
+        putExtra(Intent.EXTRA_TEXT, prompt)
+        setPackage(installedPackage)
+    }
+
+    if (shareIntent.resolveActivity(packageManager) != null) {
+        context.startActivity(shareIntent)
+        return
+    }
+
+    // 3) 앱 런처 인텐트 실행 + 프롬프트 클립보드 복사
+    val launchIntent = packageManager.getLaunchIntentForPackage(installedPackage)
+    if (launchIntent != null) {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        clipboard.setPrimaryClip(ClipData.newPlainText("AI Practice Prompt", prompt))
+        Toast.makeText(context, "프롬프트를 클립보드에 복사했습니다. 앱에서 붙여넣기 해주세요.", Toast.LENGTH_LONG).show()
+        context.startActivity(launchIntent)
+        return
+    }
+
+    Toast.makeText(context, "앱 실행 인텐트를 찾을 수 없습니다.", Toast.LENGTH_SHORT).show()
 }
