@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -41,6 +42,7 @@ fun HomeScreen(
     viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
     onSongClick: (String) -> Unit,
+    onAiTipClick: () -> Unit,
     paddingValues: PaddingValues
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
@@ -57,16 +59,17 @@ fun HomeScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(
-            start = paddingValues.calculateStartPadding(layoutDirection),
-            top = paddingValues.calculateTopPadding(),
-            end = paddingValues.calculateEndPadding(layoutDirection),
-            bottom = paddingValues.calculateBottomPadding() + 24.dp
-        ),
-        verticalArrangement = Arrangement.spacedBy(24.dp)
-    ) {
+    Box(modifier = Modifier.fillMaxSize()) {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = paddingValues.calculateStartPadding(layoutDirection),
+                top = paddingValues.calculateTopPadding(),
+                end = paddingValues.calculateEndPadding(layoutDirection),
+                bottom = paddingValues.calculateBottomPadding() + 96.dp
+            ),
+            verticalArrangement = Arrangement.spacedBy(24.dp)
+        ) {
         // 1. 타이틀 및 검색창 섹션
         item {
             Column(
@@ -224,6 +227,18 @@ fun HomeScreen(
                     )
                 }
             }
+        }
+        }
+
+        FloatingActionButton(
+            onClick = onAiTipClick,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 20.dp, bottom = paddingValues.calculateBottomPadding() + 20.dp),
+            containerColor = MaterialTheme.colorScheme.primary,
+            contentColor = Color.White
+        ) {
+            Icon(Icons.Default.AutoAwesome, contentDescription = "AI 연습 팁")
         }
     }
 }

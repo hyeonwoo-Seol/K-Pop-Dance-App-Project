@@ -104,6 +104,7 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
 
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
+    object AiPracticeTip : Screen("aiPracticeTip", "AI 팁", Icons.Default.Analytics)
 
     // 💡 [수정] URL을 전달받기 위해 경로 끝에 /{videoUrl} 추가
     object DancePractice : Screen(
@@ -219,6 +220,7 @@ fun AppNavigation(
         Screen.AnalysisLoading.route,
         Screen.Record.route,
         Screen.Analysis.route,
+        Screen.AiPracticeTip.route,
     )
 
     val showMainBars = if (currentRoute != null) {
@@ -496,7 +498,17 @@ fun AppNavHost(
                 onSongClick = { songId ->
                     navController.navigate("songDetail/$songId")
                 },
+                onAiTipClick = {
+                    navController.navigate(Screen.AiPracticeTip.route)
+                },
                 paddingValues = innerPadding
+            )
+        }
+
+        composable(Screen.AiPracticeTip.route) {
+            AiPracticeTipScreen(
+                paddingValues = innerPadding,
+                onBackClick = { navController.popBackStack() }
             )
         }
 
