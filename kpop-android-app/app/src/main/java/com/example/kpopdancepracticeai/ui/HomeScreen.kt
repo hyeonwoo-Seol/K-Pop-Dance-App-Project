@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -26,6 +27,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
@@ -43,6 +45,7 @@ import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -329,34 +332,70 @@ fun SongCard(
     imageUrl: String?,
     onClick: () -> Unit
 ) {
+    val thumbnailRotation = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var isAnimating by remember { mutableStateOf(false) }
+
     Column(
         modifier = Modifier
             .width(140.dp) // 카드 너비 조정
-            .clickable(onClick = onClick)
     ) {
         // 앨범 커버 이미지
         Box(
             modifier = Modifier
                 .size(140.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant), // 로딩 중 배경색
-            contentAlignment = Alignment.Center
+                .graphicsLayer {
+                    rotationZ = thumbnailRotation.value
+                }
+                .clickable(enabled = !isAnimating) {
+                    if (isAnimating) return@clickable
+
+                    scope.launch {
+                        isAnimating = true
+                        thumbnailRotation.animateTo(
+                            targetValue = 15f,
+                            animationSpec = tween(durationMillis = 120)
+                        )
+                        thumbnailRotation.animateTo(
+                            targetValue = -5f,
+                            animationSpec = tween(durationMillis = 180)
+                        )
+                        //thumbnailRotation.animateTo(
+                        //    targetValue = 5f,
+                        //    animationSpec = tween(durationMillis = 130)
+                        //)
+                        thumbnailRotation.animateTo(
+                            targetValue = 0f,
+                            animationSpec = tween(durationMillis = 100)
+                        )
+                        isAnimating = false
+                        onClick()
+                    }
+                }
         ) {
-            if (!imageUrl.isNullOrEmpty()) {
-                AsyncImage(
-                    model = imageUrl,
-                    contentDescription = "$title cover",
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-            } else {
-                // 이미지가 없을 때 아이콘 표시
-                Icon(
-                    imageVector = Icons.Default.MusicNote,
-                    contentDescription = null,
-                    tint = Color.Gray,
-                    modifier = Modifier.size(48.dp)
-                )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant), // 로딩 중 배경색
+                contentAlignment = Alignment.Center
+            ) {
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "$title cover",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    // 이미지가 없을 때 아이콘 표시
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
             }
         }
 
