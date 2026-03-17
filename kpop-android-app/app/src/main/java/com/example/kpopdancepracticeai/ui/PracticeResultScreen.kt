@@ -148,6 +148,7 @@ fun PracticeResultScreen(
 
                     val joints = analyzeTop3WorstJoints(allFrames)
                     if (joints.isNotEmpty()) worstJoints = joints
+
                 }
             } catch (e: Exception) {
                 Log.e("PracticeResult", "JSON 파싱 에러", e)
@@ -357,6 +358,7 @@ fun PracticeResultScreen(
                         TopErrorJointItem(i + 1, dJoints.getOrNull(i) ?: "데이터 없음", colors[i])
                         if (i < 2) Spacer(modifier = Modifier.height(12.dp))
                     }
+
                 }
 
                 // 업적 진행도

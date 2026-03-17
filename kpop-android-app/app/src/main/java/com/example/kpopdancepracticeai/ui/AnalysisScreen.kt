@@ -393,6 +393,11 @@ fun ChoreoInsightCard(
                     }
                 }
             }
+
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text("가장 많이 틀린 구간", color = TextGray, fontSize = 13.sp)
+                Text(uiState.topErrorJointWindowText, color = TextDark, fontSize = 13.sp, fontWeight = FontWeight.Medium)
+            }
         }
     }
 }
