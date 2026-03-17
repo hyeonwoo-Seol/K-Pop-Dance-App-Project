@@ -279,7 +279,10 @@ fun AppNavigation(
                 innerPadding = innerPadding,
                 viewModel = viewModel,
                 startDestination = startDestination,
-                authRepository = authRepository
+                authRepository = authRepository,
+                onAiTipOverlayVisibilityChanged = { isVisible ->
+                    isAiTipOverlayVisible = isVisible
+                }
             )
         }
     }
@@ -375,7 +378,8 @@ fun AppNavHost(
     innerPadding: PaddingValues,
     viewModel: MainViewModel,
     startDestination: String,
-    authRepository: AuthRepository
+    authRepository: AuthRepository,
+    onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     NavHost(
         navController = navController,
@@ -502,9 +506,7 @@ fun AppNavHost(
                     navController.navigate("songDetail/$songId")
                 },
                 paddingValues = innerPadding,
-                onAiTipOverlayVisibilityChanged = { isVisible ->
-                    isAiTipOverlayVisible = isVisible
-                }
+                onAiTipOverlayVisibilityChanged = onAiTipOverlayVisibilityChanged
             )
         }
 
