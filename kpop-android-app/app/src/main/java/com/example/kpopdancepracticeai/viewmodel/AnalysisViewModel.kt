@@ -3,13 +3,16 @@ package com.example.kpopdancepracticeai.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.repository.AppRepository
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -46,6 +49,7 @@ class AnalysisViewModel(
         val filteredTrendLabels: List<String> = emptyList(),
         val bestGrade: String = "-",
         val topWorstPoints: List<Pair<String, Int>> = emptyList(),
+        val topErrorJointWindowText: String = "데이터 없음",
         val filteredPracticeCount: Int = 0
     )
 
@@ -60,6 +64,12 @@ class AnalysisViewModel(
         val songId: Long,
         val titleKr: String,
         val artistKr: String
+    )
+
+    private data class TopJointErrorWindow(
+        val jointName: String,
+        val startSecond: Int,
+        val endSecond: Int
     )
 
     // 화면 진입 시 호출
@@ -166,6 +176,12 @@ class AnalysisViewModel(
             .sortedByDescending { it.second }
             .take(3)
 
+        val topErrorJointWindowText = selectedHistory
+            .maxByOrNull { it.createdAt }
+            ?.let { analyzeTopErrorJointTimeWindow(it.fullJsonPath) }
+            ?.let { "${it.jointName}: ${it.startSecond}초 ~ ${it.endSecond}초" }
+            ?: "데이터 없음"
+
         val days = when (_uiState.value.selectedRange) {
             TrendRange.RECENT_7_DAYS -> 7
             TrendRange.FULL_1_MONTH -> 30
@@ -180,8 +196,66 @@ class AnalysisViewModel(
             filteredTrendLabels = trendLabels,
             bestGrade = bestGrade,
             topWorstPoints = topWorstPoints,
+            topErrorJointWindowText = topErrorJointWindowText,
             filteredPracticeCount = selectedHistory.size
         )
+    }
+
+    private fun analyzeTopErrorJointTimeWindow(fullJsonPath: String): TopJointErrorWindow? {
+        return runCatching {
+            val jsonFile = File(fullJsonPath)
+            if (!jsonFile.exists()) return null
+
+            val result = Gson().fromJson(jsonFile.readText(), AnalysisResultResponse::class.java)
+            val frames = result.frames
+            if (frames.isEmpty()) return null
+
+            val majorJoints = (5..16).toSet()
+            val errorCounts = mutableMapOf<Int, Int>()
+
+            frames.forEach { frame ->
+                frame.errors.forEachIndexed { index, isError ->
+                    if (index in majorJoints && isError == 1) {
+                        errorCounts[index] = (errorCounts[index] ?: 0) + 1
+                    }
+                }
+            }
+
+            val topJointIndex = errorCounts.maxByOrNull { it.value }?.key ?: return null
+
+            val bySecond = mutableMapOf<Int, Int>()
+            frames.forEach { frame ->
+                if (frame.errors.getOrNull(topJointIndex) == 1) {
+                    val secondBucket = frame.timestamp.toInt()
+                    bySecond[secondBucket] = (bySecond[secondBucket] ?: 0) + 1
+                }
+            }
+
+            val topSecond = bySecond.maxByOrNull { it.value }?.key ?: return null
+            TopJointErrorWindow(
+                jointName = getJointNameKorean(topJointIndex),
+                startSecond = topSecond,
+                endSecond = topSecond + 1
+            )
+        }.getOrNull()
+    }
+
+    private fun getJointNameKorean(index: Int): String {
+        return when (index) {
+            5 -> "왼쪽 어깨"
+            6 -> "오른쪽 어깨"
+            7 -> "왼쪽 팔꿈치"
+            8 -> "오른쪽 팔꿈치"
+            9 -> "왼쪽 손목"
+            10 -> "오른쪽 손목"
+            11 -> "왼쪽 골반"
+            12 -> "오른쪽 골반"
+            13 -> "왼쪽 무릎"
+            14 -> "오른쪽 무릎"
+            15 -> "왼쪽 발목"
+            16 -> "오른쪽 발목"
+            else -> "관절"
+        }
     }
 
     private fun buildDailyAverageTrend(history: List<PracticeHistory>, days: Int): Pair<List<Float>, List<String>> {

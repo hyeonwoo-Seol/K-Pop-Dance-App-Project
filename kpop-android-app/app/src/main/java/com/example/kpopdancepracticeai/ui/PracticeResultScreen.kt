@@ -76,7 +76,6 @@ fun PracticeResultScreen(
     var totalScore by remember { mutableIntStateOf(if (isPreview) 87 else score) }
     var accuracyGrade by remember { mutableStateOf(if (isPreview) "B" else "-") }
     var worstJoints by remember { mutableStateOf<List<String>>(if (isPreview) listOf("왼쪽 어깨", "오른쪽 팔꿈치", "왼쪽 무릎") else emptyList()) }
-    var topJointTimeWindowText by remember { mutableStateOf(if (isPreview) "오른쪽 팔꿈치: 12초 ~ 13초" else "데이터 없음") }
 
     // 신체 부위별 점수 (순서: 0.몸통, 1.오른팔, 2.오른다리, 3.왼다리, 4.왼팔)
     var partScores by remember { mutableStateOf(if (isPreview) listOf(90f, 85f, 75f, 88f, 82f) else listOf(0f, 0f, 0f, 0f, 0f)) }
@@ -150,10 +149,6 @@ fun PracticeResultScreen(
                     val joints = analyzeTop3WorstJoints(allFrames)
                     if (joints.isNotEmpty()) worstJoints = joints
 
-                    val topJointWindow = analyzeTopErrorJointTimeWindow(allFrames)
-                    topJointTimeWindowText = topJointWindow?.let {
-                        "${it.jointName}: ${it.startSecond}초 ~ ${it.endSecond}초"
-                    } ?: "데이터 없음"
                 }
             } catch (e: Exception) {
                 Log.e("PracticeResult", "JSON 파싱 에러", e)
@@ -364,15 +359,6 @@ fun PracticeResultScreen(
                         if (i < 2) Spacer(modifier = Modifier.height(12.dp))
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("⏱️", fontSize = 16.sp)
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = "가장 많이 틀린 구간: $topJointTimeWindowText",
-                            style = TextStyle(fontSize = 14.sp, fontWeight = FontWeight.Medium, color = Color(0xff444444))
-                        )
-                    }
                 }
 
                 // 업적 진행도
@@ -603,50 +589,6 @@ fun analyzeTop3WorstJoints(frames: List<FrameData>): List<String> {
         .entries.sortedByDescending { it.value }
         .take(3)
         .map { getJointNameKorean(it.key) }
-}
-
-data class TopJointErrorWindow(
-    val jointIndex: Int,
-    val jointName: String,
-    val startSecond: Int,
-    val endSecond: Int,
-    val errorCount: Int
-)
-
-fun analyzeTopErrorJointTimeWindow(frames: List<FrameData>): TopJointErrorWindow? {
-    if (frames.isEmpty()) return null
-
-    val majorJoints = (5..16).toSet()
-    val jointErrorCounts = mutableMapOf<Int, Int>()
-
-    frames.forEach { frame ->
-        frame.errors.forEachIndexed { index, isError ->
-            if (index in majorJoints && isError == 1) {
-                jointErrorCounts[index] = (jointErrorCounts[index] ?: 0) + 1
-            }
-        }
-    }
-
-    val topJointIndex = jointErrorCounts.maxByOrNull { it.value }?.key ?: return null
-
-    val bucketCountBySecond = mutableMapOf<Int, Int>()
-    frames.forEach { frame ->
-        val hasError = frame.errors.getOrNull(topJointIndex) == 1
-        if (hasError) {
-            val secondBucket = frame.timestamp.toInt()
-            bucketCountBySecond[secondBucket] = (bucketCountBySecond[secondBucket] ?: 0) + 1
-        }
-    }
-
-    val topSecondBucket = bucketCountBySecond.maxByOrNull { it.value }?.key ?: return null
-
-    return TopJointErrorWindow(
-        jointIndex = topJointIndex,
-        jointName = getJointNameKorean(topJointIndex),
-        startSecond = topSecondBucket,
-        endSecond = topSecondBucket + 1,
-        errorCount = jointErrorCounts[topJointIndex] ?: 0
-    )
 }
 
 fun getJointNameKorean(index: Int): String {
