@@ -49,7 +49,8 @@ fun HomeScreen(
     viewModel: MainViewModel = viewModel(), // DB 데이터를 가져오기 위한 ViewModel
     onSearch: (String) -> Unit,
     onSongClick: (String) -> Unit,
-    paddingValues: PaddingValues
+    paddingValues: PaddingValues,
+    onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
     val dbSongs by viewModel.songs.collectAsState()
@@ -65,6 +66,10 @@ fun HomeScreen(
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var showAiTipOverlay by remember { mutableStateOf(false) }
+
+    LaunchedEffect(showAiTipOverlay) {
+        onAiTipOverlayVisibilityChanged(showAiTipOverlay)
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -237,15 +242,17 @@ fun HomeScreen(
         }
         }
 
-        FloatingActionButton(
-            onClick = { showAiTipOverlay = true },
+        if (!showAiTipOverlay) {
+            FloatingActionButton(
+                onClick = { showAiTipOverlay = true },
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 20.dp, bottom = paddingValues.calculateBottomPadding() + 20.dp),
             containerColor = MaterialTheme.colorScheme.primary,
             contentColor = Color.White
-        ) {
-            Icon(Icons.Default.AutoAwesome, contentDescription = "AI 연습 팁")
+            ) {
+                Icon(Icons.Default.AutoAwesome, contentDescription = "AI 연습 팁")
+            }
         }
 
         AnimatedVisibility(
@@ -262,6 +269,7 @@ fun HomeScreen(
         }
 
         AnimatedVisibility(
+            modifier = Modifier.fillMaxSize(),
             visible = showAiTipOverlay,
             enter = slideInVertically(
                 initialOffsetY = { it },
@@ -272,20 +280,24 @@ fun HomeScreen(
                 animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
             ) + fadeOut(animationSpec = tween(durationMillis = 180))
         ) {
-            Surface(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .fillMaxHeight(0.9f),
-                shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
-                tonalElevation = 8.dp,
-                shadowElevation = 8.dp,
-                color = MaterialTheme.colorScheme.surface
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.BottomCenter
             ) {
-                AiPracticeTipScreen(
-                    paddingValues = PaddingValues(0.dp),
-                    onBackClick = { showAiTipOverlay = false }
-                )
+                Surface(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.9f),
+                    shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+                    tonalElevation = 8.dp,
+                    shadowElevation = 8.dp,
+                    color = MaterialTheme.colorScheme.surface
+                ) {
+                    AiPracticeTipScreen(
+                        paddingValues = PaddingValues(0.dp),
+                        onBackClick = { showAiTipOverlay = false }
+                    )
+                }
             }
         }
     }
