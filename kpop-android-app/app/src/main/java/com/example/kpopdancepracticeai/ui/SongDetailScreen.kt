@@ -48,7 +48,9 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
@@ -262,13 +264,14 @@ private fun SongHeaderCard(info: SongInfoUi) {
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             DifficultyChip(level = info.level)
                             MetaIconText(
                                 icon = Icons.Default.CalendarToday,
-                                text = info.releaseDate
+                                text = info.releaseDate,
+                                textStyle = MaterialTheme.typography.labelSmall
                             )
                         }
                         MetaIconText(
@@ -318,22 +321,25 @@ private fun DifficultyChip(level: String) {
 @Composable
 private fun MetaIconText(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String
+    text: String,
+    textStyle: TextStyle = MaterialTheme.typography.bodyMedium
 ) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
     ) {
         Icon(
             imageVector = icon,
             contentDescription = null,
             tint = DetailSecondaryText,
-            modifier = Modifier.size(16.dp)
+            modifier = Modifier.size(14.dp)
         )
         Text(
             text = text,
             color = DetailSecondaryText,
-            style = MaterialTheme.typography.bodyMedium
+            style = textStyle,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
