@@ -153,7 +153,7 @@ private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
 // 홈/검색/프로필 탭 이동 전환에 적용됩니다.
 private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 550
 // 안무 상세 화면 전환 속도(ms).
-private const val SONG_DETAIL_ENTER_TRANSITION_DURATION_MS = 630
+private const val SONG_DETAIL_ENTER_TRANSITION_DURATION_MS = 610
 private const val SONG_DETAIL_EXIT_TRANSITION_DURATION_MS = 520
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
