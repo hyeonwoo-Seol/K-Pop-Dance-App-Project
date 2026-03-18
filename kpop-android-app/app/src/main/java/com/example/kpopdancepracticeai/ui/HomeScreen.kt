@@ -63,7 +63,6 @@ import kotlinx.coroutines.launch
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
-// 필요하면 HomeScreen(..., promoCollapseDurationMillis = 원하는값) 으로 화면별 오버라이드 가능
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
