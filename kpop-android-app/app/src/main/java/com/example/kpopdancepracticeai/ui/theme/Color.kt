@@ -23,6 +23,8 @@ val PointGreen = Color(0xff008236)
 val PointYellow = Color(0xfff0b100)
 
 // 배경색
+val AppBackgroundTop = Color(0xFFDDE3FF)
+val AppBackgroundBottom = Color(0xFFF0E8FF)
 val BgPurpleLight = Color(0xfffaf5ff)
 val BgBlueLight = Color(0xffeff6ff)
 val BgGreenLight = Color(0xffdcfce7)

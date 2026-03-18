@@ -21,7 +21,8 @@ import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.kpopdancepracticeai.data.RealDataSource
-import com.example.kpopdancepracticeai.ui.theme.BgPurpleLight
+import com.example.kpopdancepracticeai.ui.theme.AppBackgroundBottom
+import com.example.kpopdancepracticeai.ui.theme.AppBackgroundTop
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 
 // UI용 데이터 클래스
@@ -48,6 +49,11 @@ fun SongDetailScreen(
 ) {
     val songs by viewModel.songs.collectAsState()
     val selectedSong = songs.find { it.songId.toString() == songId }
+    val screenBackground = remember {
+        Brush.verticalGradient(
+            colors = listOf(AppBackgroundTop, AppBackgroundBottom)
+        )
+    }
 
     var uiState by remember { mutableStateOf<SongInfoUi?>(null) }
 
@@ -69,69 +75,108 @@ fun SongDetailScreen(
         }
     }
 
-    Scaffold(
-        containerColor = BgPurpleLight,
-        bottomBar = {
-            Button(
-                onClick = { navController.navigate("songPartSelect/$songId") },
-                modifier = Modifier.fillMaxWidth().padding(16.dp).height(56.dp),
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                Icon(Icons.Default.PlayArrow, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text("파트 선택하고 연습하기")
-            }
-        }
-    ) { innerPadding ->
-        if (uiState != null) {
-            val info = uiState!!
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(BgPurpleLight)
-                    .padding(innerPadding)
-            ) {
-                Box(modifier = Modifier.height(300.dp).fillMaxWidth()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current).data(info.albumArtUrl).crossfade(true).build(),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize()
-                    )
-                    Box(modifier = Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(0.7f)))))
-                    IconButton(onClick = onBackClick, modifier = Modifier.padding(16.dp)) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back", tint = Color.White)
-                    }
-                    Column(modifier = Modifier.align(Alignment.BottomStart).padding(24.dp)) {
-                        Text(info.title, style = MaterialTheme.typography.headlineMedium, color = Color.White, fontWeight = FontWeight.Bold)
-                        Text(info.artist, style = MaterialTheme.typography.titleMedium, color = Color.White.copy(0.8f))
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(screenBackground)
+    ) {
+        Scaffold(
+            containerColor = Color.Transparent,
+            bottomBar = {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(AppBackgroundBottom)
+                ) {
+                    Button(
+                        onClick = { navController.navigate("songPartSelect/$songId") },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp)
+                            .height(56.dp),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("파트 선택하고 연습하기")
                     }
                 }
-                Column(modifier = Modifier.padding(24.dp)) {
-                    Text("상세 정보", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
-                    Text("난이도: ${info.level}")
-                    Text("발매일: ${info.time}")
-                    info.mainArtist?.let { Text("메인 아티스트: $it") }
-                    if (info.composers.isNotEmpty()) {
-                        Text("작곡가: ${info.composers.joinToString(separator = ", ")}")
-                    }
-                    if (info.lyricists.isNotEmpty()) {
-                        Text("작사가: ${info.lyricists.joinToString(separator = ", ")}")
-                    }
-                    if (info.producers.isNotEmpty()) {
-                        Text("프로듀서: ${info.producers.joinToString(separator = ", ")}")
-                    }
-                    info.source?.let { Text("출처: $it") }
-                }
             }
-        } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(BgPurpleLight),
-                contentAlignment = Alignment.Center
-            ) { CircularProgressIndicator() }
+        ) { innerPadding ->
+            if (uiState != null) {
+                val info = uiState!!
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(screenBackground)
+                        .padding(innerPadding)
+                ) {
+                    Box(modifier = Modifier.height(300.dp).fillMaxWidth()) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(info.albumArtUrl)
+                                .crossfade(true)
+                                .build(),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize()
+                        )
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .background(
+                                    Brush.verticalGradient(
+                                        listOf(Color.Transparent, Color.Black.copy(0.7f))
+                                    )
+                                )
+                        )
+                        IconButton(onClick = onBackClick, modifier = Modifier.padding(16.dp)) {
+                            Icon(
+                                Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Back",
+                                tint = Color.White
+                            )
+                        }
+                        Column(modifier = Modifier.align(Alignment.BottomStart).padding(24.dp)) {
+                            Text(
+                                info.title,
+                                style = MaterialTheme.typography.headlineMedium,
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                info.artist,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = Color.White.copy(0.8f)
+                            )
+                        }
+                    }
+                    Column(modifier = Modifier.padding(24.dp)) {
+                        Text("상세 정보", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(16.dp))
+                        Text("난이도: ${info.level}")
+                        Text("발매일: ${info.time}")
+                        info.mainArtist?.let { Text("메인 아티스트: $it") }
+                        if (info.composers.isNotEmpty()) {
+                            Text("작곡가: ${info.composers.joinToString(separator = ", ")}")
+                        }
+                        if (info.lyricists.isNotEmpty()) {
+                            Text("작사가: ${info.lyricists.joinToString(separator = ", ")}")
+                        }
+                        if (info.producers.isNotEmpty()) {
+                            Text("프로듀서: ${info.producers.joinToString(separator = ", ")}")
+                        }
+                        info.source?.let { Text("출처: $it") }
+                    }
+                }
+            } else {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(screenBackground),
+                    contentAlignment = Alignment.Center
+                ) { CircularProgressIndicator() }
+            }
         }
     }
 }
