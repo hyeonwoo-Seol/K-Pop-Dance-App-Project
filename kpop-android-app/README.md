@@ -6,11 +6,17 @@
 
 ### 1-1. 최근 연습한 안무 표시
 
+<img src="https://github.com/user-attachments/assets/26a3541b-e4e4-41a0-9bf2-ebb5d969f758" width="400">
+
 앱을 처음 설치해서 최근 연습한 안무가 없다면 최근에 연습한 안무가 없다고 표시합니다.
 
 안무를 연습하면 마지막 연습 날짜와 함께 최대 4개까지 최근에 연습한 안무가 표시됩니다.
 
 ### 1-2. AI 채팅으로 안무 연습하기
+
+<img src="https://github.com/user-attachments/assets/7229fc4c-0d52-40e9-936b-82d09ccecf5e" width="400">
+
+<img src="https://github.com/user-attachments/assets/3fe609fa-aedd-40cf-8486-a0bd789efea5" width="400">
 
 오른쪽 하단에 AI 채팅 플로팅 버튼을 터치하면, 사용자가 연습한 안무 목록들 중 하나를 선택하게 되고, ChatGPT나 Gemini 중 하나를 선택해서 DB에 있는 사용자 정보들을 이용한 미리 작성된 AI 연습 TIP 프롬프트를 자동으로 외부 AI 챗봇 앱으로 보낼 수 있습니다.
 
@@ -18,11 +24,15 @@
 
 ### 1-3. 인기 급상승 챌린지
 
+<img src="https://github.com/user-attachments/assets/d6b4d2ea-6e4d-49f7-838e-1bab75d8ed04" width="400">
+
 여러 사용자들의 안무 연습 횟수를 수집하여 내림차순 정렬한 뒤, 이를 기준으로 안무 목록을 표시합니다.
 
 ### 1-4. 안무 화면 뜨는 모션
 
 안무 썸네일을 터치해서 상세 정보 화면으로 넘어갈 때, 터치한 안무의 위치값을 기준으로 새 화면이 펼쳐지는 자연스러운 화면 전환을 구현했습니다.
+
+https://github.com/user-attachments/assets/328f76b4-e22e-48a0-a16b-3abb960c18b2
 
 ## 2. 검색 화면
 
