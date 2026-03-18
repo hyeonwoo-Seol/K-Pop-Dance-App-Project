@@ -120,6 +120,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val achievementMetaByCode = RealDataSource.getRealAchievements.associateBy { it.id }
 
     private var currentUserId: String? = null
+    private var subscribedUserId: String? = null
 
     fun checkUserExists(userId: String) {
         viewModelScope.launch {
@@ -143,101 +144,32 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         _loginState.value = LoginState.Idle
     }
 
-    fun loadInitialData(userId: String) {
-        if (currentUserId == userId) return
+    fun loadInitialData(
+        userId: String,
+        syncRemoteUserData: Boolean = false,
+        showSyncMessage: Boolean = false
+    ) {
         currentUserId = userId
 
         viewModelScope.launch {
             _isSyncing.value = true
             try {
                 repository.prePopulateSongsIfNeeded()
-
                 repository.fetchInitialData(userId)
+                subscribeToUserData(userId)
 
-                // 구독 설정
-                launch { repository.getUserStats(userId).collect { _userStats.value = it } }
-                launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
-                launch {
-                    repository.allSongs.collect {
-                        _songs.value = it
-                        remapTopPracticedChoreos()
-                    }
-                }
-                launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
-                launch {
-                    repository.getRecentChoreoRows(userId).collect { rows ->
-                        _recentChoreo.value = rows.map { row ->
-                            RecentChoreoUiModel(
-                                songId = row.songId,
-                                partNumber = row.partNumber,
-                                title = row.titleKr,
-                                artist = row.artistKr,
-                                coverUrl = row.coverUrl,
-                                practiceCount = row.practiceCount,
-                                lastPracticedAt = row.lastPracticedAt
-                            )
-                        }
-                    }
-                }
-                launch {
-                    repository.getTopPracticedHistoryRows(userId).collect { rows ->
-                        topPracticedHistoryRowsCache = rows
-                        remapTopPracticedChoreos()
-                    }
+                if (syncRemoteUserData) {
+                    repository.syncUserDataFromRemote(userId)
                 }
 
-                // 업적 구독 및 변환
-                launch {
-                    repository.getUserAchievements(userId).collect { list ->
-                        val progressByCode = list.associateBy { it.achievementCode }
-                        val uiModels = achievementMetaByCode.values.map { meta ->
-                            val item = progressByCode[meta.id]
-                            val currentStep = item?.currentStep ?: 0
-                            val goalStep = item?.goalStep ?: meta.goalCount
-                            val isUnlocked = item?.isCompleted ?: false
-                            val progress = if (goalStep > 0) currentStep.toFloat() / goalStep else 0f
-                            val safeProgress = progress.coerceIn(0f, 1f)
-                            val progressText = "$currentStep / $goalStep (${(safeProgress * 100).toInt()}%)"
-
-                            AchievementUiModel(
-                                code = meta.id,
-                                title = meta.title,
-                                description = meta.description,
-                                currentStep = currentStep,
-                                goalStep = goalStep,
-                                isUnlocked = isUnlocked,
-                                progress = safeProgress,
-                                progressText = progressText
-                            )
-                        }.sortedWith(
-                            compareByDescending<AchievementUiModel> { it.isUnlocked }
-                                .thenByDescending { it.progress }
-                                .thenBy { it.title }
-                        )
-
-                        _achievementProgress.value = uiModels
-                    }
+                if (showSyncMessage) {
+                    _syncMessage.value = "데이터 동기화 완료"
                 }
-
-                // 배지 구독 및 변환
-                launch {
-                    repository.getUserBadges(userId).collect { list ->
-                        _userBadges.value = list.map { badge ->
-                            val color = when {
-                                badge.name.contains("마스터") -> Color(0xFFEBEBFF)
-                                badge.name.contains("팬") -> Color(0xFFD6F5FF)
-                                badge.name.contains("전문가") -> Color(0xFFFFD6EB)
-                                else -> Color(0xFFD9FFE5)
-                            }
-                            BadgeUiModel(badge.name, color)
-                        }
-                    }
-                }
-
-                _syncMessage.value = "데이터 동기화 완료"
             } catch (e: Exception) {
                 e.printStackTrace()
-                _syncMessage.value = "동기화 실패: ${e.message}"
+                if (showSyncMessage || syncRemoteUserData) {
+                    _syncMessage.value = "동기화 실패: ${e.message}"
+                }
             } finally {
                 _isSyncing.value = false
             }
@@ -290,7 +222,11 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         val userId = currentUserId
         if (userId != null) {
             updateUsageTime()
-            loadInitialData(userId)
+            loadInitialData(
+                userId = userId,
+                syncRemoteUserData = true,
+                showSyncMessage = true
+            )
         } else {
             viewModelScope.launch {
                 repository.prePopulateSongsIfNeeded()
@@ -337,6 +273,90 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     }
 
     fun clearSyncMessage() { _syncMessage.value = null }
+
+    private fun subscribeToUserData(userId: String) {
+        if (subscribedUserId == userId) return
+        subscribedUserId = userId
+
+        launchStateCollection(userId)
+    }
+
+    private fun launchStateCollection(userId: String) {
+        viewModelScope.launch { repository.getUserStats(userId).collect { _userStats.value = it } }
+        viewModelScope.launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
+        viewModelScope.launch {
+            repository.allSongs.collect {
+                _songs.value = it
+                remapTopPracticedChoreos()
+            }
+        }
+        viewModelScope.launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
+        viewModelScope.launch {
+            repository.getRecentChoreoRows(userId).collect { rows ->
+                _recentChoreo.value = rows.map { row ->
+                    RecentChoreoUiModel(
+                        songId = row.songId,
+                        partNumber = row.partNumber,
+                        title = row.titleKr,
+                        artist = row.artistKr,
+                        coverUrl = row.coverUrl,
+                        practiceCount = row.practiceCount,
+                        lastPracticedAt = row.lastPracticedAt
+                    )
+                }
+            }
+        }
+        viewModelScope.launch {
+            repository.getTopPracticedHistoryRows(userId).collect { rows ->
+                topPracticedHistoryRowsCache = rows
+                remapTopPracticedChoreos()
+            }
+        }
+        viewModelScope.launch {
+            repository.getUserAchievements(userId).collect { list ->
+                val progressByCode = list.associateBy { it.achievementCode }
+                val uiModels = achievementMetaByCode.values.map { meta ->
+                    val item = progressByCode[meta.id]
+                    val currentStep = item?.currentStep ?: 0
+                    val goalStep = item?.goalStep ?: meta.goalCount
+                    val isUnlocked = item?.isCompleted ?: false
+                    val progress = if (goalStep > 0) currentStep.toFloat() / goalStep else 0f
+                    val safeProgress = progress.coerceIn(0f, 1f)
+                    val progressText = "$currentStep / $goalStep (${(safeProgress * 100).toInt()}%)"
+
+                    AchievementUiModel(
+                        code = meta.id,
+                        title = meta.title,
+                        description = meta.description,
+                        currentStep = currentStep,
+                        goalStep = goalStep,
+                        isUnlocked = isUnlocked,
+                        progress = safeProgress,
+                        progressText = progressText
+                    )
+                }.sortedWith(
+                    compareByDescending<AchievementUiModel> { it.isUnlocked }
+                        .thenByDescending { it.progress }
+                        .thenBy { it.title }
+                )
+
+                _achievementProgress.value = uiModels
+            }
+        }
+        viewModelScope.launch {
+            repository.getUserBadges(userId).collect { list ->
+                _userBadges.value = list.map { badge ->
+                    val color = when {
+                        badge.name.contains("마스터") -> Color(0xFFEBEBFF)
+                        badge.name.contains("팬") -> Color(0xFFD6F5FF)
+                        badge.name.contains("전문가") -> Color(0xFFFFD6EB)
+                        else -> Color(0xFFD9FFE5)
+                    }
+                    BadgeUiModel(badge.name, color)
+                }
+            }
+        }
+    }
 
     private fun remapTopPracticedChoreos() {
         val songs = _songs.value
