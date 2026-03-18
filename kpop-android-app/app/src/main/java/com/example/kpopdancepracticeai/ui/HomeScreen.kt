@@ -357,3 +357,260 @@ private fun HomePromoVideoSection(
         )
     }
 }
+
+
+@Composable
+private fun RecentChoreoSection(
+    recentChoreo: List<RecentChoreoUiModel>,
+    onSongClick: (songId: String, originX: Float, originY: Float) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionTitle(
+            title = "최근 연습한 안무",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        if (recentChoreo.isEmpty()) {
+            Text(
+                text = "최근에 연습한 안무가 없습니다",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color.Gray,
+                fontSize = 14.sp
+            )
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(recentChoreo.take(4)) { item ->
+                    SongCard(
+                        artist = item.artist,
+                        title = "${item.title} (파트 ${item.partNumber})",
+                        views = "마지막 연습 ${item.lastPracticedAt}",
+                        imageUrl = item.coverUrl,
+                        onClick = { originX, originY ->
+                            onSongClick(item.songId.toString(), originX, originY)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RegisteredChoreoSection(
+    dbSongs: List<Song>,
+    onSongClick: (songId: String, originX: Float, originY: Float) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionTitle(
+            title = "등록된 안무 목록",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        if (dbSongs.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(150.dp)
+                    .padding(horizontal = 16.dp)
+                    .background(Color.LightGray.copy(alpha = 0.3f), RoundedCornerShape(12.dp)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "등록된 곡이 없습니다.\n데이터를 동기화해주세요.",
+                    textAlign = TextAlign.Center,
+                    color = Color.Gray
+                )
+            }
+        } else {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(dbSongs) { song ->
+                    SongCard(
+                        artist = song.artistKr ?: "Unknown Artist",
+                        title = song.titleKr ?: "Unknown Title",
+                        views = "난이도 ${song.difficulty}",
+                        imageUrl = song.coverUrl,
+                        onClick = { originX, originY ->
+                            onSongClick(song.songId.toString(), originX, originY)
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TrendingChallengeSection(
+    dbSongs: List<Song>,
+    onSongClick: (songId: String, originX: Float, originY: Float) -> Unit
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        HomeSectionTitle(
+            title = "인기 급상승 챌린지",
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        )
+
+        if (dbSongs.isNotEmpty()) {
+            LazyRow(
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                items(dbSongs.reversed()) { song ->
+                    SongCard(
+                        artist = song.artistKr ?: "",
+                        title = song.titleKr ?: "",
+                        views = "인기",
+                        imageUrl = song.coverUrl,
+                        onClick = { originX, originY ->
+                            onSongClick(song.songId.toString(), originX, originY)
+                        }
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = "챌린지 목록을 불러올 수 없습니다.",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                color = Color.Gray,
+                fontSize = 14.sp
+            )
+        }
+    }
+}
+
+@Composable
+private fun HomeSectionTitle(title: String, modifier: Modifier = Modifier) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.titleMedium,
+        fontWeight = FontWeight.Bold,
+        fontSize = 18.sp,
+        modifier = modifier
+    )
+}
+
+@Composable
+private fun SongCard(
+    artist: String,
+    title: String,
+    views: String,
+    imageUrl: String?,
+    onClick: (originX: Float, originY: Float) -> Unit
+) {
+    val thumbnailRotation = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    var isAnimating by remember { mutableStateOf(false) }
+    var clickOrigin by remember { mutableStateOf(0.5f to 0.5f) }
+
+    Column(
+        modifier = Modifier.width(140.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .graphicsLayer {
+                    rotationZ = thumbnailRotation.value
+                }
+                .onGloballyPositioned { coordinates ->
+                    val bounds = coordinates.boundsInRoot()
+                    val rootSize = coordinates.findRootCoordinates().size
+
+                    if (rootSize.width > 0 && rootSize.height > 0) {
+                        val centerX = bounds.left + bounds.width / 2f
+                        val centerY = bounds.top + bounds.height / 2f
+
+                        clickOrigin = (
+                            (centerX / rootSize.width.toFloat()).coerceIn(0f, 1f) to
+                                (centerY / rootSize.height.toFloat()).coerceIn(0f, 1f)
+                            )
+                    }
+                }
+                .clickable(enabled = !isAnimating) {
+                    if (isAnimating) return@clickable
+
+                    scope.launch {
+                        isAnimating = true
+                        thumbnailRotation.animateTo(
+                            targetValue = 15f,
+                            animationSpec = tween(durationMillis = 120)
+                        )
+                        thumbnailRotation.animateTo(
+                            targetValue = -5f,
+                            animationSpec = tween(durationMillis = 180)
+                        )
+                        onClick(clickOrigin.first, clickOrigin.second)
+                        thumbnailRotation.animateTo(
+                            targetValue = 0f,
+                            animationSpec = tween(durationMillis = 100)
+                        )
+                        isAnimating = false
+                    }
+                }
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (!imageUrl.isNullOrEmpty()) {
+                    AsyncImage(
+                        model = imageUrl,
+                        contentDescription = "$title cover",
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = Icons.Default.MusicNote,
+                        contentDescription = null,
+                        tint = Color.Gray,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Text(
+            text = title,
+            style = MaterialTheme.typography.bodyLarge,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = artist,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = views,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            maxLines = 1
+        )
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+private fun HomeScreenPreview() {
+    KpopDancePracticeAITheme {
+        HomeScreen(
+            onSearch = {},
+            onSongClick = { _, _, _ -> },
+            paddingValues = PaddingValues()
+        )
+    }
+}
