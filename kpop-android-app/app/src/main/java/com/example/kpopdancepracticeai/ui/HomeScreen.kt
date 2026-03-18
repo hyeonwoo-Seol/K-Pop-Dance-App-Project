@@ -31,8 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -60,6 +62,7 @@ import com.example.kpopdancepracticeai.viewmodel.RecentChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.gestures.detectTapGestures
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
@@ -469,7 +472,19 @@ fun SongCard(
     val thumbnailRotation = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var isAnimating by remember { mutableStateOf(false) }
-    var clickOrigin by remember { mutableStateOf(0.5f to 0.5f) }
+    val coordinateHolder = remember { object { var coordinates: LayoutCoordinates? = null } }
+
+    fun resolveClickOrigin(tapOffset: Offset): Pair<Float, Float> {
+        val coordinates = coordinateHolder.coordinates ?: return 0.5f to 0.5f
+        val rootCoordinates = coordinates.findRootCoordinates()
+        val rootSize = rootCoordinates.size
+
+        if (rootSize.width <= 0 || rootSize.height <= 0) return 0.5f to 0.5f
+
+        val tapInRoot = coordinates.localToRoot(tapOffset)
+        return (tapInRoot.x / rootSize.width.toFloat()).coerceIn(0f, 1f) to
+            (tapInRoot.y / rootSize.height.toFloat()).coerceIn(0f, 1f)
+    }
 
     Column(
         modifier = Modifier
@@ -482,38 +497,31 @@ fun SongCard(
                     rotationZ = thumbnailRotation.value
                 }
                 .onGloballyPositioned { coordinates ->
-                    val bounds = coordinates.boundsInRoot()
-                    val rootSize = coordinates.findRootCoordinates().size
-
-                    if (rootSize.width > 0 && rootSize.height > 0) {
-                        val centerX = bounds.left + bounds.width / 2f
-                        val centerY = bounds.top + bounds.height / 2f
-
-                        clickOrigin = (
-                            (centerX / rootSize.width.toFloat()).coerceIn(0f, 1f) to
-                                (centerY / rootSize.height.toFloat()).coerceIn(0f, 1f)
-                            )
-                    }
+                    coordinateHolder.coordinates = coordinates
                 }
-                .clickable(enabled = !isAnimating) {
-                    if (isAnimating) return@clickable
+                .pointerInput(isAnimating) {
+                    detectTapGestures { tapOffset ->
+                        if (isAnimating) return@detectTapGestures
 
-                    scope.launch {
-                        isAnimating = true
-                        thumbnailRotation.animateTo(
-                            targetValue = 15f,
-                            animationSpec = tween(durationMillis = 120)
-                        )
-                        thumbnailRotation.animateTo(
-                            targetValue = -5f,
-                            animationSpec = tween(durationMillis = 180)
-                        )
-                        onClick(clickOrigin.first, clickOrigin.second)
-                        thumbnailRotation.animateTo(
-                            targetValue = 0f,
-                            animationSpec = tween(durationMillis = 100)
-                        )
-                        isAnimating = false
+                        val (originX, originY) = resolveClickOrigin(tapOffset)
+
+                        scope.launch {
+                            isAnimating = true
+                            thumbnailRotation.animateTo(
+                                targetValue = 15f,
+                                animationSpec = tween(durationMillis = 120)
+                            )
+                            thumbnailRotation.animateTo(
+                                targetValue = -5f,
+                                animationSpec = tween(durationMillis = 180)
+                            )
+                            onClick(originX, originY)
+                            thumbnailRotation.animateTo(
+                                targetValue = 0f,
+                                animationSpec = tween(durationMillis = 100)
+                            )
+                            isAnimating = false
+                        }
                     }
                 }
         ) {
