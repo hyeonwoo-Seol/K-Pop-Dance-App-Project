@@ -20,6 +20,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.kpopdancepracticeai.data.RealDataSource
+import com.example.kpopdancepracticeai.ui.theme.BgPurpleLight
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 
 // UI용 데이터 클래스
@@ -28,7 +30,12 @@ data class SongInfoUi(
     val artist: String,
     val albumArtUrl: String,
     val level: String,
-    val time: String
+    val time: String,
+    val mainArtist: String?,
+    val composers: List<String>,
+    val lyricists: List<String>,
+    val producers: List<String>,
+    val source: String?
 )
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -46,19 +53,24 @@ fun SongDetailScreen(
 
     LaunchedEffect(selectedSong) {
         if (selectedSong != null) {
-            // [오류 해결] Song 엔티티 필드명 수정
+            val detailMetadata = RealDataSource.songDetailMetadataByTitleKr[selectedSong.titleKr]
             uiState = SongInfoUi(
                 title = selectedSong.titleKr,
                 artist = selectedSong.artistKr,
                 albumArtUrl = selectedSong.coverUrl ?: "",
                 level = selectedSong.difficulty,
-                // duration 필드 대신 releaseDate 또는 기본값 사용
-                time = selectedSong.releaseDate ?: "-"
+                time = selectedSong.releaseDate ?: "-",
+                mainArtist = detailMetadata?.mainArtist,
+                composers = detailMetadata?.composers.orEmpty(),
+                lyricists = detailMetadata?.lyricists.orEmpty(),
+                producers = detailMetadata?.producers.orEmpty(),
+                source = detailMetadata?.source
             )
         }
     }
 
     Scaffold(
+        containerColor = BgPurpleLight,
         bottomBar = {
             Button(
                 onClick = { navController.navigate("songPartSelect/$songId") },
@@ -73,7 +85,12 @@ fun SongDetailScreen(
     ) { innerPadding ->
         if (uiState != null) {
             val info = uiState!!
-            Column(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(BgPurpleLight)
+                    .padding(innerPadding)
+            ) {
                 Box(modifier = Modifier.height(300.dp).fillMaxWidth()) {
                     AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current).data(info.albumArtUrl).crossfade(true).build(),
@@ -95,10 +112,26 @@ fun SongDetailScreen(
                     Spacer(Modifier.height(16.dp))
                     Text("난이도: ${info.level}")
                     Text("발매일: ${info.time}")
+                    info.mainArtist?.let { Text("메인 아티스트: $it") }
+                    if (info.composers.isNotEmpty()) {
+                        Text("작곡가: ${info.composers.joinToString(separator = ", ")}")
+                    }
+                    if (info.lyricists.isNotEmpty()) {
+                        Text("작사가: ${info.lyricists.joinToString(separator = ", ")}")
+                    }
+                    if (info.producers.isNotEmpty()) {
+                        Text("프로듀서: ${info.producers.joinToString(separator = ", ")}")
+                    }
+                    info.source?.let { Text("출처: $it") }
                 }
             }
         } else {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(BgPurpleLight),
+                contentAlignment = Alignment.Center
+            ) { CircularProgressIndicator() }
         }
     }
 }

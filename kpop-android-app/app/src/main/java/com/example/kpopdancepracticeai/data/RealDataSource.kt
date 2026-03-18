@@ -8,6 +8,14 @@ import com.example.kpopdancepracticeai.data.entity.LightStick
 import com.example.kpopdancepracticeai.data.entity.UserAchievementProgress
 
 object RealDataSource {
+    data class SongDetailMetadata(
+        val mainArtist: String,
+        val composers: List<String>,
+        val lyricists: List<String>,
+        val producers: List<String>,
+        val source: String
+    )
+
     private const val EXPERT_VIDEO_BASE_PATH =
         "file:///data/data/com.example.kpopdancepracticeai/files/expert_videos/"
     private const val APP_PACKAGE_NAME = "com.example.kpopdancepracticeai"
@@ -26,6 +34,16 @@ object RealDataSource {
         "sneakers" -> drawableCover("cover_sneakers")
         else -> drawableCover("cover_eleven")
     }
+
+    val songDetailMetadataByTitleKr = mapOf(
+        "러브다이브" to SongDetailMetadata(
+            mainArtist = "IVE",
+            composers = listOf("Nick Hahn", "Sophia Brennan", "Elle Campbell"),
+            lyricists = listOf("서지음"),
+            producers = listOf("Nick Hahn"),
+            source = "STARSHIP Entertainment"
+        )
+    )
 
     val getRealSongs = listOf(
         Song(540L, "일레븐", "ELEVEN", "아이브 (원영)", "IVE (Wonyoung)", "Female", "Dance", "Medium", "보통", coverForSongTitle("ELEVEN"), "2021-12-01"),
