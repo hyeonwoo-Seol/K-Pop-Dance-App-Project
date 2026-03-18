@@ -7,9 +7,9 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -156,11 +156,10 @@ fun HomeScreen(
             item {
                 AnimatedVisibility(
                     visible = showPromoVideo,
-                    exit = fadeOut(animationSpec = tween(durationMillis = 220)) +
-                        slideOutVertically(
-                            targetOffsetY = { -it / 6 },
-                            animationSpec = tween(durationMillis = 220)
-                        )
+                    exit = shrinkVertically(
+                        animationSpec = tween(durationMillis = 280),
+                        shrinkTowards = Alignment.Top
+                    ) + fadeOut(animationSpec = tween(durationMillis = 280))
                 ) {
                     HomePromoVideoSection(
                         modifier = Modifier.padding(horizontal = 16.dp),
@@ -171,30 +170,24 @@ fun HomeScreen(
             }
 
             item {
-                UpwardRevealVisibility(visible = !showPromoVideo) {
-                    RecentChoreoSection(
-                        recentChoreo = recentChoreo,
-                        onSongClick = onSongClick
-                    )
-                }
+                RecentChoreoSection(
+                    recentChoreo = recentChoreo,
+                    onSongClick = onSongClick
+                )
             }
 
             item {
-                UpwardRevealVisibility(visible = !showPromoVideo) {
-                    RegisteredChoreoSection(
-                        dbSongs = dbSongs,
-                        onSongClick = onSongClick
-                    )
-                }
+                RegisteredChoreoSection(
+                    dbSongs = dbSongs,
+                    onSongClick = onSongClick
+                )
             }
 
             item {
-                UpwardRevealVisibility(visible = !showPromoVideo) {
-                    TrendingChallengeSection(
-                        dbSongs = dbSongs,
-                        onSongClick = onSongClick
-                    )
-                }
+                TrendingChallengeSection(
+                    dbSongs = dbSongs,
+                    onSongClick = onSongClick
+                )
             }
         }
 
@@ -311,41 +304,16 @@ private fun HomePromoVideoSection(
         AndroidView(
             modifier = Modifier
                 .fillMaxWidth()
-                .aspectRatio(9f / 16f),
+                .aspectRatio(16f / 9f),
             factory = { viewContext ->
                 PlayerView(viewContext).apply {
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     this.player = exoPlayer
                 }
             },
             update = { it.player = exoPlayer }
         )
-    }
-}
-
-@Composable
-private fun UpwardRevealVisibility(
-    visible: Boolean,
-    content: @Composable () -> Unit
-) {
-    val visibleState = remember {
-        MutableTransitionState(false)
-    }
-
-    LaunchedEffect(visible) {
-        visibleState.targetState = visible
-    }
-
-    AnimatedVisibility(
-        visibleState = visibleState,
-        enter = slideInVertically(
-            initialOffsetY = { it / 3 },
-            animationSpec = tween(durationMillis = 280)
-        ) + fadeIn(animationSpec = tween(durationMillis = 280)),
-        exit = fadeOut(animationSpec = tween(durationMillis = 180))
-    ) {
-        content()
     }
 }
 
