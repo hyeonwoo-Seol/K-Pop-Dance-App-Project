@@ -19,13 +19,17 @@ import androidx.core.view.WindowCompat
 private val DarkColorScheme = darkColorScheme(
     primary = Purple80,
     secondary = PurpleGrey80,
-    tertiary = Pink80
+    tertiary = Pink80,
+    background = Color(0xFF121212),
+    surface = Color(0xFF121212)
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = Purple40,
     secondary = PurpleGrey40,
-    tertiary = Pink40
+    tertiary = Pink40,
+    background = AppBackgroundBottom,
+    surface = AppBackgroundBottom
 
     /* Other default colors to override
     background = Color(0xFFFFFBFE),
@@ -45,10 +49,21 @@ fun KpopDancePracticeAITheme(
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
+    val darkFallbackBackground = Color(0xFF121212)
     val colorScheme = when {
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+            if (darkTheme) {
+                dynamicDarkColorScheme(context).copy(
+                    background = darkFallbackBackground,
+                    surface = darkFallbackBackground
+                )
+            } else {
+                dynamicLightColorScheme(context).copy(
+                    background = AppBackgroundBottom,
+                    surface = AppBackgroundBottom
+                )
+            }
         }
 
         darkTheme -> DarkColorScheme
@@ -61,16 +76,15 @@ fun KpopDancePracticeAITheme(
         SideEffect {
             val window = (view.context as Activity).window
 
-            // [수정] 상단바/하단바 배경색을 '불투명'한 흰색으로 설정 (검정 아이콘을 위해)
-            // 주의: 이렇게 하면 Edge-to-Edge 설정과 무관하게 시스템 바가 흰색으로 칠해집니다.
-            window.statusBarColor = Color.White.toArgb()
-            window.navigationBarColor = Color.White.toArgb()
+            val systemBarColor = if (darkTheme) darkFallbackBackground else AppBackgroundBottom
+            window.statusBarColor = systemBarColor.toArgb()
+            window.navigationBarColor = systemBarColor.toArgb()
 
             // [수정] 아이콘 색상을 '검정색'으로 강제 설정
             // (isAppearanceLightStatusBars = true -> 배경이 밝으니 아이콘을 어둡게 하라는 의미)
             WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = true
-                isAppearanceLightNavigationBars = true
+                isAppearanceLightStatusBars = !darkTheme
+                isAppearanceLightNavigationBars = !darkTheme
             }
         }
     }
