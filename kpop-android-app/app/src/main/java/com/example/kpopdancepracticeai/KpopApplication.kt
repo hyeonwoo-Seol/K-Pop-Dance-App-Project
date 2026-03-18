@@ -12,6 +12,15 @@ class KpopApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    var shouldShowHomePromoVideo: Boolean = true
+        private set
+
+    fun consumeHomePromoVideoVisibility(): Boolean {
+        val shouldShow = shouldShowHomePromoVideo
+        shouldShowHomePromoVideo = false
+        return shouldShow
+    }
+
     val database by lazy {
         AppDatabase.getDatabase(this)
     }
