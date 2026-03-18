@@ -150,9 +150,11 @@ val bottomNavItems = listOf(
 private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
 
 // 메인 화면 전환 속도(ms).
-// 홈/검색/프로필 탭 이동 + 홈에서 안무(곡) 상세 화면으로 이동할 때 동일하게 적용됩니다.
-// 테스트하면서 이 값 하나만 조절하면 전환 속도를 함께 맞출 수 있습니다.
+// 홈/검색/프로필 탭 이동 전환에 적용됩니다.
 private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 550
+// 안무 상세 화면 전환 속도(ms).
+private const val SONG_DETAIL_ENTER_TRANSITION_DURATION_MS = 630
+private const val SONG_DETAIL_EXIT_TRANSITION_DURATION_MS = 520
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
@@ -938,8 +940,8 @@ fun AppNavHost(
                 scaleIn(
                     initialScale = 0.75f,
                     transformOrigin = TransformOrigin(originX, originY),
-                    animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS))
+                    animationSpec = tween(durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+                ) + fadeIn(animationSpec = tween(durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS))
             },
             popExitTransition = {
                 val originX = initialState.arguments?.getFloat("originX") ?: 0.5f
@@ -947,8 +949,8 @@ fun AppNavHost(
                 scaleOut(
                     targetScale = 0.75f,
                     transformOrigin = TransformOrigin(originX, originY),
-                    animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS))
+                    animationSpec = tween(durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
+                ) + fadeOut(animationSpec = tween(durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS))
             }
         ) { backStackEntry ->
             val songId = backStackEntry.arguments?.getString("songId") ?: ""
