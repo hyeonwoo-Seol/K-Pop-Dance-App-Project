@@ -384,16 +384,12 @@ fun SongCard(
                             targetValue = -5f,
                             animationSpec = tween(durationMillis = 180)
                         )
-                        //thumbnailRotation.animateTo(
-                        //    targetValue = 5f,
-                        //    animationSpec = tween(durationMillis = 130)
-                        //)
+                        onClick(clickOrigin.first, clickOrigin.second)
                         thumbnailRotation.animateTo(
                             targetValue = 0f,
                             animationSpec = tween(durationMillis = 100)
                         )
                         isAnimating = false
-                        onClick(clickOrigin.first, clickOrigin.second)
                     }
                 }
         ) {
