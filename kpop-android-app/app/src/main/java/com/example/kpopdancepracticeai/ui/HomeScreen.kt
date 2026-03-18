@@ -62,6 +62,8 @@ import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
+private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
+// 필요하면 HomeScreen(..., promoCollapseDurationMillis = 원하는값) 으로 화면별 오버라이드 가능
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +72,8 @@ fun HomeScreen(
     onSearch: (String) -> Unit,
     onSongClick: (songId: String, originX: Float, originY: Float) -> Unit,
     paddingValues: PaddingValues,
-    onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
+    onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {},
+    promoCollapseDurationMillis: Int = HOME_PROMO_COLLAPSE_DURATION_MS
 ) {
     // DB에서 불러온 노래 목록을 상태로 관리
     val dbSongs by viewModel.songs.collectAsState()
@@ -157,9 +160,9 @@ fun HomeScreen(
                 AnimatedVisibility(
                     visible = showPromoVideo,
                     exit = shrinkVertically(
-                        animationSpec = tween(durationMillis = 280),
+                        animationSpec = tween(durationMillis = promoCollapseDurationMillis),
                         shrinkTowards = Alignment.Top
-                    ) + fadeOut(animationSpec = tween(durationMillis = 280))
+                    ) + fadeOut(animationSpec = tween(durationMillis = promoCollapseDurationMillis))
                 ) {
                     HomePromoVideoSection(
                         modifier = Modifier.padding(horizontal = 16.dp),
