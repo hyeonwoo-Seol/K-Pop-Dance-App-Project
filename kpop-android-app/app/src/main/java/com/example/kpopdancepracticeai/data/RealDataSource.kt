@@ -36,12 +36,65 @@ object RealDataSource {
     }
 
     val songDetailMetadataByTitleKr = mapOf(
+        "일레븐" to SongDetailMetadata(
+            mainArtist = "IVE",
+            composers = listOf("Peter Rycroft (Lostboy)", "Lauren Aquilina", "Ryan S. Jhun", "Alawn"),
+            lyricists = listOf("서지음"),
+            producers = listOf("Ryan S. Jhun", "Alawn"),
+            source = "Starship Entertainment"
+        ),
+        "오오" to SongDetailMetadata(
+            mainArtist = "NMIXX",
+            composers = listOf(
+                "EJAE",
+                "Brian U",
+                "Enan",
+                "MarkAlong",
+                "Charlotte Wilson",
+                "Chanti",
+                "Awry",
+                "Ayushy",
+                "Jan Baars",
+                "Rajan Muse"
+            ),
+            lyricists = listOf("Dr.JO (153/Joombas)"),
+            producers = listOf("EJAE", "Brian U", "Enan"),
+            source = "JYP Entertainment"
+        ),
+        "워너비" to SongDetailMetadata(
+            mainArtist = "ITZY",
+            composers = listOf("Star Wars (Galactika)"),
+            lyricists = listOf("Star Wars (Galactika)"),
+            producers = listOf("Galactika"),
+            source = "JYP Entertainment"
+        ),
+        "로코" to SongDetailMetadata(
+            mainArtist = "ITZY",
+            composers = listOf("Star Wars (Galactika)", "Athena (Galactika)", "Woo Bin (Galactika)"),
+            lyricists = listOf("Star Wars (Galactika)"),
+            producers = listOf("Team Galactika"),
+            source = "JYP Entertainment"
+        ),
         "러브다이브" to SongDetailMetadata(
             mainArtist = "IVE",
             composers = listOf("Nick Hahn", "Sophia Brennan", "Elle Campbell"),
             lyricists = listOf("서지음"),
             producers = listOf("Nick Hahn"),
-            source = "STARSHIP Entertainment"
+            source = "Starship Entertainment"
+        ),
+        "스테이디스웨이" to SongDetailMetadata(
+            mainArtist = "fromis_9",
+            composers = listOf("Justin Reinstein", "Lee Woo-min collapsedone", "Anna Timgren"),
+            lyricists = listOf("서지음"),
+            producers = listOf("Justin Reinstein", "Lee Woo-min collapsedone"),
+            source = "Pledis Entertainment"
+        ),
+        "스니커즈" to SongDetailMetadata(
+            mainArtist = "ITZY",
+            composers = listOf("Didrik Thott", "Jessica Pierpoint", "Sebastian Thott"),
+            lyricists = listOf("Friday (Galactika)", "OGI (Galactika)", "Didrik Thott", "Jessica Pierpoint"),
+            producers = listOf("Sebastian Thott"),
+            source = "JYP Entertainment"
         )
     )
 
