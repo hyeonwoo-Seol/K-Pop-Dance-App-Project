@@ -56,6 +56,7 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.data.entity.Song
+import com.example.kpopdancepracticeai.viewmodel.RecentChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
@@ -266,7 +267,7 @@ private fun HomePromoVideoSection(
 ) {
     val context = LocalContext.current
     var finishHandled by remember { mutableStateOf(false) }
-    val player = remember(assetFileName) {
+    val exoPlayer = remember(assetFileName) {
         ExoPlayer.Builder(context).build().apply {
             val mediaItem = MediaItem.fromUri(Uri.parse("asset:///$assetFileName"))
             setMediaItem(mediaItem)
@@ -276,7 +277,7 @@ private fun HomePromoVideoSection(
         }
     }
 
-    DisposableEffect(player) {
+    DisposableEffect(exoPlayer) {
         val listener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (playbackState == Player.STATE_ENDED && !finishHandled) {
@@ -293,10 +294,10 @@ private fun HomePromoVideoSection(
             }
         }
 
-        player.addListener(listener)
+        exoPlayer.addListener(listener)
         onDispose {
-            player.removeListener(listener)
-            player.release()
+            exoPlayer.removeListener(listener)
+            exoPlayer.release()
         }
     }
 
@@ -315,10 +316,10 @@ private fun HomePromoVideoSection(
                 PlayerView(viewContext).apply {
                     useController = false
                     resizeMode = AspectRatioFrameLayout.RESIZE_MODE_ZOOM
-                    player = player
+                    this.player = exoPlayer
                 }
             },
-            update = { it.player = player }
+            update = { it.player = exoPlayer }
         )
     }
 }
@@ -350,7 +351,7 @@ private fun UpwardRevealVisibility(
 
 @Composable
 private fun RecentChoreoSection(
-    recentChoreo: List<com.example.kpopdancepracticeai.data.entity.PracticeHistory>,
+    recentChoreo: List<RecentChoreoUiModel>,
     onSongClick: (songId: String, originX: Float, originY: Float) -> Unit
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
