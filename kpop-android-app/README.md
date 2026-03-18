@@ -38,6 +38,8 @@ https://github.com/user-attachments/assets/328f76b4-e22e-48a0-a16b-3abb960c18b2
 
 ### 2-1. 검색 필터링
 
+<img src="https://github.com/user-attachments/assets/15b689b2-275c-4a74-b474-f72013563dd5" width="400">
+
 검색 필터링이 가능하도록 했습니다.
 
 난이도, 아티스트 성별, 템포 등을 선택할 수 있습니다. 이 세 가지를 모두 선탟하지 않아도 필터링 검색이 동작하도록 구현했습니다.
@@ -45,6 +47,8 @@ https://github.com/user-attachments/assets/328f76b4-e22e-48a0-a16b-3abb960c18b2
 ### 2-2. 검색 결과 화면 애니메이션
 
 검색 결과 화면에서 검색된 안무 목록이 뜰 때 안무 리스트가 순서대로 나열되는 애니메이션을 적용하여 자연스럽고 재미있는 동작을 구현했습니다.
+
+https://github.com/user-attachments/assets/78541f8d-6e7d-43f9-9e0a-3c861bc88690
 
 ## 3. 안무 연습
 
