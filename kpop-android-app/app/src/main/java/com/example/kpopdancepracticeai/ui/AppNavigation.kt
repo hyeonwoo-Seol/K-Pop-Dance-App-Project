@@ -229,6 +229,7 @@ fun AppNavigation(
         Screen.Record.route,
         Screen.Analysis.route,
         Screen.AiPracticeTip.route,
+        Screen.VideoDownload.route,
     )
 
     val showMainBars = if (currentRoute != null) {
