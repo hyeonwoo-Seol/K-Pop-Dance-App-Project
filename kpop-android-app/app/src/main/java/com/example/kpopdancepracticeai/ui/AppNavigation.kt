@@ -3,7 +3,7 @@ package com.example.kpopdancepracticeai.ui
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContentTransitionScope
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
@@ -152,9 +152,24 @@ private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
 // 메인 화면 전환 속도(ms).
 // 홈/검색/프로필 탭 이동 전환에 적용됩니다.
 private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 550
+
 // 안무 상세 화면 전환 속도(ms).
 private const val SONG_DETAIL_ENTER_TRANSITION_DURATION_MS = 610
 private const val SONG_DETAIL_EXIT_TRANSITION_DURATION_MS = 520
+
+// iPhone 앱 느낌에 가깝게, 초반 반응은 빠르고 마지막 감속은 부드럽게 느껴지도록 맞춘 기본 프리셋입니다.
+// 필요하면 아래 4개 좌표만 바꿔가며 바로 체감 속도를 테스트할 수 있습니다.
+private const val SCREEN_TRANSITION_EASING_X1 = 0.22f
+private const val SCREEN_TRANSITION_EASING_Y1 = 1.00f
+private const val SCREEN_TRANSITION_EASING_X2 = 0.36f
+private const val SCREEN_TRANSITION_EASING_Y2 = 1.00f
+
+private val ScreenTransitionEasing = CubicBezierEasing(
+    SCREEN_TRANSITION_EASING_X1,
+    SCREEN_TRANSITION_EASING_Y1,
+    SCREEN_TRANSITION_EASING_X2,
+    SCREEN_TRANSITION_EASING_Y2
+)
 
 private fun NavBackStackEntry.isProfileRoute(): Boolean {
     return destination.route == Screen.Profile.route
@@ -392,16 +407,36 @@ fun AppNavHost(
         startDestination = startDestination,
         modifier = modifier,
         enterTransition = {
-            fadeIn(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
+            fadeIn(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
         },
         exitTransition = {
-            fadeOut(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
+            fadeOut(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
         },
         popEnterTransition = {
-            fadeIn(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
+            fadeIn(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
         },
         popExitTransition = {
-            fadeOut(animationSpec = tween(MAIN_SCREEN_TRANSITION_DURATION_MS))
+            fadeOut(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
         }
     ) {
         composable(Screen.Login.route) {
@@ -560,7 +595,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -571,7 +606,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -582,7 +617,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -593,7 +628,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -613,7 +648,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -624,7 +659,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -635,7 +670,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -646,7 +681,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -662,7 +697,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -673,7 +708,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -684,7 +719,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -695,7 +730,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -711,7 +746,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -722,7 +757,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -733,7 +768,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -744,7 +779,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -761,7 +796,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -772,7 +807,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -783,7 +818,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -794,7 +829,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -841,7 +876,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -852,7 +887,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Left,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -863,7 +898,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -874,7 +909,7 @@ fun AppNavHost(
                         AnimatedContentTransitionScope.SlideDirection.Right,
                         animationSpec = tween(
                             durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
-                            easing = FastOutSlowInEasing
+                            easing = ScreenTransitionEasing
                         )
                     )
                 } else null
@@ -941,8 +976,16 @@ fun AppNavHost(
                 scaleIn(
                     initialScale = 0.75f,
                     transformOrigin = TransformOrigin(originX, originY),
-                    animationSpec = tween(durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-                ) + fadeIn(animationSpec = tween(durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS))
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                )
             },
             popExitTransition = {
                 val originX = initialState.arguments?.getFloat("originX") ?: 0.5f
@@ -950,8 +993,16 @@ fun AppNavHost(
                 scaleOut(
                     targetScale = 0.75f,
                     transformOrigin = TransformOrigin(originX, originY),
-                    animationSpec = tween(durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS, easing = FastOutSlowInEasing)
-                ) + fadeOut(animationSpec = tween(durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS))
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                )
             }
         ) { backStackEntry ->
             val songId = backStackEntry.arguments?.getString("songId") ?: ""
