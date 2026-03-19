@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui.test
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
@@ -41,7 +43,7 @@ fun IntegrationTestScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
-            .verticalScroll(scrollState),
+            .verticalScroll(scrollState, flingBehavior = rememberIosLikeFlingBehavior()),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {

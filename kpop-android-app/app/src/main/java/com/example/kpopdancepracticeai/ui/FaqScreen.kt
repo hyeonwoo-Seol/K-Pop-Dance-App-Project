@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
@@ -111,6 +113,7 @@ fun FaqScreen(onBackClick: () -> Unit) {
         containerColor = Color(0xFFF7F8FA) // 전체 배경색
     ) { innerPadding ->
         LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)

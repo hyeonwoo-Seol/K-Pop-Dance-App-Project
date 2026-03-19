@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -168,6 +170,7 @@ fun SongDetailScreen(
                 }
             } else {
                 LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(innerPadding),

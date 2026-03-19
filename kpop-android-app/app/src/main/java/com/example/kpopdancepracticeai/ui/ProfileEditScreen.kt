@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.content.Context
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -179,7 +181,7 @@ fun ProfileEditScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)
-                    .verticalScroll(rememberScrollState()),
+                    .verticalScroll(rememberScrollState(), flingBehavior = rememberIosLikeFlingBehavior()),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 TopAppBar(

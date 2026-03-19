@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -115,6 +117,7 @@ fun AiPracticeTipScreen(
             .padding(paddingValues)
     ) {
         LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 16.dp),

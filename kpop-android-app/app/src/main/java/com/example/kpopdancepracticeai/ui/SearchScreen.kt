@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -38,6 +40,7 @@ fun SearchScreen(
 
     // 3. 스크롤 가능한 본문 (LazyColumn이 최상위)
     LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp), // 좌우 여백

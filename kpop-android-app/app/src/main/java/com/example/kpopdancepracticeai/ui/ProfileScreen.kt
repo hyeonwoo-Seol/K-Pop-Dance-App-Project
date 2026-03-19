@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -107,6 +109,7 @@ fun ProfileScreen(
     val animationSpec = remember { ProfileTabAnimationSpec() }
 
     LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),

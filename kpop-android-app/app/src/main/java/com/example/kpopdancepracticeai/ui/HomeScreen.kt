@@ -2,6 +2,8 @@
 
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -106,6 +108,7 @@ fun HomeScreen(
 
     Box(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
                 start = paddingValues.calculateStartPadding(layoutDirection),
@@ -345,6 +348,7 @@ private fun RecentChoreoSection(
             )
         } else {
             LazyRow(
+                flingBehavior = rememberIosLikeFlingBehavior(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -392,6 +396,7 @@ private fun RegisteredChoreoSection(
             }
         } else {
             LazyRow(
+                flingBehavior = rememberIosLikeFlingBehavior(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -424,6 +429,7 @@ private fun TrendingChallengeSection(
 
         if (dbSongs.isNotEmpty()) {
             LazyRow(
+                flingBehavior = rememberIosLikeFlingBehavior(),
                 contentPadding = PaddingValues(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp)
             ) {

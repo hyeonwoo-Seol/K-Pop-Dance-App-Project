@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
@@ -70,6 +72,7 @@ fun SearchResultsScreen(
     }
 
     LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),

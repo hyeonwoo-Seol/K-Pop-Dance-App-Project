@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.content.pm.PackageManager
 import android.os.Build
 import android.widget.Toast
@@ -86,6 +88,7 @@ fun AppInfoScreen(
             containerColor = Color.Transparent,
         ) { innerPadding ->
             LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
                 contentPadding = innerPadding,
                 modifier = Modifier.fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally

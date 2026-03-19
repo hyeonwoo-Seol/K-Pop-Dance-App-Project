@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -112,6 +114,7 @@ fun PrivacySettingsScreen(
             // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
                 contentPadding = innerPadding,
                 modifier = Modifier
                     .fillMaxSize(),

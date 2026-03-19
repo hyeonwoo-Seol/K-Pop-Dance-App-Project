@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import android.net.Uri
 import android.util.Log
 import android.widget.Toast
@@ -343,6 +345,7 @@ fun SongPartSelectContent(
                 )
 
                 LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),

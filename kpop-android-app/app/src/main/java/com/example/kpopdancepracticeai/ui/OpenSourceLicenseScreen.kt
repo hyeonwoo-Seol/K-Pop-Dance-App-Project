@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -86,6 +88,7 @@ fun OpenSourceLicenseScreen(
             }
         ) { innerPadding ->
             LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(innerPadding)

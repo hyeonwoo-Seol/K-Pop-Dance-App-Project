@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import com.example.kpopdancepracticeai.ui.motion.rememberIosLikeFlingBehavior
+
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -57,6 +59,7 @@ fun NotificationSettingsScreen(
             // topBar 제거: 스크롤 영역 내부로 이동
         ) { innerPadding ->
             LazyColumn(
+            flingBehavior = rememberIosLikeFlingBehavior(),
                 contentPadding = innerPadding,
                 modifier = Modifier
                     .fillMaxSize(),
