@@ -50,7 +50,7 @@ fun rememberIosLikeFlingBehavior(
 
                 var remainingVelocity = initialVelocity
                 var lastValue = 0f
-                val animationState = AnimationState<Float, AnimationVector1D>(
+                val animationState: AnimationState<Float, AnimationVector1D> = AnimationState(
                     initialValue = 0f,
                     initialVelocity = initialVelocity
                 )
