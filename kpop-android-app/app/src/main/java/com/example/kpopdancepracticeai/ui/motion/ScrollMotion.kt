@@ -1,6 +1,7 @@
 package com.example.kpopdancepracticeai.ui.motion
 
 import androidx.compose.animation.core.AnimationState
+import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.SpringSpec
 import androidx.compose.animation.core.animateDecay
@@ -48,18 +49,23 @@ fun rememberIosLikeFlingBehavior(
                 if (abs(initialVelocity) < 1f) return initialVelocity
 
                 var remainingVelocity = initialVelocity
-                val animationState = AnimationState(
+                var lastValue = 0f
+                val animationState = AnimationState<Float, AnimationVector1D>(
                     initialValue = 0f,
                     initialVelocity = initialVelocity
                 )
 
                 animationState.animateDecay(decaySpec) {
-                    val delta = value - previousValue
+                    val currentValue = value
+                    val currentVelocity = velocity
+                    val delta = currentValue - lastValue
+                    lastValue = currentValue
+
                     val consumed = scrollBy(delta)
                     val unconsumed = delta - consumed
-                    remainingVelocity = velocity
+                    remainingVelocity = currentVelocity
 
-                    if (abs(unconsumed) > 0.5f || abs(velocity) < 1f) {
+                    if (abs(unconsumed) > 0.5f || abs(currentVelocity) < 1f) {
                         cancelAnimation()
                     }
                 }
