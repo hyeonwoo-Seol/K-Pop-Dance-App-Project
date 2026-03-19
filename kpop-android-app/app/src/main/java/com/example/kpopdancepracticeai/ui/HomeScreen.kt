@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.example.kpopdancepracticeai.ui
 
 import android.net.Uri
@@ -9,12 +11,10 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.exponentialDecay
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -35,7 +35,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
@@ -56,7 +55,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -70,22 +68,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
-// iPhone 앱에서 느껴지는 것처럼 관성이 조금 더 길게 살아 있고, 복귀는 급하지 않게 보이도록 맞춘 기본 프리셋입니다.
-private const val SONG_CARD_RETURN_DURATION_MS = 360
-
-// SongCard를 손가락으로 스와이프했을 때의 관성(Fling) 감쇠 강도입니다.
-// 값을 키우면 더 빨리 멈추고, 낮추면 더 멀리 미끄러집니다.
-private const val SONG_CARD_FLING_FRICTION = 1.72f
-
-// 이 속도(px/s)를 넘으면 손을 뗐을 때 fling을 적용합니다.
-// 값을 키우면 더 세게 스와이프해야 관성이 붙고, 낮추면 가볍게 밀어도 멀리 이동합니다.
-private const val SONG_CARD_FLING_VELOCITY_THRESHOLD = 680f
-
-// 카드가 화면 밖으로 너무 멀리 나가지 않도록 제한하는 최대 이동 비율입니다.
-private const val SONG_CARD_MAX_SWIPE_RATIO = 0.52f
-
-// 드래그 거리 대비 카드 회전량입니다. 수치를 키우면 스와이프 체감이 더 극적으로 보입니다.
-private const val SONG_CARD_ROTATION_PER_PIXEL = 0.055f
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -279,7 +261,6 @@ fun HomeScreen(
 }
 
 @Composable
-@OptIn(UnstableApi::class)
 private fun HomePromoVideoSection(
     assetFileName: String,
     modifier: Modifier = Modifier,
@@ -491,15 +472,9 @@ fun SongCard(
     onClick: (originX: Float, originY: Float) -> Unit
 ) {
     val thumbnailRotation = remember { Animatable(0f) }
-    val thumbnailOffsetX = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
     var isAnimating by remember { mutableStateOf(false) }
-    var thumbnailWidthPx by remember { mutableStateOf(0f) }
     val coordinateHolder = remember { object { var coordinates: LayoutCoordinates? = null } }
-    val velocityTracker = remember { VelocityTracker() }
-    val swipeDecay = remember {
-        exponentialDecay<Float>(frictionMultiplier = SONG_CARD_FLING_FRICTION)
-    }
 
     fun resolveClickOrigin(tapOffset: Offset): Pair<Float, Float> {
         val coordinates = coordinateHolder.coordinates ?: return 0.5f to 0.5f
@@ -513,11 +488,6 @@ fun SongCard(
             (tapInRoot.y / rootSize.height.toFloat()).coerceIn(0f, 1f)
     }
 
-    fun calculateBoundedOffset(targetOffset: Float): Float {
-        val maxOffset = (thumbnailWidthPx * SONG_CARD_MAX_SWIPE_RATIO).coerceAtLeast(1f)
-        return targetOffset.coerceIn(-maxOffset, maxOffset)
-    }
-
     Column(
         modifier = Modifier
             .width(140.dp)
@@ -526,12 +496,10 @@ fun SongCard(
             modifier = Modifier
                 .size(140.dp)
                 .graphicsLayer {
-                    translationX = thumbnailOffsetX.value
                     rotationZ = thumbnailRotation.value
                 }
                 .onGloballyPositioned { coordinates ->
                     coordinateHolder.coordinates = coordinates
-                    thumbnailWidthPx = coordinates.size.width.toFloat()
                 }
                 .pointerInput(isAnimating) {
                     detectTapGestures { tapOffset ->
@@ -550,10 +518,6 @@ fun SongCard(
                                 animationSpec = tween(durationMillis = 180)
                             )
                             onClick(originX, originY)
-                            thumbnailOffsetX.animateTo(
-                                targetValue = 0f,
-                                animationSpec = tween(durationMillis = SONG_CARD_RETURN_DURATION_MS)
-                            )
                             thumbnailRotation.animateTo(
                                 targetValue = 0f,
                                 animationSpec = tween(durationMillis = 100)
@@ -561,84 +525,6 @@ fun SongCard(
                             isAnimating = false
                         }
                     }
-                }
-                .pointerInput(isAnimating, thumbnailWidthPx) {
-                    detectDragGestures(
-                        onDragStart = { offset ->
-                            if (isAnimating) return@detectDragGestures
-                            velocityTracker.resetTracking()
-                            velocityTracker.addPosition(0L, offset)
-                            scope.launch {
-                                thumbnailOffsetX.stop()
-                                thumbnailRotation.stop()
-                            }
-                        },
-                        onDrag = { change, dragAmount ->
-                            if (isAnimating) return@detectDragGestures
-                            change.consume()
-                            velocityTracker.addPosition(change.uptimeMillis, change.position)
-
-                            val nextOffset = calculateBoundedOffset(thumbnailOffsetX.value + dragAmount.x)
-                            val nextRotation = nextOffset * SONG_CARD_ROTATION_PER_PIXEL
-
-                            scope.launch {
-                                thumbnailOffsetX.snapTo(nextOffset)
-                                thumbnailRotation.snapTo(nextRotation)
-                            }
-                        },
-                        onDragEnd = {
-                            if (isAnimating) return@detectDragGestures
-                            val velocityX = velocityTracker.calculateVelocity().x
-                            val maxOffset = (thumbnailWidthPx * SONG_CARD_MAX_SWIPE_RATIO).coerceAtLeast(1f)
-
-                            scope.launch {
-                                if (kotlin.math.abs(velocityX) >= SONG_CARD_FLING_VELOCITY_THRESHOLD) {
-                                    thumbnailOffsetX.updateBounds(-maxOffset, maxOffset)
-                                    thumbnailOffsetX.animateDecay(
-                                        initialVelocity = velocityX,
-                                        animationSpec = swipeDecay
-                                    )
-                                    thumbnailOffsetX.updateBounds(
-                                        lowerBound = Float.NEGATIVE_INFINITY,
-                                        upperBound = Float.POSITIVE_INFINITY
-                                    )
-                                }
-
-                                thumbnailOffsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = tween(
-                                        durationMillis = SONG_CARD_RETURN_DURATION_MS,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                )
-                                thumbnailRotation.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = tween(
-                                        durationMillis = SONG_CARD_RETURN_DURATION_MS,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                )
-                            }
-                        },
-                        onDragCancel = {
-                            scope.launch {
-                                thumbnailOffsetX.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = tween(
-                                        durationMillis = SONG_CARD_RETURN_DURATION_MS,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                )
-                                thumbnailRotation.animateTo(
-                                    targetValue = 0f,
-                                    animationSpec = tween(
-                                        durationMillis = SONG_CARD_RETURN_DURATION_MS,
-                                        easing = FastOutSlowInEasing
-                                    )
-                                )
-                            }
-                        }
-                    )
                 }
         ) {
             Box(
