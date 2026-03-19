@@ -1,3 +1,5 @@
+@file:OptIn(androidx.media3.common.util.UnstableApi::class)
+
 package com.example.kpopdancepracticeai.ui
 
 import android.net.Uri
