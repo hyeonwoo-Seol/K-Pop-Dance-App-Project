@@ -157,8 +157,7 @@ private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 550
 private const val SONG_DETAIL_ENTER_TRANSITION_DURATION_MS = 610
 private const val SONG_DETAIL_EXIT_TRANSITION_DURATION_MS = 520
 
-// iPhone 앱 느낌에 가깝게, 초반 반응은 빠르고 마지막 감속은 부드럽게 느껴지도록 맞춘 기본 프리셋입니다.
-// 필요하면 아래 4개 좌표만 바꿔가며 바로 체감 속도를 테스트할 수 있습니다.
+// 초반 반응은 빠르고 마지막 감속은 부드럽게 느껴지도록 맞춘 기본 프리셋
 private const val SCREEN_TRANSITION_EASING_X1 = 0.22f
 private const val SCREEN_TRANSITION_EASING_Y1 = 1.00f
 private const val SCREEN_TRANSITION_EASING_X2 = 0.36f
