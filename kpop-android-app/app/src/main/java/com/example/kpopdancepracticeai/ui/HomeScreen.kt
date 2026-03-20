@@ -37,6 +37,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -65,6 +66,8 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
+private val TABLET_HORIZONTAL_PADDING = 32.dp
+private val LARGE_TABLET_HORIZONTAL_PADDING = 48.dp
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -89,8 +92,14 @@ fun HomeScreen(
     }
 
     val layoutDirection = LocalLayoutDirection.current
+    val configuration = LocalConfiguration.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    val tabletHorizontalPadding = when {
+        configuration.smallestScreenWidthDp >= 840 -> LARGE_TABLET_HORIZONTAL_PADDING
+        configuration.smallestScreenWidthDp >= 600 -> TABLET_HORIZONTAL_PADDING
+        else -> 0.dp
+    }
     var showAiTipOverlay by remember { mutableStateOf(false) }
 
     LaunchedEffect(showAiTipOverlay) {
@@ -105,9 +114,9 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = paddingValues.calculateStartPadding(layoutDirection),
+                start = paddingValues.calculateStartPadding(layoutDirection) + tabletHorizontalPadding,
                 top = paddingValues.calculateTopPadding(),
-                end = paddingValues.calculateEndPadding(layoutDirection),
+                end = paddingValues.calculateEndPadding(layoutDirection) + tabletHorizontalPadding,
                 bottom = paddingValues.calculateBottomPadding() + 96.dp
             ),
             verticalArrangement = Arrangement.spacedBy(24.dp)
@@ -201,7 +210,7 @@ fun HomeScreen(
                 onClick = { showAiTipOverlay = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = paddingValues.calculateBottomPadding() + 20.dp),
+                    .padding(end = 20.dp + tabletHorizontalPadding, bottom = paddingValues.calculateBottomPadding() + 20.dp),
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
