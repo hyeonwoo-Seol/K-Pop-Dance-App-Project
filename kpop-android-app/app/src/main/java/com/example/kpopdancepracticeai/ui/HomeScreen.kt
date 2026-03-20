@@ -1,5 +1,3 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package com.example.kpopdancepracticeai.ui
 
 import android.net.Uri
@@ -56,7 +54,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.data.entity.Song
@@ -68,7 +65,6 @@ import androidx.compose.foundation.gestures.detectTapGestures
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -92,6 +88,8 @@ fun HomeScreen(
     }
 
     val layoutDirection = LocalLayoutDirection.current
+    val responsivePadding = rememberResponsiveScaffoldPadding(paddingValues)
+    val tabletHorizontalPadding = rememberTabletHorizontalPadding()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     var showAiTipOverlay by remember { mutableStateOf(false) }
@@ -108,10 +106,10 @@ fun HomeScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize(),
             contentPadding = PaddingValues(
-                start = paddingValues.calculateStartPadding(layoutDirection),
-                top = paddingValues.calculateTopPadding(),
-                end = paddingValues.calculateEndPadding(layoutDirection),
-                bottom = paddingValues.calculateBottomPadding() + 96.dp
+                start = responsivePadding.calculateStartPadding(layoutDirection),
+                top = responsivePadding.calculateTopPadding(),
+                end = responsivePadding.calculateEndPadding(layoutDirection),
+                bottom = responsivePadding.calculateBottomPadding() + 96.dp
             ),
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
@@ -204,7 +202,7 @@ fun HomeScreen(
                 onClick = { showAiTipOverlay = true },
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = paddingValues.calculateBottomPadding() + 20.dp),
+                    .padding(end = 20.dp + tabletHorizontalPadding, bottom = paddingValues.calculateBottomPadding() + 20.dp),
                 containerColor = MaterialTheme.colorScheme.primary,
                 contentColor = Color.White
             ) {
@@ -316,7 +314,6 @@ private fun HomePromoVideoSection(
             factory = { viewContext ->
                 PlayerView(viewContext).apply {
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     this.player = exoPlayer
                 }
             },

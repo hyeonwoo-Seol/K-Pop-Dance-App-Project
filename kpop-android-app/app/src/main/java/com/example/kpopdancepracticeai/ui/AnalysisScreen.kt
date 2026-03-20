@@ -78,7 +78,7 @@ fun AnalysisScreen(
             .fillMaxSize()
             .background(appGradient)
             .statusBarsPadding()
-            .padding(bottom = paddingValues.calculateBottomPadding())
+            .padding(rememberResponsiveScaffoldPadding(paddingValues))
     ) {
         LazyColumn(
             modifier = Modifier
