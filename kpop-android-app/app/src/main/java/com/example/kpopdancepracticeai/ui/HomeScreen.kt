@@ -1,5 +1,3 @@
-@file:OptIn(androidx.media3.common.util.UnstableApi::class)
-
 package com.example.kpopdancepracticeai.ui
 
 import android.net.Uri
@@ -55,6 +53,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
@@ -260,6 +259,7 @@ fun HomeScreen(
     }
 }
 
+@OptIn(UnstableApi::class)
 @Composable
 private fun HomePromoVideoSection(
     assetFileName: String,
