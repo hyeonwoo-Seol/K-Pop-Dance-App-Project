@@ -53,9 +53,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.data.entity.Song
@@ -259,7 +257,6 @@ fun HomeScreen(
     }
 }
 
-@OptIn(UnstableApi::class)
 @Composable
 private fun HomePromoVideoSection(
     assetFileName: String,
@@ -316,7 +313,6 @@ private fun HomePromoVideoSection(
             factory = { viewContext ->
                 PlayerView(viewContext).apply {
                     useController = false
-                    resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
                     this.player = exoPlayer
                 }
             },
