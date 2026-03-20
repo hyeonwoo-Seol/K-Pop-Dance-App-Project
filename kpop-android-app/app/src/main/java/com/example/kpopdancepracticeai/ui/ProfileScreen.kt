@@ -110,7 +110,7 @@ fun ProfileScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        contentPadding = paddingValues,
+        contentPadding = rememberResponsiveScaffoldPadding(paddingValues),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {

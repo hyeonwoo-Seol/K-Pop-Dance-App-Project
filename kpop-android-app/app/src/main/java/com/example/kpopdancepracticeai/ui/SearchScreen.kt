@@ -41,7 +41,7 @@ fun SearchScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp), // 좌우 여백
-        contentPadding = paddingValues,
+        contentPadding = rememberResponsiveScaffoldPadding(paddingValues),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         // [삭제됨] 타이틀("KPOP 댄스 연습 앱") 제거 (요청사항 반영)

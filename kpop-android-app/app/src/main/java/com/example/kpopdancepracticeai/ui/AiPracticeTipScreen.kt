@@ -112,7 +112,7 @@ fun AiPracticeTipScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(appGradient)
-            .padding(paddingValues)
+            .padding(rememberResponsiveScaffoldPadding(paddingValues))
     ) {
         LazyColumn(
             modifier = Modifier
