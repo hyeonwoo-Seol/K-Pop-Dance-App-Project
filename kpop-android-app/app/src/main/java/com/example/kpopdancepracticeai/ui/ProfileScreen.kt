@@ -14,6 +14,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -199,18 +200,18 @@ private fun ProfileTabContent(
         ) {
             when (tab) {
                 "통계" -> {
-                    AnimatedTabEntry(index = 0, animationSpec = animationSpec) { StatisticsRow(userStats = userStats) }
-                    AnimatedTabEntry(index = 1, animationSpec = animationSpec) {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec, replayKey = tab) { StatisticsRow(userStats = userStats) }
+                    AnimatedTabEntry(index = 1, animationSpec = animationSpec, replayKey = tab) {
                         AchievementsSummaryCard(
                             achievements = achievements,
                             topPracticedChoreos = topPracticedChoreos
                         )
                     }
-                    AnimatedTabEntry(index = 2, animationSpec = animationSpec) { AcquiredBadgesCard(badges = badges) }
+                    AnimatedTabEntry(index = 2, animationSpec = animationSpec, replayKey = tab) { AcquiredBadgesCard(badges = badges) }
                 }
 
                 "업적" -> {
-                    AnimatedTabEntry(index = 0, animationSpec = animationSpec) {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec, replayKey = tab) {
                         Text(
                             text = "업적 및 성과",
                             style = MaterialTheme.typography.headlineMedium,
@@ -220,7 +221,7 @@ private fun ProfileTabContent(
                         )
                     }
                     if (achievements.isEmpty()) {
-                        AnimatedTabEntry(index = 1, animationSpec = animationSpec) {
+                        AnimatedTabEntry(index = 1, animationSpec = animationSpec, replayKey = tab) {
                             Text(
                                 "아직 진행중인 업적이 없습니다.",
                                 modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -230,7 +231,7 @@ private fun ProfileTabContent(
                         }
                     } else {
                         achievements.forEachIndexed { index, item ->
-                            AnimatedTabEntry(index = index + 1, animationSpec = animationSpec) {
+                            AnimatedTabEntry(index = index + 1, animationSpec = animationSpec, replayKey = tab) {
                                 AchievementCard(
                                     title = item.title,
                                     description = item.description,
@@ -244,7 +245,7 @@ private fun ProfileTabContent(
                 }
 
                 "설정" -> {
-                    AnimatedTabEntry(index = 0, animationSpec = animationSpec) {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec, replayKey = tab) {
                         SettingsContent(
                             onNavigateToProfileEdit,
                             onNavigateToPracticeSettings,
@@ -266,11 +267,17 @@ private fun ProfileTabContent(
 private fun AnimatedTabEntry(
     index: Int,
     animationSpec: ProfileTabAnimationSpec,
+    replayKey: Any,
     content: @Composable () -> Unit
 ) {
     val delay = (index * animationSpec.itemStaggerDelayMs).coerceAtMost(animationSpec.maxItemDelayMs)
+    val visibleState = remember(replayKey) {
+        MutableTransitionState(false).apply {
+            targetState = true
+        }
+    }
     AnimatedVisibility(
-        visible = true,
+        visibleState = visibleState,
         enter = tabEnterTransition(delay, animationSpec),
         exit = ExitTransition.None,
         label = "profileTabEntryAnimation"
