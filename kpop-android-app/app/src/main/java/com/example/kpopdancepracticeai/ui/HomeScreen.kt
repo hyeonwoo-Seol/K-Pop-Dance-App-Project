@@ -56,12 +56,15 @@ import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.Song
 import com.example.kpopdancepracticeai.viewmodel.RecentChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import kotlinx.coroutines.launch
 import androidx.compose.foundation.gestures.detectTapGestures
+import java.time.LocalDate
+import kotlin.random.Random
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
@@ -190,8 +193,7 @@ fun HomeScreen(
             }
 
             item {
-                TrendingChallengeSection(
-                    dbSongs = dbSongs,
+                TodayRecommendedSection(
                     onSongClick = onSongClick
                 )
             }
@@ -409,36 +411,54 @@ private fun RegisteredChoreoSection(
 }
 
 @Composable
-private fun TrendingChallengeSection(
-    dbSongs: List<Song>,
+private fun TodayRecommendedSection(
     onSongClick: (songId: String, originX: Float, originY: Float) -> Unit
 ) {
+    val today = remember { LocalDate.now().toString() }
+    val todayRecommendations = remember(today) {
+        RealDataSource.getRealSongs
+            .shuffled(Random(today.hashCode()))
+            .take(4)
+    }
+
     Column(modifier = Modifier.fillMaxWidth()) {
         SectionTitle(
-            title = "인기 급상승 챌린지",
+            title = "오늘의 추천 안무",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
 
-        if (dbSongs.isNotEmpty()) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+        if (todayRecommendations.isNotEmpty()) {
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                items(dbSongs.reversed()) { song ->
-                    SongCard(
-                        artist = song.artistKr ?: "",
-                        title = song.titleKr ?: "",
-                        views = "인기",
-                        imageUrl = song.coverUrl,
-                        onClick = { originX, originY ->
-                            onSongClick(song.songId.toString(), originX, originY)
+                todayRecommendations.chunked(2).forEach { rowItems ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        rowItems.forEach { song ->
+                            Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
+                                SongCard(
+                                    artist = song.artistKr,
+                                    title = song.titleKr,
+                                    views = "오늘의 추천",
+                                    imageUrl = song.coverUrl,
+                                    onClick = { originX, originY ->
+                                        onSongClick(song.songId.toString(), originX, originY)
+                                    }
+                                )
+                            }
                         }
-                    )
+                        if (rowItems.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
                 }
             }
         } else {
             Text(
-                text = "챌린지 목록을 불러올 수 없습니다.",
+                text = "추천 안무를 불러올 수 없습니다.",
                 modifier = Modifier.padding(horizontal = 16.dp),
                 color = Color.Gray,
                 fontSize = 14.sp
