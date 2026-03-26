@@ -10,6 +10,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -38,6 +39,7 @@ import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.findRootCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -47,6 +49,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -68,6 +72,11 @@ import kotlin.random.Random
 
 private const val HOME_PROMO_VIDEO_ASSET = "home_intro.mp4"
 private const val HOME_PROMO_COLLAPSE_DURATION_MS = 560 // 카드가 위로 올라오는 속도는 이 값으로 조절
+private const val HOME_SECTION_ENTRANCE_TOTAL_DURATION_MS = 2000
+private const val HOME_SECTION_ENTRANCE_FINISH_DURATION_MS = 1500
+private const val HOME_SECTION_ENTRANCE_FAST_DURATION_MS =
+    HOME_SECTION_ENTRANCE_TOTAL_DURATION_MS - HOME_SECTION_ENTRANCE_FINISH_DURATION_MS
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -179,23 +188,35 @@ fun HomeScreen(
             }
 
             item {
-                RecentChoreoSection(
-                    recentChoreo = recentChoreo,
-                    onSongClick = onSongClick
-                )
+                HomeSectionEntrance(
+                    initialOffsetY = 120.dp
+                ) {
+                    RecentChoreoSection(
+                        recentChoreo = recentChoreo,
+                        onSongClick = onSongClick
+                    )
+                }
             }
 
             item {
-                RegisteredChoreoSection(
-                    dbSongs = dbSongs,
-                    onSongClick = onSongClick
-                )
+                HomeSectionEntrance(
+                    initialOffsetY = 260.dp
+                ) {
+                    RegisteredChoreoSection(
+                        dbSongs = dbSongs,
+                        onSongClick = onSongClick
+                    )
+                }
             }
 
             item {
-                TodayRecommendedSection(
-                    onSongClick = onSongClick
-                )
+                HomeSectionEntrance(
+                    initialOffsetY = 300.dp
+                ) {
+                    TodayRecommendedSection(
+                        onSongClick = onSongClick
+                    )
+                }
             }
         }
 
@@ -257,6 +278,65 @@ fun HomeScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun HomeSectionEntrance(
+    initialOffsetY: Dp,
+    content: @Composable () -> Unit
+) {
+    val density = LocalDensity.current
+    val initialOffsetPx = with(density) { initialOffsetY.toPx() }
+    val translateY = remember(initialOffsetPx) { Animatable(initialOffsetPx) }
+    val alpha = remember { Animatable(0f) }
+
+    LaunchedEffect(initialOffsetPx) {
+        translateY.snapTo(initialOffsetPx)
+        alpha.snapTo(0f)
+
+        // 0.5초: 빠르게 위로 올라오고, 1.5초: 천천히 자리 잡는 2단계 모션
+        launch {
+            translateY.animateTo(
+                targetValue = initialOffsetPx * 0.2f,
+                animationSpec = tween(
+                    durationMillis = HOME_SECTION_ENTRANCE_FAST_DURATION_MS,
+                    easing = LinearEasing
+                )
+            )
+            translateY.animateTo(
+                targetValue = 0f,
+                animationSpec = tween(
+                    durationMillis = HOME_SECTION_ENTRANCE_FINISH_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
+        }
+
+        launch {
+            alpha.animateTo(
+                targetValue = 0.8f,
+                animationSpec = tween(
+                    durationMillis = HOME_SECTION_ENTRANCE_FAST_DURATION_MS,
+                    easing = LinearEasing
+                )
+            )
+            alpha.animateTo(
+                targetValue = 1f,
+                animationSpec = tween(
+                    durationMillis = HOME_SECTION_ENTRANCE_FINISH_DURATION_MS,
+                    easing = FastOutSlowInEasing
+                )
+            )
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .offset { IntOffset(0, translateY.value.toInt()) }
+            .graphicsLayer { this.alpha = alpha.value }
+    ) {
+        content()
     }
 }
 
