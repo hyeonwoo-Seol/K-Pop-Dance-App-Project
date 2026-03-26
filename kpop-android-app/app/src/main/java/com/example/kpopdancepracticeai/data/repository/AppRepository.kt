@@ -7,6 +7,11 @@ import com.example.kpopdancepracticeai.data.dao.UserChoreoStatsDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
 import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
+import com.example.kpopdancepracticeai.data.network.RemoteAchievementDto
+import com.example.kpopdancepracticeai.data.network.RemoteUserDto
+import com.example.kpopdancepracticeai.data.network.RemoteUserStatisticsDto
+import com.example.kpopdancepracticeai.data.network.RetrofitClient
+import com.google.gson.JsonElement
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -67,6 +72,40 @@ class AppRepository(
 
     suspend fun updateUserProfile(user: User) {
         userDao.updateUser(user)
+    }
+
+    suspend fun syncUserDataFromRemote(userId: String) {
+        val remoteUserResponse = RetrofitClient.apiService.getRemoteUser(userId)
+        val remoteStatsResponse = RetrofitClient.apiService.getRemoteUserStatistics(userId)
+        val remoteAchievementsResponse = RetrofitClient.apiService.getRemoteAchievements(userId)
+
+        if (!remoteUserResponse.isSuccessful) {
+            error("Users 동기화 실패 (${remoteUserResponse.code()})")
+        }
+        if (!remoteStatsResponse.isSuccessful) {
+            error("UserStatistics 동기화 실패 (${remoteStatsResponse.code()})")
+        }
+        if (!remoteAchievementsResponse.isSuccessful) {
+            error("Achievements 동기화 실패 (${remoteAchievementsResponse.code()})")
+        }
+
+        val remoteUser = remoteUserResponse.body()
+            ?: error("Users 응답이 비어 있습니다.")
+        val remoteStats = remoteStatsResponse.body()
+            ?: error("UserStatistics 응답이 비어 있습니다.")
+        val remoteAchievements = remoteAchievementsResponse.body().orEmpty()
+
+        val existingUser = userDao.getUserProfileOneShot(userId)
+        val existingStats = userDao.getUserStatsOneShot(userId)
+
+        userDao.insertUser(remoteUser.toLocalUser(existingUser))
+        userDao.insertOrUpdate(remoteStats.toLocalUserStats(existingStats))
+
+        achievementDao.insertAchievements(RealDataSource.getRealAchievements)
+        achievementDao.deleteUserAchievementProgress(userId)
+        if (remoteAchievements.isNotEmpty()) {
+            achievementDao.insertProgress(remoteAchievements.map { it.toLocalProgress(userId) })
+        }
     }
 
     suspend fun fetchInitialData(userId: String) {
@@ -251,6 +290,81 @@ class AppRepository(
             artistKr.substring(start + 1, end).trim()
         } else {
             artistKr.trim()
+        }
+    }
+
+    private fun RemoteUserDto.toLocalUser(existingUser: User?): User {
+        return User(
+            userUuid = userUuid,
+            loginId = loginId ?: existingUser?.loginId ?: "user_$userUuid",
+            email = email ?: existingUser?.email ?: "",
+            passwordHash = passwordHash ?: existingUser?.passwordHash,
+            name = name ?: existingUser?.name ?: "New Dancer",
+            birthDate = birthDate ?: existingUser?.birthDate ?: "2000-01-01",
+            gender = gender ?: existingUser?.gender ?: "Unknown",
+            createdAt = existingUser?.createdAt ?: System.currentTimeMillis(),
+            danceSkill = danceSkill ?: existingUser?.danceSkill ?: "BEGINNER",
+            favoriteGenres = favoriteGenres.asFavoriteGenresString(existingUser?.favoriteGenres ?: ""),
+            bio = bio ?: existingUser?.bio,
+            joinDate = joinDate ?: existingUser?.joinDate ?: getCurrentTime(),
+            profileImageUrl = profileImageUrl ?: existingUser?.profileImageUrl
+        )
+    }
+
+    private fun RemoteUserStatisticsDto.toLocalUserStats(existingStats: UserStats?): UserStats {
+        return UserStats(
+            statId = existingStats?.statId ?: statId ?: 0,
+            userUuid = userUuid,
+            appLevel = appLevel ?: existingStats?.appLevel ?: 1,
+            currentExp = currentExp ?: existingStats?.currentExp ?: 0,
+            totalPlayTime = totalPlayTime ?: existingStats?.totalPlayTime ?: 0L,
+            completedParts = completedParts ?: existingStats?.completedParts ?: 0,
+            avgAccuracy = avgAccuracy ?: existingStats?.avgAccuracy ?: 0.0,
+            badgeCount = badgeCount ?: existingStats?.badgeCount ?: 0,
+            lightstickCount = lightstickCount ?: existingStats?.lightstickCount ?: 0,
+            achievementScore = achievementScore ?: existingStats?.achievementScore ?: 0,
+            lastUpdated = lastUpdated ?: existingStats?.lastUpdated ?: getCurrentTime()
+        )
+    }
+
+    private fun RemoteAchievementDto.toLocalProgress(userId: String): UserAchievementProgress {
+        return UserAchievementProgress(
+            userUuid = userId,
+            achievementCode = id,
+            currentStep = currentCount ?: 0,
+            goalStep = goalCount ?: 0,
+            isCompleted = isUnlocked ?: false,
+            achievedDate = achievedAt.asNormalizedString()
+        )
+    }
+
+    private fun JsonElement?.asFavoriteGenresString(defaultValue: String): String {
+        if (this == null || isJsonNull) return defaultValue
+        return when {
+            isJsonArray -> asJsonArray.mapNotNull { item ->
+                item.takeUnless { it.isJsonNull }?.asString?.trim()?.takeIf { it.isNotEmpty() }
+            }.joinToString(",")
+            isJsonPrimitive -> asString.trim().removeSurrounding("[", "]")
+                .split(",")
+                .map { it.trim().trim('"') }
+                .filter { it.isNotEmpty() }
+                .joinToString(",")
+            else -> defaultValue
+        }
+    }
+
+    private fun JsonElement?.asNormalizedString(): String? {
+        if (this == null || isJsonNull) return null
+        return when {
+            isJsonPrimitive -> asJsonPrimitive.let { primitive ->
+                when {
+                    primitive.isString -> primitive.asString
+                    primitive.isNumber -> primitive.asNumber.toString()
+                    primitive.isBoolean -> primitive.asBoolean.toString()
+                    else -> primitive.toString()
+                }
+            }
+            else -> toString()
         }
     }
 

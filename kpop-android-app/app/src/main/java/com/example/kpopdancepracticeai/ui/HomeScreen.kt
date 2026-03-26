@@ -85,11 +85,6 @@ fun HomeScreen(
     val app = LocalContext.current.applicationContext as KpopApplication
     var showPromoVideo by remember { mutableStateOf(app.consumeHomePromoVideoVisibility()) }
 
-    // 화면 진입 시 최신 데이터 로드 (필요한 경우)
-    LaunchedEffect(Unit) {
-        viewModel.refreshData()
-    }
-
     val layoutDirection = LocalLayoutDirection.current
     val responsivePadding = rememberResponsiveScaffoldPadding(paddingValues)
     val tabletHorizontalPadding = rememberTabletHorizontalPadding()

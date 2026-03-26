@@ -59,6 +59,9 @@ interface AchievementDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertProgress(progress: List<UserAchievementProgress>)
 
+    @Query("DELETE FROM user_achievement_progress WHERE user_uuid = :userId")
+    suspend fun deleteUserAchievementProgress(userId: String)
+
     // 초기 데이터 세팅용: 응원봉 메타 데이터 삽입
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertLightSticks(lightSticks: List<LightStick>)
