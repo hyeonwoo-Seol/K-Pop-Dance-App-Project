@@ -6,6 +6,7 @@ import android.util.Log
 import com.example.kpopdancepracticeai.data.api.UploadApiService
 import com.example.kpopdancepracticeai.data.dto.PresignedUrlRequest
 import com.example.kpopdancepracticeai.data.dto.AnalysisStatusRequest
+import com.example.kpopdancepracticeai.data.dto.WithdrawalRequest
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -37,6 +38,12 @@ import java.util.zip.GZIPInputStream
 class PresignedUrlUploader(private val context: Context) {
 
     private val apiService: UploadApiService
+
+    data class WithdrawalResult(
+        val message: String,
+        val deletedS3Objects: Int,
+        val deletedDynamodbItems: Int
+    )
 
     init {
         // Retrofit 설정: AWS API Gateway 주소를 기본으로 설정합니다.
@@ -200,6 +207,25 @@ class PresignedUrlUploader(private val context: Context) {
             } catch (e: Exception) {
                 withContext(Dispatchers.Main) { onError(e) }
             }
+        }
+    }
+
+    /**
+     * 회원 탈퇴 시 AWS에 저장된 사용자 데이터를 삭제합니다.
+     */
+    suspend fun withdrawUserData(userId: String): WithdrawalResult {
+        return withContext(Dispatchers.IO) {
+            val response = apiService.withdrawUserData(WithdrawalRequest(userId = userId))
+            if (!response.isSuccessful || response.body() == null) {
+                throw Exception("회원 데이터 삭제 실패: ${response.code()}")
+            }
+
+            val body = response.body()!!
+            WithdrawalResult(
+                message = body.message,
+                deletedS3Objects = body.deletedS3Objects,
+                deletedDynamodbItems = body.deletedDynamodbItems
+            )
         }
     }
 

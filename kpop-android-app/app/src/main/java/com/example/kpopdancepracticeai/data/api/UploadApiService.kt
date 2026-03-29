@@ -4,6 +4,8 @@ import com.example.kpopdancepracticeai.data.dto.PresignedUrlRequest
 import com.example.kpopdancepracticeai.data.dto.PresignedUrlResponse
 import com.example.kpopdancepracticeai.data.dto.AnalysisStatusRequest
 import com.example.kpopdancepracticeai.data.dto.AnalysisStatusResponse
+import com.example.kpopdancepracticeai.data.dto.WithdrawalRequest
+import com.example.kpopdancepracticeai.data.dto.WithdrawalResponse
 import retrofit2.Response
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -15,4 +17,7 @@ interface UploadApiService {
 
     @POST("default/checkAnalysisStatus")
     suspend fun checkAnalysisStatus(@Body request: AnalysisStatusRequest): Response<AnalysisStatusResponse>
+
+    @POST("default/withdrawUserData")
+    suspend fun withdrawUserData(@Body request: WithdrawalRequest): Response<WithdrawalResponse>
 }

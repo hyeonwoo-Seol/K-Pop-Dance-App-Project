@@ -27,3 +27,15 @@ data class AnalysisStatusResponse(
     @SerializedName("result_s3_key") val resultS3Key: String?,
     @SerializedName("error_message") val errorMessage: String?
 )
+
+//  5. 회원 탈퇴(사용자 데이터 삭제) 요청
+data class WithdrawalRequest(
+    @SerializedName("user_id") val userId: String
+)
+
+//  6. 회원 탈퇴(사용자 데이터 삭제) 응답
+data class WithdrawalResponse(
+    @SerializedName("message") val message: String,
+    @SerializedName("deleted_s3_objects") val deletedS3Objects: Int = 0,
+    @SerializedName("deleted_dynamodb_items") val deletedDynamodbItems: Int = 0
+)

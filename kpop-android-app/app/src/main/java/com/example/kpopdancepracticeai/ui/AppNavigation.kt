@@ -1,6 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
 import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.CubicBezierEasing
@@ -47,6 +48,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -74,10 +76,12 @@ import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.example.kpopdancepracticeai.KpopApplication
+import com.example.kpopdancepracticeai.data.PresignedUrlUploader
 import com.example.kpopdancepracticeai.data.repository.AuthRepository
 import com.example.kpopdancepracticeai.data.repository.RoomSongDataRepository
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
+import kotlinx.coroutines.launch
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
@@ -401,6 +405,12 @@ fun AppNavHost(
     authRepository: AuthRepository,
     onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val uploader = remember { PresignedUrlUploader(context) }
+    var isWithdrawing by remember { mutableStateOf(false) }
+    var withdrawErrorMessage by remember { mutableStateOf<String?>(null) }
+
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -915,10 +925,46 @@ fun AppNavHost(
             }
         ) {
             WithdrawalScreen(
-                onBackClick = { navController.popBackStack() },
+                onBackClick = {
+                    if (!isWithdrawing) {
+                        navController.popBackStack()
+                    }
+                },
+                isWithdrawing = isWithdrawing,
+                withdrawErrorMessage = withdrawErrorMessage,
                 onWithdrawConfirm = {
-                    navController.navigate(Screen.Login.route) {
-                        popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                    if (isWithdrawing) return@WithdrawalScreen
+
+                    val currentUser = authRepository.getCurrentUser()
+                    if (currentUser == null) {
+                        withdrawErrorMessage = "로그인 정보를 찾을 수 없습니다. 다시 로그인해 주세요."
+                        return@WithdrawalScreen
+                    }
+
+                    isWithdrawing = true
+                    withdrawErrorMessage = null
+
+                    scope.launch {
+                        try {
+                            val result = uploader.withdrawUserData(currentUser.uid)
+                            authRepository.signOut()
+
+                            Toast.makeText(
+                                context,
+                                "탈퇴 완료: ${result.deletedDynamodbItems}건 기록, ${result.deletedS3Objects}개 파일 삭제",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            navController.navigate(Screen.Login.route) {
+                                popUpTo(navController.graph.findStartDestination().id) { inclusive = true }
+                            }
+                        } catch (e: Exception) {
+                            val message = "회원 탈퇴 실패: ${e.message ?: "서버 오류"}"
+                            withdrawErrorMessage = message
+                            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+                        } finally {
+                            isWithdrawing = false
+                        }
                     }
                 }
             )

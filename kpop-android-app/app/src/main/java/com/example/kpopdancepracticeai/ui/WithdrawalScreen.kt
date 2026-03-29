@@ -33,6 +33,8 @@ import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
 @Composable
 fun WithdrawalScreen(
     onBackClick: () -> Unit,
+    isWithdrawing: Boolean = false,
+    withdrawErrorMessage: String? = null,
     onWithdrawConfirm: () -> Unit
 ) {
     // 앱 전체의 그라데이션 배경
@@ -106,11 +108,32 @@ fun WithdrawalScreen(
                     }
                 }
 
+                if (!withdrawErrorMessage.isNullOrBlank()) {
+                    item {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            shape = RoundedCornerShape(12.dp),
+                            color = Color(0xFFFFF1F2),
+                            border = BorderStroke(1.dp, Color(0xFFFECACA))
+                        ) {
+                            Text(
+                                text = withdrawErrorMessage,
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp),
+                                color = Color(0xFFB42318),
+                                style = MaterialTheme.typography.bodyMedium
+                            )
+                        }
+                    }
+                }
+
                 // --- 4. 하단 버튼 ---
                 item {
                     Box(modifier = Modifier.padding(horizontal = 16.dp)) {
                         ActionButtons(
                             isAgreed = isAgreed,
+                            isWithdrawing = isWithdrawing,
                             onCancelClick = onBackClick,
                             onWithdrawClick = onWithdrawConfirm
                         )
@@ -279,6 +302,7 @@ fun AgreementCard(
 @Composable
 fun ActionButtons(
     isAgreed: Boolean,
+    isWithdrawing: Boolean,
     onCancelClick: () -> Unit,
     onWithdrawClick: () -> Unit
 ) {
@@ -288,6 +312,7 @@ fun ActionButtons(
     ) {
         OutlinedButton(
             onClick = onCancelClick,
+            enabled = !isWithdrawing,
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp),
@@ -302,7 +327,7 @@ fun ActionButtons(
 
         Button(
             onClick = onWithdrawClick,
-            enabled = isAgreed, // 동의 여부에 따라 활성화
+            enabled = isAgreed && !isWithdrawing, // 동의 + 요청 중 아님
             modifier = Modifier
                 .weight(1f)
                 .height(48.dp),
@@ -314,7 +339,15 @@ fun ActionButtons(
                 disabledContentColor = Color.White
             )
         ) {
-            Text("탈퇴하기", fontWeight = FontWeight.Bold)
+            if (isWithdrawing) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp),
+                    color = Color.White,
+                    strokeWidth = 2.dp
+                )
+            } else {
+                Text("탈퇴하기", fontWeight = FontWeight.Bold)
+            }
         }
     }
 }
@@ -324,6 +357,11 @@ fun ActionButtons(
 @Composable
 fun WithdrawalScreenPreview() {
     KpopDancePracticeAITheme {
-        WithdrawalScreen(onBackClick = {}, onWithdrawConfirm = {})
+        WithdrawalScreen(
+            onBackClick = {},
+            isWithdrawing = false,
+            withdrawErrorMessage = null,
+            onWithdrawConfirm = {}
+        )
     }
 }
