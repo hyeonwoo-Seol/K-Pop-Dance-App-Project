@@ -40,6 +40,7 @@ class KpopApplication : Application() {
         super.onCreate()
         applicationScope.launch {
             repository.prePopulateSongsIfNeeded()
+            repository.ensureAchievementIconsDownloaded(this@KpopApplication)
         }
     }
 }

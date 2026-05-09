@@ -25,7 +25,7 @@ import com.example.kpopdancepracticeai.data.entity.*
         Badge::class,
         UserAchievementProgress::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)

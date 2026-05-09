@@ -48,8 +48,11 @@ interface AchievementDao {
     suspend fun getAchievementByCode(code: String): Achievement?
 
     // [수정됨] 이제 Badge.kt에 user_uuid가 추가되었으므로 오류 없이 정상 작동합니다!
-    @Query("SELECT * FROM badges WHERE user_uuid = :userId AND isUnlocked = 1")
+    @Query("SELECT * FROM badges WHERE user_uuid = :userId AND isUnlocked = 1 ORDER BY is_selected DESC, obtainedAt DESC, name ASC")
     fun getUserBadges(userId: String): Flow<List<Badge>>
+
+    @Query("SELECT * FROM badges WHERE user_uuid = :userId AND isUnlocked = 1 AND is_selected = 1 LIMIT 1")
+    fun getSelectedBadge(userId: String): Flow<Badge?>
 
     // 초기 데이터 세팅용: 업적 메타 데이터 삽입
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -71,8 +74,17 @@ interface AchievementDao {
     @Query("UPDATE user_achievement_progress SET current_step = :step, is_completed = :completed, achieved_date = :date WHERE user_uuid = :userId AND achievement_code = :code")
     suspend fun updateProgress(userId: String, code: String, step: Int, completed: Boolean, date: String?)
 
-    @Query("UPDATE badges SET isUnlocked = 1, obtainedAt = :obtainedAt WHERE user_uuid = :userId AND id = :badgeId AND isUnlocked = 0")
+    @Query("UPDATE badges SET isUnlocked = 1, obtainedAt = :obtainedAt, is_selected = CASE WHEN (SELECT COUNT(*) FROM badges WHERE user_uuid = :userId AND isUnlocked = 1) = 0 THEN 1 ELSE is_selected END WHERE user_uuid = :userId AND id = :badgeId AND isUnlocked = 0")
     suspend fun unlockBadge(userId: String, badgeId: String, obtainedAt: Long): Int
+
+    @Query("UPDATE badges SET is_selected = CASE WHEN id = :badgeId THEN 1 ELSE 0 END WHERE user_uuid = :userId AND isUnlocked = 1")
+    suspend fun selectBadge(userId: String, badgeId: String): Int
+
+    @Query("UPDATE light_sticks SET localImage_path = :localImagePath WHERE id = :lightStickId")
+    suspend fun updateLightStickImagePath(lightStickId: String, localImagePath: String): Int
+
+    @Query("SELECT * FROM light_sticks WHERE is_owned = 1 ORDER BY obtained_at DESC, name ASC")
+    fun getOwnedLightSticks(): Flow<List<LightStick>>
 
     @Query("UPDATE light_sticks SET is_owned = 1, obtained_at = :obtainedAt WHERE id = :lightStickId AND is_owned = 0")
     suspend fun unlockLightStick(lightStickId: String, obtainedAt: Long): Int

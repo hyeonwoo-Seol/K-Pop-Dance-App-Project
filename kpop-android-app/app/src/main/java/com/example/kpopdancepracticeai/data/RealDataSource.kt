@@ -18,9 +18,12 @@ object RealDataSource {
 
     private const val EXPERT_VIDEO_BASE_PATH =
         "file:///data/data/com.example.kpopdancepracticeai/files/expert_videos/"
+    private const val ACHIEVEMENT_ICON_BASE_PATH =
+        "file:///data/data/com.example.kpopdancepracticeai/files/achievement_icons/"
     private const val APP_PACKAGE_NAME = "com.example.kpopdancepracticeai"
 
     private fun expertVideo(fileName: String): String = "$EXPERT_VIDEO_BASE_PATH$fileName"
+    private fun achievementIcon(fileName: String): String = "$ACHIEVEMENT_ICON_BASE_PATH$fileName"
     private fun drawableCover(fileName: String): String =
         "android.resource://$APP_PACKAGE_NAME/drawable/$fileName"
 
@@ -336,7 +339,7 @@ object RealDataSource {
         LightStick(
             id = "icon_itzy_complete_50",
             name = "ITZY 응원봉",
-            localImagePath = "",
+            localImagePath = achievementIcon("itzy_lightstick.png"),
             artist = "ITZY",
             isOwned = false,
             obtainedAt = null
@@ -344,7 +347,7 @@ object RealDataSource {
         LightStick(
             id = "icon_ive_complete_50",
             name = "IVE 응원봉",
-            localImagePath = "",
+            localImagePath = achievementIcon("ive_lightstick.png"),
             artist = "IVE",
             isOwned = false,
             obtainedAt = null
@@ -352,7 +355,7 @@ object RealDataSource {
         LightStick(
             id = "icon_nmixx_complete_50",
             name = "NMIXX 응원봉",
-            localImagePath = "",
+            localImagePath = achievementIcon("nmixx_lightstick.png"),
             artist = "NMIXX",
             isOwned = false,
             obtainedAt = null
@@ -360,7 +363,7 @@ object RealDataSource {
         LightStick(
             id = "icon_fromis9_complete_50",
             name = "프로미스나인 응원봉",
-            localImagePath = "",
+            localImagePath = achievementIcon("fromis9_lightstick.png"),
             artist = "프로미스나인",
             isOwned = false,
             obtainedAt = null
@@ -368,12 +371,22 @@ object RealDataSource {
         LightStick(
             id = "icon_straykids_complete_50",
             name = "스트레이키즈 응원봉",
-            localImagePath = "",
+            localImagePath = achievementIcon("straykids_lightstick.png"),
             artist = "스트레이키즈",
             isOwned = false,
             obtainedAt = null
         )
     )
+
+    val achievementIconDownloads = mapOf(
+        "icon_itzy_complete_50" to ("itzy_lightstick.png" to "https://dummyimage.com/512x512/ff5aa5/ffffff.png&text=ITZY"),
+        "icon_ive_complete_50" to ("ive_lightstick.png" to "https://dummyimage.com/512x512/7b61ff/ffffff.png&text=IVE"),
+        "icon_nmixx_complete_50" to ("nmixx_lightstick.png" to "https://dummyimage.com/512x512/19b6ff/ffffff.png&text=NMIXX"),
+        "icon_fromis9_complete_50" to ("fromis9_lightstick.png" to "https://dummyimage.com/512x512/ff8bd1/ffffff.png&text=fromis_9"),
+        "icon_straykids_complete_50" to ("straykids_lightstick.png" to "https://dummyimage.com/512x512/f43f5e/ffffff.png&text=SKZ")
+    )
+
+    fun getAchievementIconLocalPath(fileName: String): String = achievementIcon(fileName)
 
     fun getInitialBadges(userId: String): List<Badge> = listOf(
         Badge(

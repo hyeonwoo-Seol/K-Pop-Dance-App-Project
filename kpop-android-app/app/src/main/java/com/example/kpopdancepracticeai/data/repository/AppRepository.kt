@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.data.repository
 
+import android.content.Context
+import android.net.Uri
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
@@ -14,6 +16,11 @@ import java.util.Date
 import java.util.Locale
 import kotlin.random.Random
 import kotlin.math.min
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
 
 class AppRepository(
     private val userDao: UserDao,
@@ -22,6 +29,38 @@ class AppRepository(
     private val achievementDao: AchievementDao,
     private val userChoreoStatsDao: UserChoreoStatsDao
 ) {
+
+    suspend fun ensureAchievementIconsDownloaded(context: Context) = withContext(Dispatchers.IO) {
+        val iconDir = File(context.filesDir, "achievement_icons")
+        if (!iconDir.exists()) iconDir.mkdirs()
+        val client = OkHttpClient()
+
+        RealDataSource.achievementIconDownloads.forEach { (lightStickId, iconInfo) ->
+            val (fileName, imageUrl) = iconInfo
+            val targetFile = File(iconDir, fileName)
+            if (!targetFile.exists() || targetFile.length() == 0L) {
+                runCatching {
+                    val request = Request.Builder().url(imageUrl).build()
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body ?: return@use
+                            targetFile.outputStream().use { output ->
+                                body.byteStream().copyTo(output)
+                            }
+                        }
+                    }
+                }
+            }
+
+            val localPath = if (targetFile.exists() && targetFile.length() > 0L) {
+                Uri.fromFile(targetFile).toString()
+            } else {
+                RealDataSource.getAchievementIconLocalPath(fileName)
+            }
+            achievementDao.updateLightStickImagePath(lightStickId, localPath)
+        }
+    }
+
     // 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
     private var sessionStartTime: Long = System.currentTimeMillis()
 
@@ -144,6 +183,12 @@ class AppRepository(
     // --- Achievements & Badges ---
     fun getUserAchievements(userId: String): Flow<List<UserAchievementProgress>> = achievementDao.getUserAchievementProgress(userId)
     fun getUserBadges(userId: String): Flow<List<Badge>> = achievementDao.getUserBadges(userId)
+    fun getSelectedBadge(userId: String): Flow<Badge?> = achievementDao.getSelectedBadge(userId)
+    fun getOwnedLightSticks(): Flow<List<LightStick>> = achievementDao.getOwnedLightSticks()
+
+    suspend fun selectBadge(userId: String, badgeId: String) {
+        achievementDao.selectBadge(userId, badgeId)
+    }
 
     // --- Song ---
     val allSongs: Flow<List<Song>> = songDao.getAllSongs()
