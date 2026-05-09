@@ -1062,6 +1062,7 @@ fun AppNavHost(
 
             if (isTablet) {
                 PracticeScreenTablet(
+                    songId = songId,
                     songTitle = songTitle,
                     artistPart = artistPart,
                     difficulty = difficulty,
@@ -1069,10 +1070,15 @@ fun AppNavHost(
                     videoUrl = videoUrl,
                     onBackClick = { navController.popBackStack() },
                     onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) },
+                    onNavigateHome = { navController.popBackStack(Screen.Home.route, false) },
+                    mainViewModel = viewModel,
                     onRecordingComplete = { resultString ->
-                        val jsonFileName = resultString.split("/").last()
+                        val dataParts = resultString.split("|")
+                        val rawPath = dataParts[0]
+                        val videoUriString = if (dataParts.size > 1) dataParts[1] else ""
+                        val jsonFileName = rawPath.split("/").last()
                         val encodedJson = Screen.encodeArg(jsonFileName)
-                        val encodedVideo = Screen.encodeArg(resultString)
+                        val encodedVideo = Screen.encodeArg(videoUriString)
 
                         navController.navigate("practiceResult/$encodedJson/$encodedVideo") {
                             popUpTo(Screen.DancePractice.route) { inclusive = true }
