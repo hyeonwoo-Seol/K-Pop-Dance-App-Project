@@ -10,7 +10,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.core.CameraSelector
-import androidx.camera.core.Preview
+import androidx.camera.core.Preview as CameraPreview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.MediaStoreOutputOptions
@@ -620,8 +620,8 @@ fun PracticeScreenTablet(
                                 val cameraProviderFuture = ProcessCameraProvider.getInstance(context)
                                 cameraProviderFuture.addListener({
                                     val cameraProvider = cameraProviderFuture.get()
-                                    val preview = Preview.Builder().build().also {
-                                        it.setSurfaceProvider(previewView.surfaceProvider)
+                                    val preview = CameraPreview.Builder().build().also { cameraPreview ->
+                                        cameraPreview.setSurfaceProvider(previewView.surfaceProvider)
                                     }
                                     val qualitySelector = QualitySelector.from(
                                         Quality.FHD,
