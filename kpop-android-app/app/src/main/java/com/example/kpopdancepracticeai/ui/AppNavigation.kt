@@ -1066,6 +1066,7 @@ fun AppNavHost(
                     artistPart = artistPart,
                     difficulty = difficulty,
                     length = length,
+                    videoUrl = videoUrl,
                     onBackClick = { navController.popBackStack() },
                     onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) },
                     onRecordingComplete = { resultString ->

@@ -3,6 +3,7 @@ package com.example.kpopdancepracticeai.ui
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
@@ -27,12 +28,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.VolumeOff
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +52,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.data.PresignedUrlUploader
 import com.example.kpopdancepracticeai.util.NetworkUtils
 import com.example.kpopdancepracticeai.ui.theme.KpopDancePracticeAITheme
@@ -64,6 +70,7 @@ fun PracticeScreenTablet(
     artistPart: String = "BTS · Part 2: 메인 파트",
     difficulty: String = "보통",
     length: String = "2:15",
+    videoUrl: String = "",
     onBackClick: () -> Unit = {},
     onSettingsClick: () -> Unit = {},
     onRecordingComplete: (String) -> Unit = {},
@@ -108,9 +115,84 @@ fun PracticeScreenTablet(
     }
 
     // UI 상태
-    var currentPosition by remember { mutableStateOf(0.1f) }
+    var isPlaying by remember { mutableStateOf(false) }
+    var isMuted by remember { mutableStateOf(false) }
     var selectedSpeed by remember { mutableStateOf(1.0f) }
+    var currentPositionMs by remember { mutableLongStateOf(0L) }
+    var totalDurationMs by remember { mutableLongStateOf(0L) }
     var areControlsVisible by remember { mutableStateOf(true) }
+
+
+    val exoPlayer = remember {
+        ExoPlayer.Builder(context).build().apply {
+            repeatMode = Player.REPEAT_MODE_ALL
+            addListener(object : Player.Listener {
+                override fun onPlayerError(error: PlaybackException) {
+                    Toast.makeText(context, "영상 재생 에러: ${error.message}\n경로를 확인하세요.", Toast.LENGTH_LONG).show()
+                }
+            })
+        }
+    }
+
+    DisposableEffect(Unit) {
+        onDispose { exoPlayer.release() }
+    }
+
+    LaunchedEffect(videoUrl) {
+        if (videoUrl.isNotBlank()) {
+            val finalUrl = if (!videoUrl.startsWith("asset:///")) {
+                videoUrl.replace("file:///android_asset/", "asset:///")
+            } else {
+                videoUrl
+            }
+
+            try {
+                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(finalUrl)))
+                exoPlayer.prepare()
+                exoPlayer.playWhenReady = true
+                isPlaying = true
+            } catch (e: Exception) {
+                Log.e("PracticeTablet", "Video load failed", e)
+            }
+        } else if (!isPreview) {
+            Toast.makeText(context, "오류: 영상 주소가 비어있습니다.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    LaunchedEffect(isPlaying) {
+        if (isPlaying) exoPlayer.play() else exoPlayer.pause()
+    }
+
+    LaunchedEffect(selectedSpeed) {
+        exoPlayer.setPlaybackSpeed(selectedSpeed)
+    }
+
+    LaunchedEffect(isMuted) {
+        exoPlayer.volume = if (isMuted) 0f else 1f
+    }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            currentPositionMs = exoPlayer.currentPosition
+            totalDurationMs = if (exoPlayer.duration > 0) exoPlayer.duration else 0L
+            kotlinx.coroutines.delay(100)
+        }
+    }
+
+    val formatTime = { ms: Long ->
+        val totalSeconds = ms / 1000
+        val minutes = totalSeconds / 60
+        val seconds = totalSeconds % 60
+        String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
+    }
+
+    val currentTimeStr = formatTime(currentPositionMs)
+    val totalTimeStr = if (totalDurationMs > 0) formatTime(totalDurationMs) else length
+    val sliderPosition = if (totalDurationMs > 0) {
+        currentPositionMs.toFloat() / totalDurationMs.toFloat()
+    } else {
+        0f
+    }
 
     LaunchedEffect(isRecording) {
         if (isRecording) {
@@ -220,31 +302,68 @@ fun PracticeScreenTablet(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxHeight()
-                    .background(
-                        Brush.verticalGradient(
-                            listOf(Color(0xFF673AB7).copy(alpha = 0.8f), Color(0xFF3F51B5).copy(alpha = 0.9f))
-                        )
-                    ),
+                    .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                if (isPreview || videoUrl.isBlank()) {
                     Box(
                         modifier = Modifier
-                            .size(100.dp)
-                            .clip(CircleShape)
-                            .background(Color.White.copy(alpha = 0.8f))
-                            .clickable { toggleRecording() }, // 재생 아이콘 클릭 시 녹화 토글
+                            .fillMaxSize()
+                            .background(
+                                Brush.verticalGradient(
+                                    listOf(
+                                        Color(0xFF673AB7).copy(alpha = 0.8f),
+                                        Color(0xFF3F51B5).copy(alpha = 0.9f)
+                                    )
+                                )
+                            ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
-                            imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.PlayArrow,
-                            contentDescription = "녹화 시작/중지",
-                            modifier = Modifier.size(50.dp),
-                            tint = Color.Black
-                        )
+                        Text("댄서 튜토리얼 영상", color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
                     }
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("댄서 튜토리얼 영상", color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
+                } else {
+                    AndroidView(
+                        factory = { ctx ->
+                            PlayerView(ctx).apply {
+                                player = exoPlayer
+                                useController = false
+                                layoutParams = android.view.ViewGroup.LayoutParams(
+                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                                    android.view.ViewGroup.LayoutParams.MATCH_PARENT
+                                )
+                            }
+                        },
+                        modifier = Modifier.fillMaxSize(),
+                        update = { view ->
+                            if (view.player != exoPlayer) view.player = exoPlayer
+                        }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = areControlsVisible,
+                    enter = fadeIn(),
+                    exit = fadeOut()
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(
+                            modifier = Modifier
+                                .size(100.dp)
+                                .clip(CircleShape)
+                                .background(Color.White.copy(alpha = 0.8f))
+                                .clickable { isPlaying = !isPlaying },
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector = if (isPlaying) Icons.Default.MusicNote else Icons.Default.PlayArrow,
+                                contentDescription = if (isPlaying) "일시정지" else "재생",
+                                modifier = Modifier.size(50.dp),
+                                tint = Color.Black.copy(alpha = 0.8f)
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Text("댄서 튜토리얼 영상", color = Color.White.copy(alpha = 0.7f), fontSize = 18.sp)
+                    }
                 }
             }
 
@@ -342,8 +461,20 @@ fun PracticeScreenTablet(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    RoundIconButton(icon = Icons.AutoMirrored.Filled.VolumeUp, onClick = {})
-                    RoundIconButton(icon = Icons.Default.Refresh, onClick = { lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) CameraSelector.LENS_FACING_BACK else CameraSelector.LENS_FACING_FRONT })
+                    RoundIconButton(
+                        icon = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                        onClick = { isMuted = !isMuted }
+                    )
+                    RoundIconButton(
+                        icon = Icons.Default.Refresh,
+                        onClick = {
+                            lensFacing = if (lensFacing == CameraSelector.LENS_FACING_FRONT) {
+                                CameraSelector.LENS_FACING_BACK
+                            } else {
+                                CameraSelector.LENS_FACING_FRONT
+                            }
+                        }
+                    )
                     RoundIconButton(icon = Icons.Default.Settings, onClick = onSettingsClick)
                 }
             }
@@ -365,22 +496,29 @@ fun PracticeScreenTablet(
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 SongInfoBar(title = songTitle, artistPart = artistPart, difficulty = difficulty)
-                
-//                PlaybackSlider(
-//                    currentPosition = currentPosition,
-//                    totalTime = length,
-//                    //onPositionChange = { currentPosition = it }
-//                )
+
+                PlaybackSlider(
+                    currentPosition = sliderPosition,
+                    currentTime = currentTimeStr,
+                    totalTime = totalTimeStr,
+                    onPositionChange = { newPosition ->
+                        if (totalDurationMs > 0) {
+                            exoPlayer.seekTo((newPosition * totalDurationMs).toLong())
+                        }
+                    }
+                )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    SpeedControlRow(
-                        selectedSpeed = selectedSpeed,
-                        onSpeedSelected = { selectedSpeed = it }
-                    )
+                    Box(modifier = Modifier.weight(1f)) {
+                        SpeedControlRow(
+                            selectedSpeed = selectedSpeed,
+                            onSpeedSelected = { selectedSpeed = it }
+                        )
+                    }
 
                     // 하단 녹화 버튼
                     val buttonPadding by animateDpAsState(if (isRecording) 12.dp else 4.dp, label = "")
