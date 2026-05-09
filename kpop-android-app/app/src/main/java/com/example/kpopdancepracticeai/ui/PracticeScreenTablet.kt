@@ -3,7 +3,6 @@ package com.example.kpopdancepracticeai.ui
 import android.Manifest
 import android.content.ContentValues
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.provider.MediaStore
 import android.util.Log
 import android.widget.Toast
@@ -14,6 +13,9 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.video.*
 import androidx.camera.view.PreviewView
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -28,12 +30,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeOff
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -50,6 +52,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.media3.common.MediaItem
@@ -117,7 +120,7 @@ fun PracticeScreenTablet(
     // UI 상태
     var isPlaying by remember { mutableStateOf(false) }
     var isMuted by remember { mutableStateOf(false) }
-    var selectedSpeed by remember { mutableStateOf(1.0f) }
+    var selectedSpeed by remember { mutableFloatStateOf(1.0f) }
     var currentPositionMs by remember { mutableLongStateOf(0L) }
     var totalDurationMs by remember { mutableLongStateOf(0L) }
     var areControlsVisible by remember { mutableStateOf(true) }
@@ -147,7 +150,7 @@ fun PracticeScreenTablet(
             }
 
             try {
-                exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(finalUrl)))
+                exoPlayer.setMediaItem(MediaItem.fromUri(finalUrl.toUri()))
                 exoPlayer.prepare()
                 exoPlayer.playWhenReady = true
                 isPlaying = true
@@ -164,7 +167,7 @@ fun PracticeScreenTablet(
     }
 
     LaunchedEffect(selectedSpeed) {
-        exoPlayer.setPlaybackSpeed(selectedSpeed)
+        exoPlayer.playbackParameters = exoPlayer.playbackParameters.withSpeed(selectedSpeed)
     }
 
     LaunchedEffect(isMuted) {
@@ -215,11 +218,13 @@ fun PracticeScreenTablet(
             val videoCapture = videoCaptureState.value
             if (videoCapture != null) {
                 isRecording = true
-                val name = "Kpop_Tablet_${System.currentTimeMillis()}.mp4"
+                //noinspection SpellCheckingInspection
+                val name = "KPop_Tablet_${System.currentTimeMillis()}.mp4"
                 val contentValues = ContentValues().apply {
                     put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                     put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-                    put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/KpopDancePractice")
+                    //noinspection SpellCheckingInspection
+                    put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/KPopDancePractice")
                 }
                 val mediaStoreOutputOptions = MediaStoreOutputOptions
                     .Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI)
@@ -235,6 +240,7 @@ fun PracticeScreenTablet(
                                 val uri = event.outputResults.outputUri
                                 
                                 // [파일명 형식 생성] RecordScreenMobile.kt와 동일
+                                //noinspection SpellCheckingInspection
                                 val userId = "xooyong"
                                 val songIdClean = songTitle.replace(" ", "").replace("_", "")
                                 
@@ -340,7 +346,7 @@ fun PracticeScreenTablet(
                     )
                 }
 
-                AnimatedVisibility(
+                TabletAnimatedVisibility(
                     visible = areControlsVisible,
                     enter = fadeIn(),
                     exit = fadeOut()
@@ -442,7 +448,7 @@ fun PracticeScreenTablet(
         }
 
         // 상단 컨트롤 바
-        AnimatedVisibility(
+        TabletAnimatedVisibility(
             visible = areControlsVisible,
             modifier = Modifier.align(Alignment.TopCenter),
             enter = slideInVertically(initialOffsetY = { -it }) + fadeIn(),
@@ -462,7 +468,7 @@ fun PracticeScreenTablet(
 
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     RoundIconButton(
-                        icon = if (isMuted) Icons.Default.VolumeOff else Icons.Default.VolumeUp,
+                        icon = if (isMuted) Icons.AutoMirrored.Filled.VolumeOff else Icons.AutoMirrored.Filled.VolumeUp,
                         onClick = { isMuted = !isMuted }
                     )
                     RoundIconButton(
@@ -481,7 +487,7 @@ fun PracticeScreenTablet(
         }
 
         // 하단 제어판
-        AnimatedVisibility(
+        TabletAnimatedVisibility(
             visible = areControlsVisible,
             modifier = Modifier.align(Alignment.BottomCenter),
             enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
@@ -535,6 +541,24 @@ fun PracticeScreenTablet(
             }
         }
     }
+}
+
+
+@Composable
+private fun TabletAnimatedVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    enter: EnterTransition = fadeIn(),
+    exit: ExitTransition = fadeOut(),
+    content: @Composable AnimatedVisibilityScope.() -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = enter,
+        exit = exit,
+        content = content
+    )
 }
 
 @Preview(showBackground = true, device = "spec:width=1280dp,height=800dp,orientation=landscape")
