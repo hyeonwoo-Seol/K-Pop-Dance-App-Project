@@ -56,6 +56,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -1056,25 +1057,48 @@ fun AppNavHost(
             val length = backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) } ?: ""
             val videoUrl = backStackEntry.arguments?.getString("videoUrl")?.let { Screen.decodeArg(it) } ?: ""
 
-            PracticeScreenMobile(
-                songId = songId,
-                songTitle = songTitle,
-                artistPart = artistPart,
-                difficulty = difficulty,
-                length = length,
-                videoUrl = videoUrl,
-                onBackClick = { navController.popBackStack() },
-                onRecordClick = {
-                    val encodedTitle = Screen.encodeArg(songTitle)
-                    val encodedArtistPart = Screen.encodeArg(artistPart)
-                    val encodedDifficulty = Screen.encodeArg(difficulty)
-                    val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
-                    navController.navigate("record/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl") {
-                        popUpTo(Screen.DancePractice.route) { inclusive = true }
+            val configuration = LocalConfiguration.current
+            val isTablet = configuration.smallestScreenWidthDp >= 600
+
+            if (isTablet) {
+                PracticeScreenTablet(
+                    songTitle = songTitle,
+                    artistPart = artistPart,
+                    difficulty = difficulty,
+                    length = length,
+                    onBackClick = { navController.popBackStack() },
+                    onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) },
+                    onRecordingComplete = { resultString ->
+                        val jsonFileName = resultString.split("/").last()
+                        val encodedJson = Screen.encodeArg(jsonFileName)
+                        val encodedVideo = Screen.encodeArg(resultString)
+
+                        navController.navigate("practiceResult/$encodedJson/$encodedVideo") {
+                            popUpTo(Screen.DancePractice.route) { inclusive = true }
+                        }
                     }
-                },
-                onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
-            )
+                )
+            } else {
+                PracticeScreenMobile(
+                    songId = songId,
+                    songTitle = songTitle,
+                    artistPart = artistPart,
+                    difficulty = difficulty,
+                    length = length,
+                    videoUrl = videoUrl,
+                    onBackClick = { navController.popBackStack() },
+                    onRecordClick = {
+                        val encodedTitle = Screen.encodeArg(songTitle)
+                        val encodedArtistPart = Screen.encodeArg(artistPart)
+                        val encodedDifficulty = Screen.encodeArg(difficulty)
+                        val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
+                        navController.navigate("record/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl") {
+                            popUpTo(Screen.DancePractice.route) { inclusive = true }
+                        }
+                    },
+                    onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
+                )
+            }
         }
         composable(Screen.AnalysisLoading.route) {
             AnalysisWaitingScreen(
