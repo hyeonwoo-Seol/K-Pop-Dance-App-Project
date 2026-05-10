@@ -44,10 +44,6 @@ interface AchievementDao {
     @Query("SELECT COUNT(*) FROM user_achievement_progress WHERE user_uuid = :userId")
     suspend fun getUserAchievementProgressCount(userId: String): Int
 
-
-    @Query("SELECT * FROM user_achievement_progress WHERE user_uuid = :userId")
-    suspend fun getUserAchievementProgressRawOneShot(userId: String): List<UserAchievementProgress>
-
     @Query("SELECT * FROM achievements WHERE id = :code LIMIT 1")
     suspend fun getAchievementByCode(code: String): Achievement?
 
