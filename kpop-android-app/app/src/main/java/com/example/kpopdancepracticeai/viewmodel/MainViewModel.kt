@@ -170,7 +170,10 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 repository.fetchInitialData(userId)
 
                 val awsSyncMessage = repository.syncUserLocalDataToAws(userId)
-                    .getOrElse { throw it }
+                    .fold(
+                        onSuccess = { it },
+                        onFailure = { "AWS 동기화 실패(로컬 데이터는 정상 표시): ${it.message}" }
+                    )
 
                 // 구독 설정
                 launch { repository.getUserStats(userId).collect { _userStats.value = it } }
