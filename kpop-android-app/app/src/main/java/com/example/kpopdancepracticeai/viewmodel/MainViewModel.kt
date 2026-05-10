@@ -169,6 +169,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
                 repository.fetchInitialData(userId)
 
+                val awsSyncMessage = repository.syncUserLocalDataToAws(userId)
+                    .getOrElse { throw it }
+
                 // 구독 설정
                 launch { repository.getUserStats(userId).collect { _userStats.value = it } }
                 launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
@@ -269,7 +272,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                     }
                 }
 
-                _syncMessage.value = "데이터 동기화 완료"
+                _syncMessage.value = awsSyncMessage
             } catch (e: Exception) {
                 e.printStackTrace()
                 _syncMessage.value = "동기화 실패: ${e.message}"

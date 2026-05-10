@@ -8,7 +8,7 @@ import retrofit2.converter.gson.GsonConverterFactory
  */
 object RetrofitClient {
     // 실제 AWS 배포 전까지는 임시 URL 사용 (나중에 실제 API Gateway 주소로 변경 필요)
-    private const val BASE_URL = "https://api.example.com/"
+    private const val BASE_URL = "https://aujfpfdg6e.execute-api.ap-northeast-1.amazonaws.com/"
 
     val apiService: ApiService by lazy {
         Retrofit.Builder()
