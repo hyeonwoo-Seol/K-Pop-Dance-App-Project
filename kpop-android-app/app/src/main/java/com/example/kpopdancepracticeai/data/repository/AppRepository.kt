@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import org.json.JSONObject
 
 class AppRepository(
     private val userDao: UserDao,
@@ -230,8 +231,15 @@ class AppRepository(
             val response = RetrofitClient.apiService.syncUserLocalData(request)
             if (!response.isSuccessful) {
                 val errorBody = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
-                Log.e(TAG, "AWS sync failed: HTTP ${response.code()} body=$errorBody")
-                throw IllegalStateException("AWS sync failed: HTTP ${response.code()} | body=${errorBody.ifBlank { "<empty>" }}")
+                val parsedMessage = parseGatewayErrorMessage(errorBody)
+                val httpMessage = response.message().ifBlank { "Unknown" }
+                Log.e(TAG, "AWS sync failed: HTTP ${response.code()} $httpMessage body=$errorBody")
+                val detail = when {
+                    parsedMessage.isNotBlank() -> parsedMessage
+                    errorBody.isNotBlank() -> errorBody
+                    else -> "<empty>"
+                }
+                throw IllegalStateException("AWS sync failed: HTTP ${response.code()} ($httpMessage) | detail=$detail")
             }
             val body = response.body() ?: throw IllegalStateException("AWS sync failed: empty response")
             Log.d(TAG, "AWS sync response ok=${body.ok}, message=${body.message}, saved=${body.saved}")
@@ -242,6 +250,21 @@ class AppRepository(
             val saved = body.saved
             "AWS 동기화 완료 (user=${saved?.user == true}, stats=${saved?.userStats == true}, achievements=${saved?.achievementsCount ?: 0})"
         }
+    }
+
+
+
+    private fun parseGatewayErrorMessage(raw: String): String {
+        if (raw.isBlank()) return ""
+        return runCatching {
+            val json = JSONObject(raw)
+            when {
+                json.optString("message").isNotBlank() -> json.optString("message")
+                json.optString("error").isNotBlank() -> json.optString("error")
+                json.optString("errorMessage").isNotBlank() -> json.optString("errorMessage")
+                else -> raw
+            }
+        }.getOrElse { raw }
     }
 
     suspend fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
