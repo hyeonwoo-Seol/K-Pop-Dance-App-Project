@@ -169,12 +169,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
                 repository.fetchInitialData(userId)
 
-                val awsSyncMessage = repository.syncUserLocalDataToAws(userId)
-                    .fold(
-                        onSuccess = { it },
-                        onFailure = { "AWS 동기화 실패(로컬 데이터는 정상 표시): ${it.message}" }
-                    )
-
                 // 구독 설정
                 launch { repository.getUserStats(userId).collect { _userStats.value = it } }
                 launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
@@ -275,7 +269,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                     }
                 }
 
-                _syncMessage.value = awsSyncMessage
             } catch (e: Exception) {
                 e.printStackTrace()
                 _syncMessage.value = "동기화 실패: ${e.message}"
@@ -344,8 +337,20 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun refreshData() {
         val userId = currentUserId
         if (userId != null) {
-            updateUsageTime()
-            loadInitialData(userId)
+            viewModelScope.launch {
+                _isSyncing.value = true
+                try {
+                    updateUsageTime()
+                    val message = repository.syncUserLocalDataToAws(userId)
+                        .fold(
+                            onSuccess = { it },
+                            onFailure = { "AWS 동기화 실패: ${it.message}" }
+                        )
+                    _syncMessage.value = message
+                } finally {
+                    _isSyncing.value = false
+                }
+            }
         } else {
             viewModelScope.launch {
                 repository.prePopulateSongsIfNeeded()
