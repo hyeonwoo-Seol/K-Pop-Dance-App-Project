@@ -2,6 +2,7 @@ package com.example.kpopdancepracticeai.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
@@ -9,6 +10,11 @@ import com.example.kpopdancepracticeai.data.dao.UserChoreoStatsDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
 import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
+import com.example.kpopdancepracticeai.data.network.RetrofitClient
+import com.example.kpopdancepracticeai.data.network.SyncAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncUserDto
+import com.example.kpopdancepracticeai.data.network.SyncUserLocalDataRequest
+import com.example.kpopdancepracticeai.data.network.SyncUserStatsDto
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -29,6 +35,10 @@ class AppRepository(
     private val achievementDao: AchievementDao,
     private val userChoreoStatsDao: UserChoreoStatsDao
 ) {
+
+    companion object {
+        private const val TAG = "AwsSync"
+    }
 
     suspend fun ensureAchievementIconsDownloaded(context: Context) = withContext(Dispatchers.IO) {
         val iconDir = File(context.filesDir, "achievement_icons")
@@ -162,6 +172,78 @@ class AppRepository(
     }
 
     //  회원가입 정보 등록
+
+
+    suspend fun syncUserLocalDataToAws(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val user = userDao.getUserProfileOneShot(userId)
+                ?: throw IllegalStateException("user not found: $userId")
+            val stats = userDao.getUserStatsOneShot(userId)
+                ?: throw IllegalStateException("user stats not found: $userId")
+
+            val progressList = achievementDao.getUserAchievementProgressRawOneShot(userId)
+            val achievements = progressList.mapNotNull { progress ->
+                val meta = achievementDao.getAchievementByCode(progress.achievementCode) ?: return@mapNotNull null
+                SyncAchievementDto(
+                    id = meta.id,
+                    title = meta.title,
+                    description = meta.description,
+                    goalCount = meta.goalCount,
+                    rewardType = meta.rewardType,
+                    rewardId = meta.rewardId,
+                    currentCount = progress.currentStep,
+                    isUnlocked = progress.isCompleted,
+                    achievedAt = progress.achievedDate?.toLongOrNull()
+                )
+            }
+
+            val request = SyncUserLocalDataRequest(
+                user = SyncUserDto(
+                    userUuid = user.userUuid,
+                    loginId = user.loginId,
+                    email = user.email,
+                    passwordHash = user.passwordHash ?: "",
+                    birthDate = user.birthDate,
+                    danceSkill = user.danceSkill,
+                    favoriteGenres = user.favoriteGenres,
+                    bio = user.bio.orEmpty(),
+                    appLevel = stats.appLevel,
+                    currentExp = stats.currentExp,
+                    joinDate = user.joinDate
+                ),
+                userStats = SyncUserStatsDto(
+                    userUuid = stats.userUuid,
+                    appLevel = stats.appLevel,
+                    currentExp = stats.currentExp,
+                    totalPlayTime = stats.totalPlayTime,
+                    completedParts = stats.completedParts,
+                    avgAccuracy = stats.avgAccuracy,
+                    badgeCount = stats.badgeCount,
+                    lightstickCount = stats.lightstickCount,
+                    achievementScore = stats.achievementScore,
+                    lastUpdated = stats.lastUpdated
+                ),
+                achievements = achievements
+            )
+
+            Log.d(TAG, "syncUserLocalDataToAws start: userId=$userId, achievements=${achievements.size}")
+            val response = RetrofitClient.apiService.syncUserLocalData(request)
+            if (!response.isSuccessful) {
+                val errorBody = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
+                Log.e(TAG, "AWS sync failed: HTTP ${response.code()} body=$errorBody")
+                throw IllegalStateException("AWS sync failed: HTTP ${response.code()} | body=${errorBody.ifBlank { "<empty>" }}")
+            }
+            val body = response.body() ?: throw IllegalStateException("AWS sync failed: empty response")
+            Log.d(TAG, "AWS sync response ok=${body.ok}, message=${body.message}, saved=${body.saved}")
+            if (!body.ok) {
+                throw IllegalStateException(body.message ?: "AWS sync failed")
+            }
+
+            val saved = body.saved
+            "AWS 동기화 완료 (user=${saved?.user == true}, stats=${saved?.userStats == true}, achievements=${saved?.achievementsCount ?: 0})"
+        }
+    }
+
     suspend fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
         // 기존 통계 초기화 등 기본 정보 세팅 (없을 경우 생성)
         fetchInitialData(userId)
