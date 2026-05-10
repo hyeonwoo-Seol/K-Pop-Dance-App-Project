@@ -190,8 +190,8 @@ class AppRepository(
                     title = meta.title,
                     description = meta.description,
                     goalCount = meta.goalCount,
-                    rewardType = meta.rewardType,
-                    rewardId = meta.rewardId,
+                    rewardType = meta.rewardType.orEmpty(),
+                    rewardId = meta.rewardId.orEmpty(),
                     currentCount = progress.currentStep,
                     isUnlocked = progress.isCompleted,
                     achievedAt = progress.achievedDate?.toLongOrNull()
