@@ -26,8 +26,17 @@ data class AchievementUiModel(
 
 // UI용 배지 데이터 클래스
 data class BadgeUiModel(
+    val id: String,
     val name: String,
-    val color: Color
+    val color: Color,
+    val isSelected: Boolean
+)
+
+data class LightStickUiModel(
+    val id: String,
+    val name: String,
+    val artist: String,
+    val localImagePath: String
 )
 
 
@@ -116,6 +125,12 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
 
     private val _userBadges = MutableStateFlow<List<BadgeUiModel>>(emptyList())
     val userBadges: StateFlow<List<BadgeUiModel>> = _userBadges.asStateFlow()
+
+    private val _selectedBadge = MutableStateFlow<BadgeUiModel?>(null)
+    val selectedBadge: StateFlow<BadgeUiModel?> = _selectedBadge.asStateFlow()
+
+    private val _ownedLightSticks = MutableStateFlow<List<LightStickUiModel>>(emptyList())
+    val ownedLightSticks: StateFlow<List<LightStickUiModel>> = _ownedLightSticks.asStateFlow()
 
     private val achievementMetaByCode = RealDataSource.getRealAchievements.associateBy { it.id }
 
@@ -223,13 +238,33 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 launch {
                     repository.getUserBadges(userId).collect { list ->
                         _userBadges.value = list.map { badge ->
-                            val color = when {
-                                badge.name.contains("마스터") -> Color(0xFFEBEBFF)
-                                badge.name.contains("팬") -> Color(0xFFD6F5FF)
-                                badge.name.contains("전문가") -> Color(0xFFFFD6EB)
-                                else -> Color(0xFFD9FFE5)
-                            }
-                            BadgeUiModel(badge.name, color)
+                            BadgeUiModel(badge.id, badge.name, badgeColorForName(badge.name), badge.isSelected)
+                        }
+                    }
+                }
+
+                launch {
+                    repository.getSelectedBadge(userId).collect { badge ->
+                        _selectedBadge.value = badge?.let {
+                            BadgeUiModel(
+                                id = it.id,
+                                name = it.name,
+                                color = badgeColorForName(it.name),
+                                isSelected = true
+                            )
+                        }
+                    }
+                }
+
+                launch {
+                    repository.getOwnedLightSticks().collect { lightSticks ->
+                        _ownedLightSticks.value = lightSticks.map {
+                            LightStickUiModel(
+                                id = it.id,
+                                name = it.name,
+                                artist = it.artist,
+                                localImagePath = it.localImagePath
+                            )
                         }
                     }
                 }
@@ -242,6 +277,20 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 _isSyncing.value = false
             }
         }
+    }
+
+    fun selectBadge(badgeId: String) {
+        val userId = currentUserId ?: return
+        viewModelScope.launch {
+            repository.selectBadge(userId, badgeId)
+        }
+    }
+
+    private fun badgeColorForName(name: String): Color = when {
+        name.contains("마스터") -> Color(0xFFEBEBFF)
+        name.contains("팬") -> Color(0xFFD6F5FF)
+        name.contains("전문가") -> Color(0xFFFFD6EB)
+        else -> Color(0xFFD9FFE5)
     }
 
     fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {

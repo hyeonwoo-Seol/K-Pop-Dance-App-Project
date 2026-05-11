@@ -22,6 +22,7 @@ class AppRepository(
     private val achievementDao: AchievementDao,
     private val userChoreoStatsDao: UserChoreoStatsDao
 ) {
+
     // 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
     private var sessionStartTime: Long = System.currentTimeMillis()
 
@@ -105,6 +106,7 @@ class AppRepository(
         // 3. 초기 업적/보상 메타데이터 세팅
         achievementDao.insertAchievements(RealDataSource.getRealAchievements)
         achievementDao.insertLightSticks(RealDataSource.getRealLightSticks)
+        refreshLightStickDrawablePaths()
 
         // 4. 사용자별 업적 진행도 초기화
         // 기존 스키마에서는 progress_id(autoGenerate)가 PK라 동일 사용자/업적코드라도 중복 삽입될 수 있으므로,
@@ -144,6 +146,18 @@ class AppRepository(
     // --- Achievements & Badges ---
     fun getUserAchievements(userId: String): Flow<List<UserAchievementProgress>> = achievementDao.getUserAchievementProgress(userId)
     fun getUserBadges(userId: String): Flow<List<Badge>> = achievementDao.getUserBadges(userId)
+    fun getSelectedBadge(userId: String): Flow<Badge?> = achievementDao.getSelectedBadge(userId)
+    fun getOwnedLightSticks(): Flow<List<LightStick>> = achievementDao.getOwnedLightSticks()
+
+    suspend fun selectBadge(userId: String, badgeId: String) {
+        achievementDao.selectBadge(userId, badgeId)
+    }
+
+    private suspend fun refreshLightStickDrawablePaths() {
+        RealDataSource.getRealLightSticks.forEach { lightStick ->
+            achievementDao.updateLightStickImagePath(lightStick.id, lightStick.localImagePath)
+        }
+    }
 
     // --- Song ---
     val allSongs: Flow<List<Song>> = songDao.getAllSongs()

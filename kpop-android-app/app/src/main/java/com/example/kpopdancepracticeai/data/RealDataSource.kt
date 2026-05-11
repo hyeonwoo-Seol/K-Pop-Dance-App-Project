@@ -21,18 +21,18 @@ object RealDataSource {
     private const val APP_PACKAGE_NAME = "com.example.kpopdancepracticeai"
 
     private fun expertVideo(fileName: String): String = "$EXPERT_VIDEO_BASE_PATH$fileName"
-    private fun drawableCover(fileName: String): String =
+    private fun drawableResource(fileName: String): String =
         "android.resource://$APP_PACKAGE_NAME/drawable/$fileName"
 
     private fun coverForSongTitle(titleEn: String): String = when (titleEn.lowercase()) {
-        "eleven" -> drawableCover("cover_eleven")
-        "o.o" -> drawableCover("cover_oo")
-        "wannabe" -> drawableCover("cover_wannabe")
-        "loco" -> drawableCover("cover_loco")
-        "love dive" -> drawableCover("cover_lovedive")
-        "stay this way" -> drawableCover("cover_staythisway")
-        "sneakers" -> drawableCover("cover_sneakers")
-        else -> drawableCover("cover_eleven")
+        "eleven" -> drawableResource("cover_eleven")
+        "o.o" -> drawableResource("cover_oo")
+        "wannabe" -> drawableResource("cover_wannabe")
+        "loco" -> drawableResource("cover_loco")
+        "love dive" -> drawableResource("cover_lovedive")
+        "stay this way" -> drawableResource("cover_staythisway")
+        "sneakers" -> drawableResource("cover_sneakers")
+        else -> drawableResource("cover_eleven")
     }
 
     val songDetailMetadataByTitleKr = mapOf(
@@ -332,11 +332,14 @@ object RealDataSource {
         )
     )
 
+    // 응원봉 PNG 파일은 app/src/main/res/drawable/ 아래에
+    // lightstick_itzy.png, lightstick_ive.png, lightstick_nmixx.png,
+    // lightstick_fromis9.png, lightstick_straykids.png 이름으로 저장합니다.
     val getRealLightSticks = listOf(
         LightStick(
             id = "icon_itzy_complete_50",
             name = "ITZY 응원봉",
-            localImagePath = "",
+            localImagePath = drawableResource("lightstick_itzy"),
             artist = "ITZY",
             isOwned = false,
             obtainedAt = null
@@ -344,7 +347,7 @@ object RealDataSource {
         LightStick(
             id = "icon_ive_complete_50",
             name = "IVE 응원봉",
-            localImagePath = "",
+            localImagePath = drawableResource("lightstick_ive"),
             artist = "IVE",
             isOwned = false,
             obtainedAt = null
@@ -352,7 +355,7 @@ object RealDataSource {
         LightStick(
             id = "icon_nmixx_complete_50",
             name = "NMIXX 응원봉",
-            localImagePath = "",
+            localImagePath = drawableResource("lightstick_nmixx"),
             artist = "NMIXX",
             isOwned = false,
             obtainedAt = null
@@ -360,7 +363,7 @@ object RealDataSource {
         LightStick(
             id = "icon_fromis9_complete_50",
             name = "프로미스나인 응원봉",
-            localImagePath = "",
+            localImagePath = drawableResource("lightstick_fromis9"),
             artist = "프로미스나인",
             isOwned = false,
             obtainedAt = null
@@ -368,7 +371,7 @@ object RealDataSource {
         LightStick(
             id = "icon_straykids_complete_50",
             name = "스트레이키즈 응원봉",
-            localImagePath = "",
+            localImagePath = drawableResource("lightstick_straykids"),
             artist = "스트레이키즈",
             isOwned = false,
             obtainedAt = null

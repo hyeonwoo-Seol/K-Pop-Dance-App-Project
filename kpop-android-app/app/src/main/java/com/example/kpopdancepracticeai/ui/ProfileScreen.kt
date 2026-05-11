@@ -36,11 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -49,6 +51,7 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
 import com.example.kpopdancepracticeai.viewmodel.BadgeUiModel
+import com.example.kpopdancepracticeai.viewmodel.LightStickUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.TopPracticedChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.*
@@ -89,6 +92,8 @@ fun ProfileScreen(
     val levelInfo by viewModel.userLevelInfo.collectAsState()
     val achievements by viewModel.achievementProgress.collectAsState()
     val badges by viewModel.userBadges.collectAsState()
+    val selectedBadge by viewModel.selectedBadge.collectAsState()
+    val ownedLightSticks by viewModel.ownedLightSticks.collectAsState()
     val topPracticedChoreos by viewModel.topPracticedChoreos.collectAsState()
 
     val context = LocalContext.current
@@ -119,6 +124,8 @@ fun ProfileScreen(
                 userProfile = userProfile,
                 userStats = userStats,
                 levelInfo = levelInfo,
+                selectedBadge = selectedBadge,
+                representativeLightStick = ownedLightSticks.firstOrNull(),
                 onDetailClick = onNavigateToAnalysis
             )
         }
@@ -130,6 +137,8 @@ fun ProfileScreen(
                 achievements = achievements,
                 badges = badges,
                 topPracticedChoreos = topPracticedChoreos,
+                ownedLightSticks = ownedLightSticks,
+                onBadgeSelected = viewModel::selectBadge,
                 onNavigateToProfileEdit = onNavigateToProfileEdit,
                 onNavigateToPracticeSettings = onNavigateToPracticeSettings,
                 onNavigateToNotificationSettings = onNavigateToNotificationSettings,
@@ -152,6 +161,8 @@ private fun ProfileTabContent(
     achievements: List<AchievementUiModel>,
     badges: List<BadgeUiModel>,
     topPracticedChoreos: List<TopPracticedChoreoUiModel>,
+    ownedLightSticks: List<LightStickUiModel>,
+    onBadgeSelected: (String) -> Unit,
     onNavigateToProfileEdit: () -> Unit,
     onNavigateToPracticeSettings: () -> Unit,
     onNavigateToNotificationSettings: () -> Unit,
@@ -220,8 +231,14 @@ private fun ProfileTabContent(
                             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
                         )
                     }
+                    AnimatedTabEntry(index = 1, animationSpec = animationSpec, replayKey = tab) {
+                        BadgeSelectionCard(badges = badges, onBadgeSelected = onBadgeSelected)
+                    }
+                    AnimatedTabEntry(index = 2, animationSpec = animationSpec, replayKey = tab) {
+                        OwnedLightStickCard(lightSticks = ownedLightSticks)
+                    }
                     if (achievements.isEmpty()) {
-                        AnimatedTabEntry(index = 1, animationSpec = animationSpec, replayKey = tab) {
+                        AnimatedTabEntry(index = 3, animationSpec = animationSpec, replayKey = tab) {
                             Text(
                                 "아직 진행중인 업적이 없습니다.",
                                 modifier = Modifier.fillMaxWidth().padding(20.dp),
@@ -231,7 +248,7 @@ private fun ProfileTabContent(
                         }
                     } else {
                         achievements.forEachIndexed { index, item ->
-                            AnimatedTabEntry(index = index + 1, animationSpec = animationSpec, replayKey = tab) {
+                            AnimatedTabEntry(index = index + 3, animationSpec = animationSpec, replayKey = tab) {
                                 AchievementCard(
                                     title = item.title,
                                     description = item.description,
@@ -312,6 +329,8 @@ fun ProfileHeaderCard(
     userProfile: com.example.kpopdancepracticeai.data.entity.User?,
     userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
     levelInfo: Pair<Int, Pair<Long, Long>>,
+    selectedBadge: BadgeUiModel?,
+    representativeLightStick: LightStickUiModel?,
     onDetailClick: () -> Unit
 ) {
     Surface(
@@ -358,6 +377,27 @@ fun ProfileHeaderCard(
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
+                        if (selectedBadge != null || representativeLightStick != null) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                selectedBadge?.let { badge ->
+                                    SparklingBadgeText(text = badge.name)
+                                }
+                                representativeLightStick?.let { lightStick ->
+                                    AsyncImage(
+                                        model = lightStick.localImagePath,
+                                        contentDescription = lightStick.name,
+                                        modifier = Modifier
+                                            .size(24.dp)
+                                            .clip(CircleShape)
+                                            .border(1.dp, Color(0xFFFFD54F), CircleShape),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
+                            }
+                        }
                     }
                     CustomShadowButton("상세 통계 보기", onDetailClick, 92.dp, 35.dp, 11.sp)
                 }
@@ -391,6 +431,21 @@ fun ProfileHeaderCard(
             }
         }
     }
+}
+
+@Composable
+private fun SparklingBadgeText(text: String) {
+    Text(
+        text = "✦ $text ✦",
+        style = MaterialTheme.typography.labelLarge.copy(
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0xFFFFD54F), Color(0xFFFF6EC7), Color(0xFF7C4DFF))
+            ),
+            fontWeight = FontWeight.ExtraBold
+        ),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -615,6 +670,71 @@ fun AcquiredBadgesCard(badges: List<BadgeUiModel>) {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BadgeSelectionCard(badges: List<BadgeUiModel>, onBadgeSelected: (String) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("대표 배지 선택", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (badges.isEmpty()) {
+                Text("획득한 배지가 없습니다. 그룹별 첫 파트를 완료하면 배지를 얻을 수 있어요.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            } else {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    badges.forEach { badge ->
+                        BadgeChip(
+                            text = if (badge.isSelected) "✓ ${badge.name}" else badge.name,
+                            color = badge.color,
+                            modifier = Modifier.clickable { onBadgeSelected(badge.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OwnedLightStickCard(lightSticks: List<LightStickUiModel>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("획득한 아이콘", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (lightSticks.isEmpty()) {
+                Text("아직 획득한 아이콘이 없습니다. 그룹별 50회 완료 업적에 도전해보세요.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    lightSticks.forEach { lightStick ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(72.dp)) {
+                            AsyncImage(
+                                model = lightStick.localImagePath,
+                                contentDescription = lightStick.name,
+                                modifier = Modifier.size(56.dp).clip(CircleShape).border(1.dp, BorderLight, CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            Text(lightStick.artist, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun SettingsContent(
     onNavigateToProfileEdit: () -> Unit,
@@ -742,11 +862,11 @@ fun AchievementCard(
 }
 
 @Composable
-fun BadgeChip(text: String, color: Color) {
+fun BadgeChip(text: String, color: Color, modifier: Modifier = Modifier) {
     Surface(
         color = color,
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.padding(2.dp)
+        modifier = modifier.padding(2.dp)
     ) {
         Text(
             text = text,
