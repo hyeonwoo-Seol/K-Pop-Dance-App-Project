@@ -218,7 +218,7 @@ class AppRepository(
                     currentExp = stats.currentExp,
                     totalPlayTime = stats.totalPlayTime,
                     completedParts = stats.completedParts,
-                    avgAccuracy = stats.avgAccuracy,
+                    avgAccuracy = stats.avgAccuracy.toInt(),
                     badgeCount = stats.badgeCount,
                     lightstickCount = stats.lightstickCount,
                     achievementScore = stats.achievementScore,

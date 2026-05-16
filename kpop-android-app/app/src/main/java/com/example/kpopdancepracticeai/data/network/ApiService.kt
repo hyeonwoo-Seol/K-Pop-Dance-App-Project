@@ -69,7 +69,7 @@ data class SyncUserStatsDto(
     @SerializedName("current_exp") val currentExp: Long,
     @SerializedName("total_play_time") val totalPlayTime: Long,
     @SerializedName("completed_parts") val completedParts: Int,
-    @SerializedName("avg_accuracy") val avgAccuracy: Double,
+    @SerializedName("avg_accuracy") val avgAccuracy: Int,
     @SerializedName("badge_count") val badgeCount: Int,
     @SerializedName("lightstick_count") val lightstickCount: Int,
     @SerializedName("achievement_score") val achievementScore: Int,
