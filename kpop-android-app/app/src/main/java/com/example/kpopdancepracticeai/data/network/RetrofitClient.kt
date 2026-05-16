@@ -16,8 +16,22 @@ object RetrofitClient {
     // 실제 AWS 배포 전까지는 임시 URL 사용 (나중에 실제 API Gateway 주소로 변경 필요)
     private const val BASE_URL = "https://aujfpfdg6e.execute-api.ap-northeast-1.amazonaws.com/"
 
+    // TODO: 배포 시 안전한 저장소(예: BuildConfig/EncryptedSharedPreferences)에서 주입하세요.
+    private const val AUTH_BEARER_TOKEN = ""
+    private const val AWS_API_KEY = ""
+
     private val loggingInterceptor = Interceptor { chain ->
-        val request = chain.request()
+        val originalRequest = chain.request()
+        val requestBuilder = originalRequest.newBuilder()
+
+        if (AUTH_BEARER_TOKEN.isNotBlank() && originalRequest.header("Authorization").isNullOrBlank()) {
+            requestBuilder.addHeader("Authorization", "Bearer $AUTH_BEARER_TOKEN")
+        }
+        if (AWS_API_KEY.isNotBlank() && originalRequest.header("x-api-key").isNullOrBlank()) {
+            requestBuilder.addHeader("x-api-key", AWS_API_KEY)
+        }
+
+        val request = requestBuilder.build()
         val hasAuthorization = !request.header("Authorization").isNullOrBlank()
         val hasApiKey = !request.header("x-api-key").isNullOrBlank()
 
