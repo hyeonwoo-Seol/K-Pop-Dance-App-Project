@@ -2,6 +2,7 @@ package com.example.kpopdancepracticeai.data.repository
 
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
@@ -9,6 +10,13 @@ import com.example.kpopdancepracticeai.data.dao.UserChoreoStatsDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
 import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
+import com.example.kpopdancepracticeai.data.network.RetrofitClient
+import com.example.kpopdancepracticeai.data.network.SyncAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncedAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncedUserBundle
+import com.example.kpopdancepracticeai.data.network.SyncUserDto
+import com.example.kpopdancepracticeai.data.network.SyncUserLocalDataRequest
+import com.example.kpopdancepracticeai.data.network.SyncUserStatsDto
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
 import java.util.Calendar
@@ -21,6 +29,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.File
+import org.json.JSONObject
 
 class AppRepository(
     private val userDao: UserDao,
@@ -29,6 +38,10 @@ class AppRepository(
     private val achievementDao: AchievementDao,
     private val userChoreoStatsDao: UserChoreoStatsDao
 ) {
+
+    companion object {
+        private const val TAG = "AwsSync"
+    }
 
     suspend fun ensureAchievementIconsDownloaded(context: Context) = withContext(Dispatchers.IO) {
         val iconDir = File(context.filesDir, "achievement_icons")
@@ -162,6 +175,211 @@ class AppRepository(
     }
 
     //  회원가입 정보 등록
+
+
+    suspend fun syncUserLocalDataToAws(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val user = userDao.getUserProfileOneShot(userId)
+                ?: throw IllegalStateException("user not found: $userId")
+            val stats = userDao.getUserStatsOneShot(userId)
+                ?: throw IllegalStateException("user stats not found: $userId")
+
+            val progressList = achievementDao.getUserAchievementProgressRawOneShot(userId)
+            val achievements = progressList.mapNotNull { progress ->
+                val meta = achievementDao.getAchievementByCode(progress.achievementCode) ?: return@mapNotNull null
+                SyncAchievementDto(
+                    id = meta.id,
+                    title = meta.title,
+                    description = meta.description,
+                    goalCount = meta.goalCount,
+                    rewardType = meta.rewardType.orEmpty(),
+                    rewardId = meta.rewardId.orEmpty(),
+                    currentCount = progress.currentStep,
+                    isUnlocked = progress.isCompleted,
+                    achievedAt = progress.achievedDate?.toLongOrNull()
+                )
+            }
+
+            val request = SyncUserLocalDataRequest(
+                user = SyncUserDto(
+                    userUuid = user.userUuid,
+                    loginId = user.loginId,
+                    email = user.email,
+                    passwordHash = user.passwordHash ?: "",
+                    birthDate = user.birthDate,
+                    danceSkill = user.danceSkill,
+                    favoriteGenres = user.favoriteGenres,
+                    bio = user.bio.orEmpty(),
+                    appLevel = stats.appLevel,
+                    currentExp = stats.currentExp,
+                    joinDate = user.joinDate
+                ),
+                userStats = SyncUserStatsDto(
+                    userUuid = stats.userUuid,
+                    appLevel = stats.appLevel,
+                    currentExp = stats.currentExp,
+                    totalPlayTime = stats.totalPlayTime,
+                    completedParts = stats.completedParts,
+                    avgAccuracy = stats.avgAccuracy.toInt(),
+                    badgeCount = stats.badgeCount,
+                    lightstickCount = stats.lightstickCount,
+                    achievementScore = stats.achievementScore,
+                    lastUpdated = stats.lastUpdated
+                ),
+                achievements = achievements
+            )
+
+            Log.d(TAG, "syncUserLocalDataToAws start: userId=$userId, achievements=${achievements.size}")
+            val response = RetrofitClient.apiService.syncUserLocalData(request)
+            if (!response.isSuccessful) {
+                val errorBody = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
+                val parsedMessage = parseGatewayErrorMessage(errorBody)
+                val httpMessage = response.message().ifBlank { "Unknown" }
+                Log.e(TAG, "AWS sync failed: HTTP ${response.code()} $httpMessage body=$errorBody")
+                val detail = when {
+                    parsedMessage.isNotBlank() -> parsedMessage
+                    errorBody.isNotBlank() -> errorBody
+                    else -> "<empty>"
+                }
+                throw IllegalStateException("AWS sync failed: HTTP ${response.code()} ($httpMessage) | detail=$detail")
+            }
+            val body = response.body() ?: throw IllegalStateException("AWS sync failed: empty response")
+            Log.d(TAG, "AWS sync response ok=${body.ok}, message=${body.message}, saved=${body.saved}")
+            if (!body.ok) {
+                throw IllegalStateException(body.message ?: "AWS sync failed")
+            }
+
+            val saved = body.saved
+            "AWS 동기화 완료 (user=${saved?.user == true}, stats=${saved?.userStats == true}, achievements=${saved?.achievementsCount ?: 0})"
+        }
+    }
+
+
+    suspend fun syncUserDataBidirectional(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val pullResponse = RetrofitClient.apiService.getUserLocalData(userId)
+            if (!pullResponse.isSuccessful) {
+                val errorBody = runCatching { pullResponse.errorBody()?.string() }.getOrNull().orEmpty()
+                val detail = parseGatewayErrorMessage(errorBody).ifBlank { errorBody.ifBlank { "<empty>" } }
+                throw IllegalStateException("AWS pull failed: HTTP ${pullResponse.code()} | detail=$detail")
+            }
+
+            val pullBody = pullResponse.body()
+            if (pullBody != null && pullBody.ok) {
+                pullBody.data?.let { applyServerDataIfNewer(userId, it) }
+            }
+
+            val pushMessage = syncUserLocalDataToAws(userId).getOrElse { throw it }
+            "양방향 동기화 완료 | $pushMessage"
+        }
+    }
+
+    private suspend fun applyServerDataIfNewer(userId: String, server: SyncedUserBundle) {
+        val localUser = userDao.getUserProfileOneShot(userId)
+        val serverUser = server.user
+        if (localUser != null && serverUser != null && isServerUserNewer(serverUser.updatedAt, localUser.createdAt)) {
+            userDao.updateUser(
+                localUser.copy(
+                    loginId = serverUser.loginId ?: localUser.loginId,
+                    email = serverUser.email ?: localUser.email,
+                    passwordHash = serverUser.passwordHash ?: localUser.passwordHash,
+                    birthDate = serverUser.birthDate ?: localUser.birthDate,
+                    danceSkill = serverUser.danceSkill ?: localUser.danceSkill,
+                    favoriteGenres = serverUser.favoriteGenres ?: localUser.favoriteGenres,
+                    bio = serverUser.bio ?: localUser.bio,
+                    joinDate = serverUser.joinDate ?: localUser.joinDate
+                )
+            )
+        }
+
+        val localStats = userDao.getUserStatsOneShot(userId)
+        val serverStats = server.userStats
+        if (localStats != null && serverStats != null && isServerStatsNewer(serverStats.updatedAt, localStats.lastUpdated)) {
+            userDao.insertOrUpdate(
+                localStats.copy(
+                    appLevel = serverStats.appLevel ?: localStats.appLevel,
+                    currentExp = serverStats.currentExp ?: localStats.currentExp,
+                    totalPlayTime = serverStats.totalPlayTime ?: localStats.totalPlayTime,
+                    completedParts = serverStats.completedParts ?: localStats.completedParts,
+                    avgAccuracy = serverStats.avgAccuracy ?: localStats.avgAccuracy,
+                    badgeCount = serverStats.badgeCount ?: localStats.badgeCount,
+                    lightstickCount = serverStats.lightstickCount ?: localStats.lightstickCount,
+                    achievementScore = serverStats.achievementScore ?: localStats.achievementScore,
+                    lastUpdated = serverStats.lastUpdated ?: localStats.lastUpdated
+                )
+            )
+        }
+
+        server.achievements.orEmpty().forEach { applyAchievementFromServer(userId, it) }
+    }
+
+    private suspend fun applyAchievementFromServer(userId: String, item: SyncedAchievementDto) {
+        val code = item.achievementId ?: item.id ?: return
+        val existing = achievementDao.getUserAchievementProgressOneShot(userId, code)
+        val incomingStep = item.currentCount ?: 0
+        val incomingGoal = item.goalCount ?: existing?.goalStep ?: 0
+        val incomingCompleted = item.isUnlocked == true
+        val incomingAchievedDate = item.achievedAt?.toString()
+
+        if (existing == null) {
+            achievementDao.insertProgress(
+                listOf(
+                    UserAchievementProgress(
+                        userUuid = userId,
+                        achievementCode = code,
+                        currentStep = incomingStep,
+                        goalStep = incomingGoal,
+                        isCompleted = incomingCompleted,
+                        achievedDate = incomingAchievedDate
+                    )
+                )
+            )
+            return
+        }
+
+        val mergedStep = maxOf(existing.currentStep, incomingStep)
+        val mergedGoal = maxOf(existing.goalStep, incomingGoal)
+        val mergedCompleted = existing.isCompleted || incomingCompleted
+        val mergedAchievedDate = listOfNotNull(existing.achievedDate, incomingAchievedDate).minOrNull()
+
+        achievementDao.updateProgress(userId, code, mergedStep, mergedCompleted, mergedAchievedDate)
+    }
+
+    private fun isServerUserNewer(serverUpdatedAt: String?, localCreatedAt: Long): Boolean {
+        val serverEpoch = parseServerIsoToEpoch(serverUpdatedAt)
+        return serverEpoch != null && serverEpoch > localCreatedAt
+    }
+
+    private fun isServerStatsNewer(serverUpdatedAt: String?, localLastUpdated: String): Boolean {
+        val serverEpoch = parseServerIsoToEpoch(serverUpdatedAt) ?: return false
+        val localEpoch = parseLocalDateTimeToEpoch(localLastUpdated) ?: 0L
+        return serverEpoch > localEpoch
+    }
+
+    private fun parseServerIsoToEpoch(value: String?): Long? = runCatching {
+        if (value.isNullOrBlank()) return null
+        java.time.Instant.parse(value).toEpochMilli()
+    }.getOrNull()
+
+    private fun parseLocalDateTimeToEpoch(value: String?): Long? = runCatching {
+        if (value.isNullOrBlank()) return null
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(value)?.time
+    }.getOrNull()
+
+
+    private fun parseGatewayErrorMessage(raw: String): String {
+        if (raw.isBlank()) return ""
+        return runCatching {
+            val json = JSONObject(raw)
+            when {
+                json.optString("message").isNotBlank() -> json.optString("message")
+                json.optString("error").isNotBlank() -> json.optString("error")
+                json.optString("errorMessage").isNotBlank() -> json.optString("errorMessage")
+                else -> raw
+            }
+        }.getOrElse { raw }
+    }
+
     suspend fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
         // 기존 통계 초기화 등 기본 정보 세팅 (없을 경우 생성)
         fetchInitialData(userId)
