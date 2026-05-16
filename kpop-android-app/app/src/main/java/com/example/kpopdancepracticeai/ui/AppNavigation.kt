@@ -1,7 +1,6 @@
 package com.example.kpopdancepracticeai.ui
 
 import android.content.Context
-import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.CubicBezierEasing
@@ -87,7 +86,8 @@ import java.nio.charset.StandardCharsets
 
 private const val PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT = "has_shown_initial_video_prompt"
 
-private fun consumeInitialVideoPromptAndGetRoute(prefs: SharedPreferences): String {
+private fun consumeInitialVideoPromptAndGetRoute(context: Context): String {
+    val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
     return if (!prefs.getBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, false)) {
         prefs.edit().putBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, true).apply()
         Screen.VideoDownload.route
@@ -421,6 +421,7 @@ fun AppNavHost(
     authRepository: AuthRepository,
     onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
 ) {
+    val context = LocalContext.current
     NavHost(
         navController = navController,
         startDestination = startDestination,
@@ -467,7 +468,7 @@ fun AppNavHost(
                     navController.navigate("loginAttempt/$encodedEmail/$encodedPassword")
                 },
                 onLoginSuccess = {
-                    navController.navigate(consumeInitialVideoPromptAndGetRoute(prefs)) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(context)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -496,7 +497,7 @@ fun AppNavHost(
                 email = email,
                 password = password,
                 onLoginSuccess = {
-                    navController.navigate(consumeInitialVideoPromptAndGetRoute(prefs)) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(context)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -546,7 +547,7 @@ fun AppNavHost(
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->
-                    navController.navigate(consumeInitialVideoPromptAndGetRoute(prefs)) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(context)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
