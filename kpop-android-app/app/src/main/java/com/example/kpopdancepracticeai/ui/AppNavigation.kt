@@ -1,6 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.AnimatedContentTransitionScope
 import androidx.compose.animation.core.CubicBezierEasing
@@ -82,6 +83,18 @@ import com.example.kpopdancepracticeai.viewmodel.SearchViewModel
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
+
+
+private const val PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT = "has_shown_initial_video_prompt"
+
+private fun consumeInitialVideoPromptAndGetRoute(prefs: SharedPreferences): String {
+    return if (!prefs.getBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, false)) {
+        prefs.edit().putBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, true).apply()
+        Screen.VideoDownload.route
+    } else {
+        Screen.Home.route
+    }
+}
 
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Login : Screen("login", "로그인", Icons.Default.Home)
@@ -205,13 +218,19 @@ fun AppNavigation(
     val authRepository = remember { AuthRepository(context) }
 
     val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
-    val isVideoDownloaded = remember { prefs.getBoolean("is_expert_video_downloaded", false) }
+    val hasShownInitialVideoPrompt = remember { prefs.getBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, false) }
 
     val startDestination = remember {
         if (authRepository.getCurrentUser() != null) {
-            if (isVideoDownloaded) Screen.Home.route else Screen.VideoDownload.route
+            if (!hasShownInitialVideoPrompt) Screen.VideoDownload.route else Screen.Home.route
         } else {
             Screen.Login.route
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(startDestination) {
+        if (startDestination == Screen.VideoDownload.route) {
+            prefs.edit().putBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, true).apply()
         }
     }
 
@@ -448,7 +467,7 @@ fun AppNavHost(
                     navController.navigate("loginAttempt/$encodedEmail/$encodedPassword")
                 },
                 onLoginSuccess = {
-                    navController.navigate(Screen.VideoDownload.route) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(prefs)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -477,7 +496,7 @@ fun AppNavHost(
                 email = email,
                 password = password,
                 onLoginSuccess = {
-                    navController.navigate(Screen.VideoDownload.route) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(prefs)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -527,7 +546,7 @@ fun AppNavHost(
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->
-                    navController.navigate(Screen.VideoDownload.route) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(prefs)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
