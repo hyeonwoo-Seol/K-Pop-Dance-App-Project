@@ -28,7 +28,7 @@ interface ApiService {
     suspend fun syncUserLocalData(@Body request: SyncUserLocalDataRequest): Response<SyncUserLocalDataResponse>
 
     // 4. AWS에 저장된 사용자 동기화 데이터 조회 (Pull)
-    @GET("default/getUserLocalData")
+    @GET("default/syncUserLocalData")
     suspend fun getUserLocalData(@Query("user_uuid") userUuid: String): Response<GetUserLocalDataResponse>
 }
 
