@@ -12,6 +12,8 @@ import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.network.RetrofitClient
 import com.example.kpopdancepracticeai.data.network.SyncAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncedAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncedUserBundle
 import com.example.kpopdancepracticeai.data.network.SyncUserDto
 import com.example.kpopdancepracticeai.data.network.SyncUserLocalDataRequest
 import com.example.kpopdancepracticeai.data.network.SyncUserStatsDto
@@ -252,6 +254,117 @@ class AppRepository(
         }
     }
 
+
+    suspend fun syncUserDataBidirectional(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val pullResponse = RetrofitClient.apiService.getUserLocalData(userId)
+            if (!pullResponse.isSuccessful) {
+                val errorBody = runCatching { pullResponse.errorBody()?.string() }.getOrNull().orEmpty()
+                val detail = parseGatewayErrorMessage(errorBody).ifBlank { errorBody.ifBlank { "<empty>" } }
+                throw IllegalStateException("AWS pull failed: HTTP ${pullResponse.code()} | detail=$detail")
+            }
+
+            val pullBody = pullResponse.body()
+            if (pullBody != null && pullBody.ok) {
+                pullBody.data?.let { applyServerDataIfNewer(userId, it) }
+            }
+
+            val pushMessage = syncUserLocalDataToAws(userId).getOrElse { throw it }
+            "양방향 동기화 완료 | $pushMessage"
+        }
+    }
+
+    private suspend fun applyServerDataIfNewer(userId: String, server: SyncedUserBundle) {
+        val localUser = userDao.getUserProfileOneShot(userId)
+        val serverUser = server.user
+        if (localUser != null && serverUser != null && isServerUserNewer(serverUser.updatedAt, localUser.createdAt)) {
+            userDao.updateUser(
+                localUser.copy(
+                    loginId = serverUser.loginId ?: localUser.loginId,
+                    email = serverUser.email ?: localUser.email,
+                    passwordHash = serverUser.passwordHash ?: localUser.passwordHash,
+                    birthDate = serverUser.birthDate ?: localUser.birthDate,
+                    danceSkill = serverUser.danceSkill ?: localUser.danceSkill,
+                    favoriteGenres = serverUser.favoriteGenres ?: localUser.favoriteGenres,
+                    bio = serverUser.bio ?: localUser.bio,
+                    joinDate = serverUser.joinDate ?: localUser.joinDate
+                )
+            )
+        }
+
+        val localStats = userDao.getUserStatsOneShot(userId)
+        val serverStats = server.userStats
+        if (localStats != null && serverStats != null && isServerStatsNewer(serverStats.updatedAt, localStats.lastUpdated)) {
+            userDao.insertOrUpdate(
+                localStats.copy(
+                    appLevel = serverStats.appLevel ?: localStats.appLevel,
+                    currentExp = serverStats.currentExp ?: localStats.currentExp,
+                    totalPlayTime = serverStats.totalPlayTime ?: localStats.totalPlayTime,
+                    completedParts = serverStats.completedParts ?: localStats.completedParts,
+                    avgAccuracy = serverStats.avgAccuracy ?: localStats.avgAccuracy,
+                    badgeCount = serverStats.badgeCount ?: localStats.badgeCount,
+                    lightstickCount = serverStats.lightstickCount ?: localStats.lightstickCount,
+                    achievementScore = serverStats.achievementScore ?: localStats.achievementScore,
+                    lastUpdated = serverStats.lastUpdated ?: localStats.lastUpdated
+                )
+            )
+        }
+
+        server.achievements.orEmpty().forEach { applyAchievementFromServer(userId, it) }
+    }
+
+    private suspend fun applyAchievementFromServer(userId: String, item: SyncedAchievementDto) {
+        val code = item.achievementId ?: item.id ?: return
+        val existing = achievementDao.getUserAchievementProgressOneShot(userId, code)
+        val incomingStep = item.currentCount ?: 0
+        val incomingGoal = item.goalCount ?: existing?.goalStep ?: 0
+        val incomingCompleted = item.isUnlocked == true
+        val incomingAchievedDate = item.achievedAt?.toString()
+
+        if (existing == null) {
+            achievementDao.insertProgress(
+                listOf(
+                    UserAchievementProgress(
+                        userUuid = userId,
+                        achievementCode = code,
+                        currentStep = incomingStep,
+                        goalStep = incomingGoal,
+                        isCompleted = incomingCompleted,
+                        achievedDate = incomingAchievedDate
+                    )
+                )
+            )
+            return
+        }
+
+        val mergedStep = maxOf(existing.currentStep, incomingStep)
+        val mergedGoal = maxOf(existing.goalStep, incomingGoal)
+        val mergedCompleted = existing.isCompleted || incomingCompleted
+        val mergedAchievedDate = listOfNotNull(existing.achievedDate, incomingAchievedDate).minOrNull()
+
+        achievementDao.updateProgress(userId, code, mergedStep, mergedCompleted, mergedAchievedDate)
+    }
+
+    private fun isServerUserNewer(serverUpdatedAt: String?, localCreatedAt: Long): Boolean {
+        val serverEpoch = parseServerIsoToEpoch(serverUpdatedAt)
+        return serverEpoch != null && serverEpoch > localCreatedAt
+    }
+
+    private fun isServerStatsNewer(serverUpdatedAt: String?, localLastUpdated: String): Boolean {
+        val serverEpoch = parseServerIsoToEpoch(serverUpdatedAt) ?: return false
+        val localEpoch = parseLocalDateTimeToEpoch(localLastUpdated) ?: 0L
+        return serverEpoch > localEpoch
+    }
+
+    private fun parseServerIsoToEpoch(value: String?): Long? = runCatching {
+        if (value.isNullOrBlank()) return null
+        java.time.Instant.parse(value).toEpochMilli()
+    }.getOrNull()
+
+    private fun parseLocalDateTimeToEpoch(value: String?): Long? = runCatching {
+        if (value.isNullOrBlank()) return null
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(value)?.time
+    }.getOrNull()
 
 
     private fun parseGatewayErrorMessage(raw: String): String {

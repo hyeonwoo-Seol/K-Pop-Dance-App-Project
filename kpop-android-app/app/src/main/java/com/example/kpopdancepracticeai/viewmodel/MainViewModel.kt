@@ -336,7 +336,7 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 _isSyncing.value = true
                 try {
                     updateUsageTime()
-                    val message = repository.syncUserLocalDataToAws(userId)
+                    val message = repository.syncUserDataBidirectional(userId)
                         .fold(
                             onSuccess = { it },
                             onFailure = { "AWS 동기화 실패: ${it.message}" }
