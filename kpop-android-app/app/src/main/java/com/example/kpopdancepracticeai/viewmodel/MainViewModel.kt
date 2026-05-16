@@ -163,7 +163,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         currentUserId = userId
 
         viewModelScope.launch {
-            _isSyncing.value = true
             try {
                 repository.prePopulateSongsIfNeeded()
 
@@ -269,12 +268,9 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                     }
                 }
 
-                _syncMessage.value = "데이터 동기화 완료"
             } catch (e: Exception) {
                 e.printStackTrace()
-                _syncMessage.value = "동기화 실패: ${e.message}"
-            } finally {
-                _isSyncing.value = false
+                _syncMessage.value = "초기 데이터 로드 실패: ${e.message}"
             }
         }
     }
@@ -304,8 +300,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             } catch (e: Exception) {
                 e.printStackTrace()
                 _loginState.value = LoginState.Error(e.message ?: "회원 정보를 저장하지 못했습니다.")
-            } finally {
-                _isSyncing.value = false
             }
         }
     }
@@ -338,8 +332,20 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun refreshData() {
         val userId = currentUserId
         if (userId != null) {
-            updateUsageTime()
-            loadInitialData(userId)
+            viewModelScope.launch {
+                _isSyncing.value = true
+                try {
+                    updateUsageTime()
+                    val message = repository.syncUserLocalDataToAws(userId)
+                        .fold(
+                            onSuccess = { it },
+                            onFailure = { "AWS 동기화 실패: ${it.message}" }
+                        )
+                    _syncMessage.value = message
+                } finally {
+                    _isSyncing.value = false
+                }
+            }
         } else {
             viewModelScope.launch {
                 repository.prePopulateSongsIfNeeded()
