@@ -7,9 +7,22 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.MutableTransitionState
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.ChevronRight
@@ -23,11 +36,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
@@ -36,11 +51,25 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
 import com.example.kpopdancepracticeai.viewmodel.BadgeUiModel
+import com.example.kpopdancepracticeai.viewmodel.LightStickUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import com.example.kpopdancepracticeai.viewmodel.TopPracticedChoreoUiModel
 import com.example.kpopdancepracticeai.ui.theme.*
 
 val BorderLight = Color(0xFFE0E0E0)
 val TextGray = Color(0xFF757575)
+
+private data class ProfileTabAnimationSpec(
+    val contentEnterDurationMs: Int = 250,
+    val contentExitDurationMs: Int = 250, // 전체 탭 전환 속도
+    val itemFadeDurationMs: Int = 200,  // 아이템 등장 속도
+    val itemSlideDurationMs: Int = 260, // 아이템 등장 속도
+    val itemStaggerDelayMs: Int = 55,  // 순차 등장 간격
+    val maxItemDelayMs: Int = 260,  // 순차 등장 간격
+    val enterOffsetDivisor: Int = 10, // 이동거리
+    val exitOffsetDivisor: Int = 20,
+    val itemOffsetDivisor: Int = 10
+)
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -63,6 +92,9 @@ fun ProfileScreen(
     val levelInfo by viewModel.userLevelInfo.collectAsState()
     val achievements by viewModel.achievementProgress.collectAsState()
     val badges by viewModel.userBadges.collectAsState()
+    val selectedBadge by viewModel.selectedBadge.collectAsState()
+    val ownedLightSticks by viewModel.ownedLightSticks.collectAsState()
+    val topPracticedChoreos by viewModel.topPracticedChoreos.collectAsState()
 
     val context = LocalContext.current
 
@@ -72,18 +104,19 @@ fun ProfileScreen(
 
     LaunchedEffect(syncMessage) {
         syncMessage?.let {
-            Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, it, Toast.LENGTH_LONG).show()
             viewModel.clearSyncMessage()
         }
     }
 
     var selectedTab by rememberSaveable { mutableStateOf("통계") }
+    val animationSpec = remember { ProfileTabAnimationSpec() }
 
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        contentPadding = paddingValues,
+        contentPadding = rememberResponsiveScaffoldPadding(paddingValues),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -91,64 +124,203 @@ fun ProfileScreen(
                 userProfile = userProfile,
                 userStats = userStats,
                 levelInfo = levelInfo,
+                selectedBadge = selectedBadge,
                 onDetailClick = onNavigateToAnalysis
             )
         }
         item { ProfileTabRow(selectedTab = selectedTab, onTabSelected = { selectedTab = it }) }
-
-        when (selectedTab) {
-            "통계" -> {
-                item { StatisticsRow(userStats = userStats) }
-                item { AchievementsSummaryCard(achievements = achievements) }
-                item { AcquiredBadgesCard(badges = badges) }
-            }
-            "업적" -> {
-                item {
-                    Text(
-                        text = "업적 및 성과",
-                        style = MaterialTheme.typography.headlineMedium,
-                        fontWeight = FontWeight.Bold,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-                    )
-                }
-                if (achievements.isEmpty()) {
-                    item {
-                        Text(
-                            "아직 진행중인 업적이 없습니다.",
-                            modifier = Modifier.fillMaxWidth().padding(20.dp),
-                            textAlign = TextAlign.Center,
-                            color = Color.Gray
-                        )
-                    }
-                } else {
-                    items(achievements) { item ->
-                        AchievementCard(
-                            title = item.title,
-                            description = item.description,
-                            progress = item.progress,
-                            progressText = item.progressText
-                        )
-                    }
-                }
-            }
-            "설정" -> {
-                item {
-                    SettingsContent(
-                        onNavigateToProfileEdit,
-                        onNavigateToPracticeSettings,
-                        onNavigateToNotificationSettings,
-                        onNavigateToPrivacySettings,
-                        onNavigateToAppInfo,
-                        onNavigateToWithdrawal,
-                        onSyncClick = { viewModel.refreshData() },
-                        isSyncing = isSyncing
-                    )
-                }
-            }
+        item {
+            ProfileTabContent(
+                selectedTab = selectedTab,
+                userStats = userStats,
+                achievements = achievements,
+                badges = badges,
+                topPracticedChoreos = topPracticedChoreos,
+                ownedLightSticks = ownedLightSticks,
+                onBadgeSelected = viewModel::selectBadge,
+                onNavigateToProfileEdit = onNavigateToProfileEdit,
+                onNavigateToPracticeSettings = onNavigateToPracticeSettings,
+                onNavigateToNotificationSettings = onNavigateToNotificationSettings,
+                onNavigateToPrivacySettings = onNavigateToPrivacySettings,
+                onNavigateToAppInfo = onNavigateToAppInfo,
+                onNavigateToWithdrawal = onNavigateToWithdrawal,
+                isSyncing = isSyncing,
+                onSyncClick = { viewModel.refreshData() },
+                animationSpec = animationSpec
+            )
         }
         item { Spacer(modifier = Modifier.height(16.dp)) }
     }
+}
+
+@Composable
+private fun ProfileTabContent(
+    selectedTab: String,
+    userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
+    achievements: List<AchievementUiModel>,
+    badges: List<BadgeUiModel>,
+    topPracticedChoreos: List<TopPracticedChoreoUiModel>,
+    ownedLightSticks: List<LightStickUiModel>,
+    onBadgeSelected: (String) -> Unit,
+    onNavigateToProfileEdit: () -> Unit,
+    onNavigateToPracticeSettings: () -> Unit,
+    onNavigateToNotificationSettings: () -> Unit,
+    onNavigateToPrivacySettings: () -> Unit,
+    onNavigateToAppInfo: () -> Unit,
+    onNavigateToWithdrawal: () -> Unit,
+    isSyncing: Boolean,
+    onSyncClick: () -> Unit,
+    animationSpec: ProfileTabAnimationSpec
+) {
+    AnimatedContent(
+        targetState = selectedTab,
+        transitionSpec = {
+            (fadeIn(
+                animationSpec = tween(
+                    durationMillis = animationSpec.contentEnterDurationMs,
+                    easing = LinearOutSlowInEasing
+                )
+            ) +
+                slideInVertically(
+                    animationSpec = tween(
+                        durationMillis = animationSpec.contentEnterDurationMs,
+                        easing = FastOutSlowInEasing
+                    ),
+                    initialOffsetY = { it / animationSpec.enterOffsetDivisor }
+                )) togetherWith
+                (fadeOut(
+                    animationSpec = tween(
+                        durationMillis = animationSpec.contentExitDurationMs,
+                        easing = FastOutSlowInEasing
+                    )
+                ) +
+                    slideOutVertically(
+                        animationSpec = tween(
+                            durationMillis = animationSpec.contentExitDurationMs,
+                            easing = FastOutSlowInEasing
+                        ),
+                        targetOffsetY = { -it / animationSpec.exitOffsetDivisor }
+                    ))
+        },
+        label = "profileTabContentAnimation"
+    ) { tab ->
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            when (tab) {
+                "통계" -> {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec, replayKey = tab) { StatisticsRow(userStats = userStats) }
+                    AnimatedTabEntry(index = 1, animationSpec = animationSpec, replayKey = tab) {
+                        AchievementsSummaryCard(
+                            achievements = achievements,
+                            topPracticedChoreos = topPracticedChoreos
+                        )
+                    }
+                    AnimatedTabEntry(index = 2, animationSpec = animationSpec, replayKey = tab) { AcquiredBadgesCard(badges = badges) }
+                }
+
+                "업적" -> {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec, replayKey = tab) {
+                        Text(
+                            text = "업적 및 성과",
+                            style = MaterialTheme.typography.headlineMedium,
+                            fontWeight = FontWeight.Bold,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                        )
+                    }
+                    AnimatedTabEntry(index = 1, animationSpec = animationSpec, replayKey = tab) {
+                        BadgeSelectionCard(badges = badges, onBadgeSelected = onBadgeSelected)
+                    }
+                    AnimatedTabEntry(index = 2, animationSpec = animationSpec, replayKey = tab) {
+                        OwnedLightStickCard(lightSticks = ownedLightSticks)
+                    }
+                    if (achievements.isEmpty()) {
+                        AnimatedTabEntry(index = 3, animationSpec = animationSpec, replayKey = tab) {
+                            Text(
+                                "아직 진행중인 업적이 없습니다.",
+                                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                                textAlign = TextAlign.Center,
+                                color = Color.Gray
+                            )
+                        }
+                    } else {
+                        achievements.forEachIndexed { index, item ->
+                            AnimatedTabEntry(index = index + 3, animationSpec = animationSpec, replayKey = tab) {
+                                AchievementCard(
+                                    title = item.title,
+                                    description = item.description,
+                                    progressDetail = item.progressText,
+                                    progress = item.progress,
+                                    progressText = "${(item.progress * 100).toInt()}%"
+                                )
+                            }
+                        }
+                    }
+                }
+
+                "설정" -> {
+                    AnimatedTabEntry(index = 0, animationSpec = animationSpec, replayKey = tab) {
+                        SettingsContent(
+                            onNavigateToProfileEdit,
+                            onNavigateToPracticeSettings,
+                            onNavigateToNotificationSettings,
+                            onNavigateToPrivacySettings,
+                            onNavigateToAppInfo,
+                            onNavigateToWithdrawal,
+                            onSyncClick = onSyncClick,
+                            isSyncing = isSyncing
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AnimatedTabEntry(
+    index: Int,
+    animationSpec: ProfileTabAnimationSpec,
+    replayKey: Any,
+    content: @Composable () -> Unit
+) {
+    val delay = (index * animationSpec.itemStaggerDelayMs).coerceAtMost(animationSpec.maxItemDelayMs)
+    val visibleState = remember(replayKey) {
+        MutableTransitionState(false).apply {
+            targetState = true
+        }
+    }
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = tabEnterTransition(delay, animationSpec),
+        exit = ExitTransition.None,
+        label = "profileTabEntryAnimation"
+    ) {
+        content()
+    }
+}
+
+private fun tabEnterTransition(
+    delay: Int,
+    animationSpec: ProfileTabAnimationSpec
+): EnterTransition {
+    return fadeIn(
+        animationSpec = tween(
+            durationMillis = animationSpec.itemFadeDurationMs,
+            delayMillis = delay,
+            easing = LinearOutSlowInEasing
+        )
+    ) +
+        slideInVertically(
+            animationSpec = tween(
+                durationMillis = animationSpec.itemSlideDurationMs,
+                delayMillis = delay,
+                easing = FastOutSlowInEasing
+            ),
+            initialOffsetY = { it / animationSpec.itemOffsetDivisor }
+        )
 }
 
 @Composable
@@ -156,6 +328,7 @@ fun ProfileHeaderCard(
     userProfile: com.example.kpopdancepracticeai.data.entity.User?,
     userStats: com.example.kpopdancepracticeai.data.entity.UserStats?,
     levelInfo: Pair<Int, Pair<Long, Long>>,
+    selectedBadge: BadgeUiModel?,
     onDetailClick: () -> Unit
 ) {
     Surface(
@@ -202,6 +375,9 @@ fun ProfileHeaderCard(
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold
                         )
+                        selectedBadge?.let { badge ->
+                            SparklingBadgeText(text = badge.name)
+                        }
                     }
                     CustomShadowButton("상세 통계 보기", onDetailClick, 92.dp, 35.dp, 11.sp)
                 }
@@ -235,6 +411,21 @@ fun ProfileHeaderCard(
             }
         }
     }
+}
+
+@Composable
+private fun SparklingBadgeText(text: String) {
+    Text(
+        text = "✦ $text ✦",
+        style = MaterialTheme.typography.labelLarge.copy(
+            brush = Brush.linearGradient(
+                colors = listOf(Color(0xFFFFD54F), Color(0xFFFF6EC7), Color(0xFF7C4DFF))
+            ),
+            fontWeight = FontWeight.ExtraBold
+        ),
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis
+    )
 }
 
 @Composable
@@ -361,7 +552,10 @@ fun StatCard(modifier: Modifier = Modifier, value: String, label: String) {
 }
 
 @Composable
-fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
+fun AchievementsSummaryCard(
+    achievements: List<AchievementUiModel>,
+    topPracticedChoreos: List<TopPracticedChoreoUiModel>
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -372,6 +566,7 @@ fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            TopPracticedChoreosSection(topPracticedChoreos = topPracticedChoreos)
             Text("진행중인 업적 요약", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             if (achievements.isEmpty()) {
                 Text("진행 중인 업적이 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
@@ -381,6 +576,23 @@ fun AchievementsSummaryCard(achievements: List<AchievementUiModel>) {
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun TopPracticedChoreosSection(topPracticedChoreos: List<TopPracticedChoreoUiModel>) {
+    Text("가장 많이 연습한 안무 TOP 3", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+    if (topPracticedChoreos.isEmpty()) {
+        Text("아직 연습 기록이 없습니다.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+        return
+    }
+
+    topPracticedChoreos.forEachIndexed { index, choreo ->
+        Text(
+            text = "${index + 1}. ${choreo.title} (${choreo.artist}) - ${choreo.partName}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.DarkGray
+        )
     }
 }
 
@@ -431,6 +643,71 @@ fun AcquiredBadgesCard(badges: List<BadgeUiModel>) {
                 ) {
                     badges.forEach { badge ->
                         BadgeChip(text = badge.name, color = badge.color)
+                    }
+                }
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun BadgeSelectionCard(badges: List<BadgeUiModel>, onBadgeSelected: (String) -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("대표 배지 선택", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (badges.isEmpty()) {
+                Text("획득한 배지가 없습니다. 그룹별 첫 파트를 완료하면 배지를 얻을 수 있어요.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            } else {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    badges.forEach { badge ->
+                        BadgeChip(
+                            text = if (badge.isSelected) "✓ ${badge.name}" else badge.name,
+                            color = badge.color,
+                            modifier = Modifier.clickable { onBadgeSelected(badge.id) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun OwnedLightStickCard(lightSticks: List<LightStickUiModel>) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = Color.White,
+        shadowElevation = 4.dp
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("획득한 아이콘", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (lightSticks.isEmpty()) {
+                Text("아직 획득한 아이콘이 없습니다. 그룹별 50회 완료 업적에 도전해보세요.", style = MaterialTheme.typography.bodyMedium, color = Color.Gray)
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    lightSticks.forEach { lightStick ->
+                        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(72.dp)) {
+                            AsyncImage(
+                                model = lightStick.localImagePath,
+                                contentDescription = lightStick.name,
+                                modifier = Modifier.size(56.dp).clip(CircleShape).border(1.dp, BorderLight, CircleShape),
+                                contentScale = ContentScale.Crop
+                            )
+                            Text(lightStick.artist, style = MaterialTheme.typography.labelSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
                     }
                 }
             }
@@ -525,7 +802,13 @@ fun SettingsMenuDivider() {
 }
 
 @Composable
-fun AchievementCard(title: String, description: String, progress: Float, progressText: String) {
+fun AchievementCard(
+    title: String,
+    description: String,
+    progressDetail: String,
+    progress: Float,
+    progressText: String
+) {
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(20.dp),
@@ -537,6 +820,7 @@ fun AchievementCard(title: String, description: String, progress: Float, progres
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, fontSize = 20.sp, color = Color.Black)
+            Text(progressDetail, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = Color.DarkGray)
             Spacer(modifier = Modifier.height(8.dp))
             Row(
@@ -558,11 +842,11 @@ fun AchievementCard(title: String, description: String, progress: Float, progres
 }
 
 @Composable
-fun BadgeChip(text: String, color: Color) {
+fun BadgeChip(text: String, color: Color, modifier: Modifier = Modifier) {
     Surface(
         color = color,
         shape = RoundedCornerShape(12.dp),
-        modifier = Modifier.padding(2.dp)
+        modifier = modifier.padding(2.dp)
     ) {
         Text(
             text = text,

@@ -4,23 +4,63 @@ import androidx.compose.ui.graphics.Color
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.kpopdancepracticeai.data.RealDataSource
+import com.example.kpopdancepracticeai.data.dao.TopPracticedHistoryRow
 import com.example.kpopdancepracticeai.data.entity.*
 import com.example.kpopdancepracticeai.data.repository.AppRepository
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.util.Locale
 
 // UI용 업적 데이터 클래스
 data class AchievementUiModel(
+    val code: String,
     val title: String,
     val description: String,
+    val currentStep: Int,
+    val goalStep: Int,
+    val isUnlocked: Boolean,
     val progress: Float, // 0.0 ~ 1.0
     val progressText: String
 )
 
 // UI용 배지 데이터 클래스
 data class BadgeUiModel(
+    val id: String,
     val name: String,
-    val color: Color
+    val color: Color,
+    val isSelected: Boolean
+)
+
+data class LightStickUiModel(
+    val id: String,
+    val name: String,
+    val artist: String,
+    val localImagePath: String
+)
+
+
+// 홈 화면 최근 연습 안무 UI 모델
+data class RecentChoreoUiModel(
+    val songId: Long,
+    val partNumber: Int,
+    val title: String,
+    val artist: String,
+    val coverUrl: String?,
+    val practiceCount: Int,
+    val lastPracticedAt: String
+)
+
+data class TopPracticedChoreoUiModel(
+    val title: String,
+    val artist: String,
+    val partName: String
+)
+
+data class PracticeResultSummaryUiModel(
+    val songTitle: String,
+    val bestScore: Int,
+    val achievements: List<AchievementUiModel>
 )
 
 // 로그인 상태 정의
@@ -59,6 +99,14 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _recentHistory = MutableStateFlow<List<PracticeHistory>>(emptyList())
     val recentHistory: StateFlow<List<PracticeHistory>> = _recentHistory.asStateFlow()
 
+    private val _recentChoreo = MutableStateFlow<List<RecentChoreoUiModel>>(emptyList())
+    val recentChoreo: StateFlow<List<RecentChoreoUiModel>> = _recentChoreo.asStateFlow()
+
+    private val _topPracticedChoreos = MutableStateFlow<List<TopPracticedChoreoUiModel>>(emptyList())
+    val topPracticedChoreos: StateFlow<List<TopPracticedChoreoUiModel>> = _topPracticedChoreos.asStateFlow()
+
+    private var topPracticedHistoryRowsCache: List<TopPracticedHistoryRow> = emptyList()
+
     // --- 계산된 레벨 및 경험치 정보 ---
     val userLevelInfo: StateFlow<Pair<Int, Pair<Long, Long>>> = _userStats.map { stats ->
         if (stats == null) Pair(1, Pair(0L, 1000L))
@@ -78,14 +126,13 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     private val _userBadges = MutableStateFlow<List<BadgeUiModel>>(emptyList())
     val userBadges: StateFlow<List<BadgeUiModel>> = _userBadges.asStateFlow()
 
-    // 업적 코드와 UI 텍스트 매핑
-    private val achievementMeta = mapOf(
-        "PERFECTIONIST" to ("완벽주의자" to "95% 이상의 정확도 5회 달성"),
-        "PRACTICE_BUG" to ("연습 벌레" to "총 연습 시간 100시간 달성"),
-        "BTS_MASTER" to ("BTS 마스터" to "BTS 챌린지 10개 완료"),
-        "CHALLENGE_HUNTER" to ("챌린지 헌터" to "모든 챌린지 1회 이상 완료"),
-        "NEW_DANCER" to ("신입 댄서" to "첫 연습 영상 업로드")
-    )
+    private val _selectedBadge = MutableStateFlow<BadgeUiModel?>(null)
+    val selectedBadge: StateFlow<BadgeUiModel?> = _selectedBadge.asStateFlow()
+
+    private val _ownedLightSticks = MutableStateFlow<List<LightStickUiModel>>(emptyList())
+    val ownedLightSticks: StateFlow<List<LightStickUiModel>> = _ownedLightSticks.asStateFlow()
+
+    private val achievementMetaByCode = RealDataSource.getRealAchievements.associateBy { it.id }
 
     private var currentUserId: String? = null
 
@@ -116,7 +163,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         currentUserId = userId
 
         viewModelScope.launch {
-            _isSyncing.value = true
             try {
                 repository.prePopulateSongsIfNeeded()
 
@@ -125,23 +171,64 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 // 구독 설정
                 launch { repository.getUserStats(userId).collect { _userStats.value = it } }
                 launch { repository.getUserProfile(userId).collect { _currentUserProfile.value = it } }
-                launch { repository.allSongs.collect { _songs.value = it } }
+                launch {
+                    repository.allSongs.collect {
+                        _songs.value = it
+                        remapTopPracticedChoreos()
+                    }
+                }
                 launch { repository.getRecentHistory(userId).collect { _recentHistory.value = it } }
+                launch {
+                    repository.getRecentChoreoRows(userId).collect { rows ->
+                        _recentChoreo.value = rows.map { row ->
+                            RecentChoreoUiModel(
+                                songId = row.songId,
+                                partNumber = row.partNumber,
+                                title = row.titleKr,
+                                artist = row.artistKr,
+                                coverUrl = row.coverUrl,
+                                practiceCount = row.practiceCount,
+                                lastPracticedAt = row.lastPracticedAt
+                            )
+                        }
+                    }
+                }
+                launch {
+                    repository.getTopPracticedHistoryRows(userId).collect { rows ->
+                        topPracticedHistoryRowsCache = rows
+                        remapTopPracticedChoreos()
+                    }
+                }
 
                 // 업적 구독 및 변환
                 launch {
                     repository.getUserAchievements(userId).collect { list ->
-                        val uiModels = list.mapNotNull { item ->
-                            val meta = achievementMeta[item.achievementCode] ?: return@mapNotNull null
-                            val progress = if (item.goalStep > 0) item.currentStep.toFloat() / item.goalStep else 0f
-                            val progressText = "${(progress * 100).toInt()}%"
+                        val progressByCode = list.associateBy { it.achievementCode }
+                        val uiModels = achievementMetaByCode.values.map { meta ->
+                            val item = progressByCode[meta.id]
+                            val currentStep = item?.currentStep ?: 0
+                            val goalStep = item?.goalStep ?: meta.goalCount
+                            val isUnlocked = item?.isCompleted ?: false
+                            val progress = if (goalStep > 0) currentStep.toFloat() / goalStep else 0f
+                            val safeProgress = progress.coerceIn(0f, 1f)
+                            val progressText = "$currentStep / $goalStep (${(safeProgress * 100).toInt()}%)"
+
                             AchievementUiModel(
-                                title = meta.first,
-                                description = meta.second,
-                                progress = progress.coerceIn(0f, 1f),
+                                code = meta.id,
+                                title = meta.title,
+                                description = meta.description,
+                                currentStep = currentStep,
+                                goalStep = goalStep,
+                                isUnlocked = isUnlocked,
+                                progress = safeProgress,
                                 progressText = progressText
                             )
-                        }
+                        }.sortedWith(
+                            compareByDescending<AchievementUiModel> { it.isUnlocked }
+                                .thenByDescending { it.progress }
+                                .thenBy { it.title }
+                        )
+
                         _achievementProgress.value = uiModels
                     }
                 }
@@ -150,25 +237,56 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
                 launch {
                     repository.getUserBadges(userId).collect { list ->
                         _userBadges.value = list.map { badge ->
-                            val color = when {
-                                badge.name.contains("마스터") -> Color(0xFFEBEBFF)
-                                badge.name.contains("팬") -> Color(0xFFD6F5FF)
-                                badge.name.contains("전문가") -> Color(0xFFFFD6EB)
-                                else -> Color(0xFFD9FFE5)
-                            }
-                            BadgeUiModel(badge.name, color)
+                            BadgeUiModel(badge.id, badge.name, badgeColorForName(badge.name), badge.isSelected)
                         }
                     }
                 }
 
-                _syncMessage.value = "데이터 동기화 완료"
+                launch {
+                    repository.getSelectedBadge(userId).collect { badge ->
+                        _selectedBadge.value = badge?.let {
+                            BadgeUiModel(
+                                id = it.id,
+                                name = it.name,
+                                color = badgeColorForName(it.name),
+                                isSelected = true
+                            )
+                        }
+                    }
+                }
+
+                launch {
+                    repository.getOwnedLightSticks().collect { lightSticks ->
+                        _ownedLightSticks.value = lightSticks.map {
+                            LightStickUiModel(
+                                id = it.id,
+                                name = it.name,
+                                artist = it.artist,
+                                localImagePath = it.localImagePath
+                            )
+                        }
+                    }
+                }
+
             } catch (e: Exception) {
                 e.printStackTrace()
-                _syncMessage.value = "동기화 실패: ${e.message}"
-            } finally {
-                _isSyncing.value = false
+                _syncMessage.value = "초기 데이터 로드 실패: ${e.message}"
             }
         }
+    }
+
+    fun selectBadge(badgeId: String) {
+        val userId = currentUserId ?: return
+        viewModelScope.launch {
+            repository.selectBadge(userId, badgeId)
+        }
+    }
+
+    private fun badgeColorForName(name: String): Color = when {
+        name.contains("마스터") -> Color(0xFFEBEBFF)
+        name.contains("팬") -> Color(0xFFD6F5FF)
+        name.contains("전문가") -> Color(0xFFFFD6EB)
+        else -> Color(0xFFD9FFE5)
     }
 
     fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
@@ -182,8 +300,6 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
             } catch (e: Exception) {
                 e.printStackTrace()
                 _loginState.value = LoginState.Error(e.message ?: "회원 정보를 저장하지 못했습니다.")
-            } finally {
-                _isSyncing.value = false
             }
         }
     }
@@ -216,8 +332,20 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
     fun refreshData() {
         val userId = currentUserId
         if (userId != null) {
-            updateUsageTime()
-            loadInitialData(userId)
+            viewModelScope.launch {
+                _isSyncing.value = true
+                try {
+                    updateUsageTime()
+                    val message = repository.syncUserDataBidirectional(userId)
+                        .fold(
+                            onSuccess = { it },
+                            onFailure = { "AWS 동기화 실패: ${it.message}" }
+                        )
+                    _syncMessage.value = message
+                } finally {
+                    _isSyncing.value = false
+                }
+            }
         } else {
             viewModelScope.launch {
                 repository.prePopulateSongsIfNeeded()
@@ -242,7 +370,74 @@ class MainViewModel(private val repository: AppRepository) : ViewModel() {
         viewModelScope.launch { repository.savePracticeResult(history) }
     }
 
+    fun markPracticePartCompleted(userId: String, songId: Long, partNumber: Int, artistName: String) {
+        viewModelScope.launch { repository.markPracticePartCompleted(userId, songId, partNumber, artistName) }
+    }
+
+    suspend fun getPracticeResultSummary(userId: String, jsonFileName: String): PracticeResultSummaryUiModel? {
+        val history = repository.getHistoryByJsonFileName(userId, jsonFileName) ?: return null
+        val song = repository.getAllSongsSync().firstOrNull { it.songId == history.songId }
+        val songTitle = song?.titleKr ?: "곡 ${history.songId}"
+        val bestScore = repository.getBestScore(userId, history.songId) ?: history.totalScore
+        val achievements = _achievementProgress.value.sortedWith(
+            compareByDescending<AchievementUiModel> { it.isUnlocked }
+                .thenByDescending { it.progress }
+        ).take(3)
+
+        return PracticeResultSummaryUiModel(
+            songTitle = songTitle,
+            bestScore = bestScore,
+            achievements = achievements
+        )
+    }
+
     fun clearSyncMessage() { _syncMessage.value = null }
+
+    private fun remapTopPracticedChoreos() {
+        val songs = _songs.value
+        _topPracticedChoreos.value = topPracticedHistoryRowsCache.map { row ->
+            val resolvedSong = resolveSongForTopChoreo(
+                songs = songs,
+                historySongId = row.songId,
+                historyArtistName = row.artistName
+            )
+            val partName = resolvePartNameForTopChoreo(
+                songId = resolvedSong?.songId ?: row.songId,
+                partNumber = row.partNumber
+            )
+
+            TopPracticedChoreoUiModel(
+                title = resolvedSong?.titleKr ?: "곡 ${row.songId}",
+                artist = resolvedSong?.artistKr ?: row.artistName.ifBlank { "Unknown" },
+                partName = partName
+            )
+        }
+    }
+
+    private fun resolveSongForTopChoreo(
+        songs: List<Song>,
+        historySongId: Long,
+        historyArtistName: String
+    ): Song? {
+        val candidates = songs.filter { it.songId in historySongId..(historySongId + 2) }
+        if (candidates.isEmpty()) return songs.firstOrNull { it.songId == historySongId }
+
+        val normalizedArtist = historyArtistName.trim().lowercase(Locale.getDefault())
+        if (normalizedArtist.isNotBlank()) {
+            candidates.firstOrNull { candidate ->
+                candidate.artistKr.lowercase(Locale.getDefault()).contains(normalizedArtist)
+            }?.let { return it }
+        }
+
+        return candidates.firstOrNull { it.songId == historySongId } ?: candidates.firstOrNull()
+    }
+
+    private fun resolvePartNameForTopChoreo(songId: Long, partNumber: Int): String {
+        return RealDataSource.getRealSongParts
+            .firstOrNull { it.songId == songId && it.partNumber == partNumber }
+            ?.partName
+            ?: "파트$partNumber"
+    }
 
     companion object {
         fun provideFactory(repository: AppRepository): ViewModelProvider.Factory = object : ViewModelProvider.Factory {

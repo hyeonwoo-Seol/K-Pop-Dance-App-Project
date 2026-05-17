@@ -8,6 +8,7 @@ import androidx.room.TypeConverters
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
+import com.example.kpopdancepracticeai.data.dao.UserChoreoStatsDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
 import com.example.kpopdancepracticeai.data.entity.*
 
@@ -19,11 +20,12 @@ import com.example.kpopdancepracticeai.data.entity.*
         User::class,
         Song::class,
         SongPart::class,
+        UserChoreoStats::class,
         LightStick::class,
         Badge::class,
         UserAchievementProgress::class
     ],
-    version = 4, // [수정됨] 스키마 변경(프로필 이미지 필드 추가)으로 인한 버전 3 -> 4 로 증가
+    version = 6,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -32,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun userDao(): UserDao
     abstract fun songDao(): SongDao
     abstract fun historyDao(): HistoryDao
+    abstract fun userChoreoStatsDao(): UserChoreoStatsDao
     abstract fun achievementDao(): AchievementDao
 
     companion object {

@@ -16,7 +16,7 @@ fun PlaceholderScreen(screenName: String, paddingValues: PaddingValues) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(paddingValues), // ⭐️ Scaffold의 패딩을 여기에 적용합니다.
+            .padding(rememberResponsiveScaffoldPadding(paddingValues)), // ⭐️ Scaffold의 패딩을 여기에 적용합니다.
         contentAlignment = Alignment.Center
     ) {
         Text(

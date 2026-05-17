@@ -1,22 +1,79 @@
 package com.example.kpopdancepracticeai.data.repository
 
+import android.content.Context
+import android.net.Uri
+import android.util.Log
 import com.example.kpopdancepracticeai.data.dao.AchievementDao
 import com.example.kpopdancepracticeai.data.dao.HistoryDao
 import com.example.kpopdancepracticeai.data.dao.SongDao
+import com.example.kpopdancepracticeai.data.dao.UserChoreoStatsDao
 import com.example.kpopdancepracticeai.data.dao.UserDao
 import com.example.kpopdancepracticeai.data.RealDataSource
 import com.example.kpopdancepracticeai.data.entity.*
+import com.example.kpopdancepracticeai.data.network.RetrofitClient
+import com.example.kpopdancepracticeai.data.network.SyncAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncedAchievementDto
+import com.example.kpopdancepracticeai.data.network.SyncedUserBundle
+import com.example.kpopdancepracticeai.data.network.SyncUserDto
+import com.example.kpopdancepracticeai.data.network.SyncUserLocalDataRequest
+import com.example.kpopdancepracticeai.data.network.SyncUserStatsDto
 import kotlinx.coroutines.flow.Flow
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import kotlin.random.Random
+import kotlin.math.min
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import java.io.File
+import org.json.JSONObject
 
 class AppRepository(
     private val userDao: UserDao,
     private val songDao: SongDao,
     private val historyDao: HistoryDao,
-    private val achievementDao: AchievementDao
+    private val achievementDao: AchievementDao,
+    private val userChoreoStatsDao: UserChoreoStatsDao
 ) {
+
+    companion object {
+        private const val TAG = "AwsSync"
+    }
+
+    suspend fun ensureAchievementIconsDownloaded(context: Context) = withContext(Dispatchers.IO) {
+        val iconDir = File(context.filesDir, "achievement_icons")
+        if (!iconDir.exists()) iconDir.mkdirs()
+        val client = OkHttpClient()
+
+        RealDataSource.achievementIconDownloads.forEach { (lightStickId, iconInfo) ->
+            val (fileName, imageUrl) = iconInfo
+            val targetFile = File(iconDir, fileName)
+            if (!targetFile.exists() || targetFile.length() == 0L) {
+                runCatching {
+                    val request = Request.Builder().url(imageUrl).build()
+                    client.newCall(request).execute().use { response ->
+                        if (response.isSuccessful) {
+                            val body = response.body ?: return@use
+                            targetFile.outputStream().use { output ->
+                                body.byteStream().copyTo(output)
+                            }
+                        }
+                    }
+                }
+            }
+
+            val localPath = if (targetFile.exists() && targetFile.length() > 0L) {
+                Uri.fromFile(targetFile).toString()
+            } else {
+                RealDataSource.getAchievementIconLocalPath(fileName)
+            }
+            achievementDao.updateLightStickImagePath(lightStickId, localPath)
+        }
+    }
+
     // 앱이 메모리에 올라와서 실행되는 순간을 기준 시간으로 바로 잡습니다.
     private var sessionStartTime: Long = System.currentTimeMillis()
 
@@ -97,34 +154,232 @@ class AppRepository(
             userDao.insertUser(newUser)
         }
 
-        // 3. 초기 업적 데이터 세팅
-        val initialAchievements = listOf(
-            UserAchievementProgress(userUuid = userId, achievementCode = "PERFECTIONIST", currentStep = 0, goalStep = 5, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "PRACTICE_BUG", currentStep = 0, goalStep = 100, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "BTS_MASTER", currentStep = 0, goalStep = 10, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "CHALLENGE_HUNTER", currentStep = 0, goalStep = 10, isCompleted = false, achievedDate = null),
-            UserAchievementProgress(userUuid = userId, achievementCode = "NEW_DANCER", currentStep = 1, goalStep = 1, isCompleted = true, achievedDate = getCurrentTime())
-        )
-        achievementDao.insertProgress(initialAchievements)
+        // 3. 초기 업적/보상 메타데이터 세팅
+        achievementDao.insertAchievements(RealDataSource.getRealAchievements)
+        achievementDao.insertLightSticks(RealDataSource.getRealLightSticks)
 
-        // 4. 초기 배지 세팅
+        // 4. 사용자별 업적 진행도 초기화
+        // 기존 스키마에서는 progress_id(autoGenerate)가 PK라 동일 사용자/업적코드라도 중복 삽입될 수 있으므로,
+        // 최초 1회만 시드 데이터를 넣습니다.
+        if (achievementDao.getUserAchievementProgressCount(userId) == 0) {
+            val initialAchievements = RealDataSource.getInitialAchievementProgress(userId)
+            achievementDao.insertProgress(initialAchievements)
+        }
+
+        // 5. 사용자별 배지 초기화
         if (existingStats == null) {
-            achievementDao.insertBadge(
-                Badge(
-                    id = "badge_new_dancer_$userId",
-                    userUuid = userId,
-                    name = "신입 댄서",
-                    description = "첫 연습 영상 업로드",
-                    iconResName = "ic_badge_default",
-                    category = "초보자",
-                    isUnlocked = true,
-                    obtainedAt = System.currentTimeMillis()
-                )
-            )
+            RealDataSource.getInitialBadges(userId).forEach { badge ->
+                achievementDao.insertBadge(badge)
+            }
         }
     }
 
     //  회원가입 정보 등록
+
+
+    suspend fun syncUserLocalDataToAws(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val user = userDao.getUserProfileOneShot(userId)
+                ?: throw IllegalStateException("user not found: $userId")
+            val stats = userDao.getUserStatsOneShot(userId)
+                ?: throw IllegalStateException("user stats not found: $userId")
+
+            val progressList = achievementDao.getUserAchievementProgressRawOneShot(userId)
+            val achievements = progressList.mapNotNull { progress ->
+                val meta = achievementDao.getAchievementByCode(progress.achievementCode) ?: return@mapNotNull null
+                SyncAchievementDto(
+                    id = meta.id,
+                    title = meta.title,
+                    description = meta.description,
+                    goalCount = meta.goalCount,
+                    rewardType = meta.rewardType.orEmpty(),
+                    rewardId = meta.rewardId.orEmpty(),
+                    currentCount = progress.currentStep,
+                    isUnlocked = progress.isCompleted,
+                    achievedAt = progress.achievedDate?.toLongOrNull()
+                )
+            }
+
+            val request = SyncUserLocalDataRequest(
+                user = SyncUserDto(
+                    userUuid = user.userUuid,
+                    loginId = user.loginId,
+                    email = user.email,
+                    passwordHash = user.passwordHash ?: "",
+                    birthDate = user.birthDate,
+                    danceSkill = user.danceSkill,
+                    favoriteGenres = user.favoriteGenres,
+                    bio = user.bio.orEmpty(),
+                    appLevel = stats.appLevel,
+                    currentExp = stats.currentExp,
+                    joinDate = user.joinDate
+                ),
+                userStats = SyncUserStatsDto(
+                    userUuid = stats.userUuid,
+                    appLevel = stats.appLevel,
+                    currentExp = stats.currentExp,
+                    totalPlayTime = stats.totalPlayTime,
+                    completedParts = stats.completedParts,
+                    avgAccuracy = stats.avgAccuracy.toInt(),
+                    badgeCount = stats.badgeCount,
+                    lightstickCount = stats.lightstickCount,
+                    achievementScore = stats.achievementScore,
+                    lastUpdated = stats.lastUpdated
+                ),
+                achievements = achievements
+            )
+
+            Log.d(TAG, "syncUserLocalDataToAws start: userId=$userId, achievements=${achievements.size}")
+            val response = RetrofitClient.apiService.syncUserLocalData(request)
+            if (!response.isSuccessful) {
+                val errorBody = runCatching { response.errorBody()?.string() }.getOrNull().orEmpty()
+                val parsedMessage = parseGatewayErrorMessage(errorBody)
+                val httpMessage = response.message().ifBlank { "Unknown" }
+                Log.e(TAG, "AWS sync failed: HTTP ${response.code()} $httpMessage body=$errorBody")
+                val detail = when {
+                    parsedMessage.isNotBlank() -> parsedMessage
+                    errorBody.isNotBlank() -> errorBody
+                    else -> "<empty>"
+                }
+                throw IllegalStateException("AWS sync failed: HTTP ${response.code()} ($httpMessage) | detail=$detail")
+            }
+            val body = response.body() ?: throw IllegalStateException("AWS sync failed: empty response")
+            Log.d(TAG, "AWS sync response ok=${body.ok}, message=${body.message}, saved=${body.saved}")
+            if (!body.ok) {
+                throw IllegalStateException(body.message ?: "AWS sync failed")
+            }
+
+            val saved = body.saved
+            "AWS 동기화 완료 (user=${saved?.user == true}, stats=${saved?.userStats == true}, achievements=${saved?.achievementsCount ?: 0})"
+        }
+    }
+
+
+    suspend fun syncUserDataBidirectional(userId: String): Result<String> = withContext(Dispatchers.IO) {
+        runCatching {
+            val pullResponse = RetrofitClient.apiService.getUserLocalData(userId)
+            if (!pullResponse.isSuccessful) {
+                val errorBody = runCatching { pullResponse.errorBody()?.string() }.getOrNull().orEmpty()
+                val detail = parseGatewayErrorMessage(errorBody).ifBlank { errorBody.ifBlank { "<empty>" } }
+                throw IllegalStateException("AWS pull failed: HTTP ${pullResponse.code()} | detail=$detail")
+            }
+
+            val pullBody = pullResponse.body()
+            if (pullBody != null && pullBody.ok) {
+                pullBody.data?.let { applyServerDataIfNewer(userId, it) }
+            }
+
+            val pushMessage = syncUserLocalDataToAws(userId).getOrElse { throw it }
+            "양방향 동기화 완료 | $pushMessage"
+        }
+    }
+
+    private suspend fun applyServerDataIfNewer(userId: String, server: SyncedUserBundle) {
+        val localUser = userDao.getUserProfileOneShot(userId)
+        val serverUser = server.user
+        if (localUser != null && serverUser != null && isServerUserNewer(serverUser.updatedAt, localUser.createdAt)) {
+            userDao.updateUser(
+                localUser.copy(
+                    loginId = serverUser.loginId ?: localUser.loginId,
+                    email = serverUser.email ?: localUser.email,
+                    passwordHash = serverUser.passwordHash ?: localUser.passwordHash,
+                    birthDate = serverUser.birthDate ?: localUser.birthDate,
+                    danceSkill = serverUser.danceSkill ?: localUser.danceSkill,
+                    favoriteGenres = serverUser.favoriteGenres ?: localUser.favoriteGenres,
+                    bio = serverUser.bio ?: localUser.bio,
+                    joinDate = serverUser.joinDate ?: localUser.joinDate
+                )
+            )
+        }
+
+        val localStats = userDao.getUserStatsOneShot(userId)
+        val serverStats = server.userStats
+        if (localStats != null && serverStats != null && isServerStatsNewer(serverStats.updatedAt, localStats.lastUpdated)) {
+            userDao.insertOrUpdate(
+                localStats.copy(
+                    appLevel = serverStats.appLevel ?: localStats.appLevel,
+                    currentExp = serverStats.currentExp ?: localStats.currentExp,
+                    totalPlayTime = serverStats.totalPlayTime ?: localStats.totalPlayTime,
+                    completedParts = serverStats.completedParts ?: localStats.completedParts,
+                    avgAccuracy = serverStats.avgAccuracy ?: localStats.avgAccuracy,
+                    badgeCount = serverStats.badgeCount ?: localStats.badgeCount,
+                    lightstickCount = serverStats.lightstickCount ?: localStats.lightstickCount,
+                    achievementScore = serverStats.achievementScore ?: localStats.achievementScore,
+                    lastUpdated = serverStats.lastUpdated ?: localStats.lastUpdated
+                )
+            )
+        }
+
+        server.achievements.orEmpty().forEach { applyAchievementFromServer(userId, it) }
+    }
+
+    private suspend fun applyAchievementFromServer(userId: String, item: SyncedAchievementDto) {
+        val code = item.achievementId ?: item.id ?: return
+        val existing = achievementDao.getUserAchievementProgressOneShot(userId, code)
+        val incomingStep = item.currentCount ?: 0
+        val incomingGoal = item.goalCount ?: existing?.goalStep ?: 0
+        val incomingCompleted = item.isUnlocked == true
+        val incomingAchievedDate = item.achievedAt?.toString()
+
+        if (existing == null) {
+            achievementDao.insertProgress(
+                listOf(
+                    UserAchievementProgress(
+                        userUuid = userId,
+                        achievementCode = code,
+                        currentStep = incomingStep,
+                        goalStep = incomingGoal,
+                        isCompleted = incomingCompleted,
+                        achievedDate = incomingAchievedDate
+                    )
+                )
+            )
+            return
+        }
+
+        val mergedStep = maxOf(existing.currentStep, incomingStep)
+        val mergedGoal = maxOf(existing.goalStep, incomingGoal)
+        val mergedCompleted = existing.isCompleted || incomingCompleted
+        val mergedAchievedDate = listOfNotNull(existing.achievedDate, incomingAchievedDate).minOrNull()
+
+        achievementDao.updateProgress(userId, code, mergedStep, mergedCompleted, mergedAchievedDate)
+    }
+
+    private fun isServerUserNewer(serverUpdatedAt: String?, localCreatedAt: Long): Boolean {
+        val serverEpoch = parseServerIsoToEpoch(serverUpdatedAt)
+        return serverEpoch != null && serverEpoch > localCreatedAt
+    }
+
+    private fun isServerStatsNewer(serverUpdatedAt: String?, localLastUpdated: String): Boolean {
+        val serverEpoch = parseServerIsoToEpoch(serverUpdatedAt) ?: return false
+        val localEpoch = parseLocalDateTimeToEpoch(localLastUpdated) ?: 0L
+        return serverEpoch > localEpoch
+    }
+
+    private fun parseServerIsoToEpoch(value: String?): Long? = runCatching {
+        if (value.isNullOrBlank()) return null
+        java.time.Instant.parse(value).toEpochMilli()
+    }.getOrNull()
+
+    private fun parseLocalDateTimeToEpoch(value: String?): Long? = runCatching {
+        if (value.isNullOrBlank()) return null
+        SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).parse(value)?.time
+    }.getOrNull()
+
+
+    private fun parseGatewayErrorMessage(raw: String): String {
+        if (raw.isBlank()) return ""
+        return runCatching {
+            val json = JSONObject(raw)
+            when {
+                json.optString("message").isNotBlank() -> json.optString("message")
+                json.optString("error").isNotBlank() -> json.optString("error")
+                json.optString("errorMessage").isNotBlank() -> json.optString("errorMessage")
+                else -> raw
+            }
+        }.getOrElse { raw }
+    }
+
     suspend fun registerUser(userId: String, email: String, passwordHash: String, name: String, birthDate: String) {
         // 기존 통계 초기화 등 기본 정보 세팅 (없을 경우 생성)
         fetchInitialData(userId)
@@ -146,6 +401,12 @@ class AppRepository(
     // --- Achievements & Badges ---
     fun getUserAchievements(userId: String): Flow<List<UserAchievementProgress>> = achievementDao.getUserAchievementProgress(userId)
     fun getUserBadges(userId: String): Flow<List<Badge>> = achievementDao.getUserBadges(userId)
+    fun getSelectedBadge(userId: String): Flow<Badge?> = achievementDao.getSelectedBadge(userId)
+    fun getOwnedLightSticks(): Flow<List<LightStick>> = achievementDao.getOwnedLightSticks()
+
+    suspend fun selectBadge(userId: String, badgeId: String) {
+        achievementDao.selectBadge(userId, badgeId)
+    }
 
     // --- Song ---
     val allSongs: Flow<List<Song>> = songDao.getAllSongs()
@@ -161,9 +422,105 @@ class AppRepository(
         songDao.insertSongParts(parts)
     }
 
+    suspend fun generateDeveloperPracticeHistory(userId: String): Int {
+        val targetPartIds = listOf(5401L, 5404L, 5422L, 5424L, 5511L, 4522L, 5681L)
+        val songParts = songDao.getSongPartsByPartIds(targetPartIds)
+        if (songParts.isEmpty()) return 0
+
+        val songsById = songDao.getAllSongsSync().associateBy { it.songId }
+
+        var insertedCount = 0
+
+        songParts.forEach { part ->
+            val daysToGenerate = Random.nextInt(5, 9) // 5~8일
+            val calendar = Calendar.getInstance().apply {
+                add(Calendar.DAY_OF_YEAR, -(daysToGenerate - 1))
+            }
+
+            repeat(daysToGenerate) {
+                val dailyPracticeCount = Random.nextInt(1, 4) // 1~3회
+                repeat(dailyPracticeCount) { attemptIndex ->
+                    val date = calendar.time
+                    val timeStamp = String.format(
+                        Locale.getDefault(),
+                        "%02d:%02d:%02d",
+                        9 + Random.nextInt(0, 12),
+                        Random.nextInt(0, 60),
+                        (attemptIndex * 11 + Random.nextInt(0, 40)) % 60
+                    )
+                    val createdAt = "${SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(date)} $timeStamp"
+
+                    val partAccuracies = createRandomPartAccuracies()
+                    val worstPoints = partAccuracies
+                        .toList()
+                        .sortedBy { it.second }
+                        .take(3)
+                        .map { it.first }
+
+                    val history = PracticeHistory(
+                        userUuid = userId,
+                        songId = part.songId,
+                        partNumber = part.partNumber,
+                        artistName = extractMemberName(songsById[part.songId]?.artistKr),
+                        totalScore = Random.nextInt(62, 99),
+                        grade = randomGrade(),
+                        partAccuracies = partAccuracies,
+                        worstPoints = worstPoints,
+                        durationSec = part.durationSec.toDouble(),
+                        fps = 30.0,
+                        createdAt = createdAt,
+                        fullJsonPath = "developer_generated/${part.partId}_${System.currentTimeMillis()}_${Random.nextInt(100, 999)}.json",
+                        userVideoPath = "developer_generated/video_${part.partId}_${System.currentTimeMillis()}.mp4",
+                        videoWidth = 1080,
+                        videoHeight = 1920,
+                        totalFrames = (part.durationSec * 30)
+                    )
+
+                    savePracticeResult(history)
+                    insertedCount++
+                }
+                calendar.add(Calendar.DAY_OF_YEAR, 1)
+            }
+        }
+
+        return insertedCount
+    }
+
+    private fun createRandomPartAccuracies(): Map<String, Int> {
+        val points = listOf(
+            "Left Shoulder", "Right Shoulder", "Left Elbow", "Right Elbow",
+            "Left Wrist", "Right Wrist", "Left Hip", "Right Hip",
+            "Left Knee", "Right Knee", "Left Ankle", "Right Ankle"
+        )
+        return points.associateWith { Random.nextInt(55, 99) }
+    }
+
+    private fun randomGrade(): String {
+        val bucket = Random.nextInt(0, 100)
+        return when {
+            bucket >= 92 -> "S"
+            bucket >= 82 -> "A"
+            bucket >= 70 -> "B"
+            bucket >= 58 -> "C"
+            else -> "F"
+        }
+    }
+
+    private fun extractMemberName(artistKr: String?): String {
+        if (artistKr.isNullOrBlank()) return "Unknown"
+        val start = artistKr.indexOf('(')
+        val end = artistKr.indexOf(')')
+        return if (start >= 0 && end > start + 1) {
+            artistKr.substring(start + 1, end).trim()
+        } else {
+            artistKr.trim()
+        }
+    }
+
     // --- History & Stats Update ---
     suspend fun savePracticeResult(result: PracticeHistory) {
         historyDao.insertHistory(result)
+        upsertUserChoreoStats(result)
 
         val currentStats = userDao.getUserStatsOneShot(result.userUuid)
         if (currentStats != null) {
@@ -186,10 +543,112 @@ class AppRepository(
             )
             userDao.insertOrUpdate(updatedStats)
         }
+
+        updateArtistAchievements(result)
+    }
+
+    private suspend fun updateArtistAchievements(result: PracticeHistory) {
+        val artistKey = resolveArtistKey(result.songId, result.artistName) ?: return
+        incrementArtistAchievements(result.userUuid, artistKey)
+    }
+
+
+
+    private suspend fun upsertUserChoreoStats(result: PracticeHistory) {
+        val existing = userChoreoStatsDao.getOne(result.userUuid, result.songId, result.partNumber)
+        val updated = UserChoreoStats(
+            id = "${result.userUuid}_${result.songId}_${result.partNumber}",
+            userUuid = result.userUuid,
+            songId = result.songId,
+            partNumber = result.partNumber,
+            practiceCount = (existing?.practiceCount ?: 0) + 1,
+            lastPracticedAt = result.createdAt
+        )
+        userChoreoStatsDao.upsert(updated)
+    }
+
+    fun getRecentChoreoRows(userId: String) = userChoreoStatsDao.getRecentChoreoRows(userId)
+
+    suspend fun markPracticePartCompleted(userId: String, songId: Long, partNumber: Int, artistName: String) {
+        upsertLocalPracticeStats(userId, songId, partNumber)
+        val artistKey = resolveArtistKey(songId, artistName) ?: return
+        incrementArtistAchievements(userId, artistKey)
+    }
+
+    private suspend fun upsertLocalPracticeStats(userId: String, songId: Long, partNumber: Int) {
+        val existing = userChoreoStatsDao.getOne(userId, songId, partNumber)
+        val updated = UserChoreoStats(
+            id = "${userId}_${songId}_${partNumber}",
+            userUuid = userId,
+            songId = songId,
+            partNumber = partNumber,
+            practiceCount = (existing?.practiceCount ?: 0) + 1,
+            lastPracticedAt = getCurrentTime()
+        )
+        userChoreoStatsDao.upsert(updated)
+    }
+
+    private suspend fun incrementArtistAchievements(userId: String, artistKey: String) {
+        val achievementCodes = listOf("${artistKey}_complete_01", "${artistKey}_complete_50")
+        val nowMillis = System.currentTimeMillis()
+
+        achievementCodes.forEach { code ->
+            val progress = achievementDao.getUserAchievementProgressOneShot(userId, code) ?: return@forEach
+            if (progress.isCompleted) return@forEach
+
+            val updatedStep = min(progress.currentStep + 1, progress.goalStep)
+            val completed = updatedStep >= progress.goalStep
+            achievementDao.updateProgress(
+                userId = userId,
+                code = code,
+                step = updatedStep,
+                completed = completed,
+                date = if (completed) getCurrentTime() else null
+            )
+
+            if (completed) {
+                val achievementMeta = achievementDao.getAchievementByCode(code) ?: return@forEach
+                when (achievementMeta.rewardType) {
+                    "badge" -> {
+                        val badgeBaseId = achievementMeta.rewardId ?: return@forEach
+                        val badgeId = "${badgeBaseId}_$userId"
+                        achievementDao.unlockBadge(userId, badgeId, nowMillis)
+                    }
+
+                    "icon" -> {
+                        val lightStickId = achievementMeta.rewardId ?: return@forEach
+                        achievementDao.unlockLightStick(lightStickId, nowMillis)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun resolveArtistKey(songId: Long, rawArtist: String): String? {
+        val song = songDao.getSongById(songId)
+        return normalizeArtistKey(rawArtist)
+            ?: song?.artistKr?.let(::normalizeArtistKey)
+            ?: song?.artistEn?.let(::normalizeArtistKey)
+    }
+
+    private fun normalizeArtistKey(rawArtist: String): String? {
+        val normalized = rawArtist.lowercase(Locale.getDefault()).replace(" ", "")
+        return when {
+            normalized.contains("itzy") || normalized.contains("있지") -> "itzy"
+            normalized.contains("ive") || normalized.contains("아이브") -> "ive"
+            normalized.contains("nmixx") || normalized.contains("엔믹스") -> "nmixx"
+            normalized.contains("fromis") || normalized.contains("프로미스") -> "fromis9"
+            normalized.contains("straykids") || normalized.contains("스트레이키즈") -> "straykids"
+            else -> null
+        }
     }
 
     fun getRecentHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getRecentHistory(userId)
     fun getAllHistory(userId: String): Flow<List<PracticeHistory>> = historyDao.getAllHistory(userId)
+    fun getTopPracticedHistoryRows(userId: String) = historyDao.getTopPracticedHistoryRows(userId)
+    suspend fun getBestScore(userId: String, songId: Long): Int? = historyDao.getBestScore(userId, songId)
+    suspend fun getHistoryByJsonFileName(userId: String, jsonFileName: String): PracticeHistory? =
+        historyDao.getHistoryByJsonFileName(userId, jsonFileName)
 
     // 💡 [추가됨] DB에서 전체 곡 데이터를 한 번만 읽어오는 동기식 메서드
     suspend fun getAllSongsSync(): List<Song> {

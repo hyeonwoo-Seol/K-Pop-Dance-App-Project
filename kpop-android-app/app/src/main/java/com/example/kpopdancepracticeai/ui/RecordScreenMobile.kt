@@ -28,7 +28,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,7 +42,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -84,6 +82,7 @@ import com.example.kpopdancepracticeai.util.NetworkUtils
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import com.example.kpopdancepracticeai.viewmodel.SettingsViewModel
 import com.google.gson.Gson
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.File
@@ -120,6 +119,7 @@ private fun extractExpertIdentifier(
 
 @Composable
 fun RecordScreen(
+    songId: Long = 0L,
     songTitle: String = "ELEVEN",
     difficulty: String = "보통",
     artist: String = "IVE",
@@ -169,6 +169,11 @@ fun RecordScreen(
     var countdownNumber by remember { mutableIntStateOf(0) }
     var isCountdownVisible by remember { mutableStateOf(false) }
     var showAnalysisLoading by remember { mutableStateOf(false) }
+    var analysisProgress by remember { mutableStateOf(0f) }
+    var analysisStatusMessage by remember { mutableStateOf("업로드 준비 중...") }
+    var hasAutoStoppedRecording by remember { mutableStateOf(false) }
+    var progressRampJob by remember { mutableStateOf<Job?>(null) }
+    var hasTriggeredAutoRecording by remember { mutableStateOf(false) }
 
     LaunchedEffect(settings.isFrontCamera) {
         lensFacing = if (settings.isFrontCamera) CameraSelector.LENS_FACING_FRONT else CameraSelector.LENS_FACING_BACK
@@ -184,12 +189,35 @@ fun RecordScreen(
         if (expertVideoUrl.isNotBlank()) {
             try {
                 exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(expertVideoUrl)))
-                exoPlayer.repeatMode = Player.REPEAT_MODE_ALL
+                exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
                 exoPlayer.prepare()
-                exoPlayer.playWhenReady = true
+                exoPlayer.seekTo(0)
+                exoPlayer.playWhenReady = false
             } catch (e: Exception) {
                 Log.e("RecordScreen", "영상 로드 실패: $expertVideoUrl", e)
             }
+        }
+    }
+
+    DisposableEffect(exoPlayer, isRecording) {
+        val playbackListener = object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (
+                    playbackState == Player.STATE_ENDED &&
+                    isRecording &&
+                    !hasAutoStoppedRecording
+                ) {
+                    hasAutoStoppedRecording = true
+                    recordingState.value?.stop()
+                    recordingState.value = null
+                    isRecording = false
+                }
+            }
+        }
+
+        exoPlayer.addListener(playbackListener)
+        onDispose {
+            exoPlayer.removeListener(playbackListener)
         }
     }
 
@@ -215,47 +243,82 @@ fun RecordScreen(
         val userId = userProfile?.userUuid ?: authUserId ?: "none"
         val expertIdentifier = extractExpertIdentifier(expertVideoUrl, songTitle, artist, part)
         val partNum = expertIdentifier.substringAfterLast("_", "0").ifBlank { "0" }
+        val partNumberForDb = partNum.toIntOrNull() ?: 0
         val timestamp = System.currentTimeMillis()
         val filename = "${userId}_${expertIdentifier}_${timestamp}.mp4"
-        val songIdForDb = expertIdentifier
-            .substringBefore("_")
-            .toLongOrNull()
-            ?.toString() ?: "0"
+        val songIdForDbLong = if (songId > 0L) songId else (
+            expertIdentifier.substringBefore("_").toLongOrNull() ?: 0L
+        )
+        val songIdForDb = songIdForDbLong.toString()
 
         scope.launch {
             if (!settings.isServerUploadEnabled) {
                 Toast.makeText(context, "서버 전송 동의가 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
                 onNavigateHome()
                 return@launch
             }
 
             if (!settings.isAutoUpload) {
                 Toast.makeText(context, "자동 전송이 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
+                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
                 onNavigateHome()
                 return@launch
             }
 
             if (settings.isWifiOnlyUpload && !NetworkUtils.isWifiConnected(context)) {
                 Toast.makeText(context, "WIFI 전용 업로드 설정으로 로컬 저장 후 홈으로 이동합니다.", Toast.LENGTH_SHORT).show()
+                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
                 onNavigateHome()
                 return@launch
             }
 
             Toast.makeText(context, "녹화 완료. 업로드 시작...", Toast.LENGTH_SHORT).show()
             showAnalysisLoading = true
+            analysisProgress = 0f
+            analysisStatusMessage = "영상을 클라우드로 전송 중..."
             uploader.uploadVideo(
                 fileUri = uri,
                 filename = filename,
+                onUploadProgress = { uploadProgress ->
+                    val cappedUploadProgress = (uploadProgress * 0.2f).coerceIn(0f, 0.2f)
+                    if (analysisProgress < 0.2f) {
+                        analysisProgress = cappedUploadProgress.coerceAtLeast(analysisProgress)
+                    }
+                    analysisStatusMessage = "영상을 클라우드로 전송 중... ${(uploadProgress * 100).toInt()}%"
+                },
                 onComplete = {
                     Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
+                    analysisProgress = 0.2f
+                    analysisStatusMessage = "서버에서 AI 분석 중..."
+
+                    progressRampJob?.cancel()
+                    progressRampJob = scope.launch {
+                        repeat(12) {
+                            delay(1000)
+                            if (analysisProgress >= 0.92f) return@launch
+                            analysisProgress = (analysisProgress + 0.06f).coerceAtMost(0.92f)
+                        }
+                    }
+
                     scope.launch {
                         uploader.pollAnalysisResult(
                             userId = userId,
                             timestamp = timestamp,
-                            onProgress = { msg -> Toast.makeText(context, msg, Toast.LENGTH_SHORT).show() },
+                            onProgress = { msg ->
+                                analysisStatusMessage = msg
+                                analysisProgress = (analysisProgress + 0.03f).coerceAtMost(0.95f)
+                            },
                             onComplete = { resultS3Key ->
                                 scope.launch {
                                     try {
+                                        progressRampJob?.cancel()
+
+                                        while (analysisProgress < 1f) {
+                                            analysisProgress = (analysisProgress + 0.04f).coerceAtMost(1f)
+                                            delay(60)
+                                        }
+
                                         val jsonString = uploader.downloadResultJson(resultS3Key)
                                         val jsonFileName = uploader.extractResultFileName(resultS3Key)
                                         val response = Gson().fromJson(
@@ -283,10 +346,12 @@ fun RecordScreen(
                                         )
                                         mainViewModel.savePracticeResult(historyEntity)
 
+                                        analysisStatusMessage = "분석 완료!"
                                         showAnalysisLoading = false
                                         Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
                                         onRecordingComplete("$jsonFileName|${uri}")
                                     } catch (e: Exception) {
+                                        progressRampJob?.cancel()
                                         showAnalysisLoading = false
                                         Toast.makeText(context, "결과 처리 실패: ${e.message}", Toast.LENGTH_LONG).show()
                                         Log.e("RecordScreen", "결과 처리 실패", e)
@@ -294,6 +359,7 @@ fun RecordScreen(
                                 }
                             },
                             onError = { e ->
+                                progressRampJob?.cancel()
                                 showAnalysisLoading = false
                                 Toast.makeText(context, "분석 실패: ${e.message}", Toast.LENGTH_LONG).show()
                             }
@@ -301,6 +367,7 @@ fun RecordScreen(
                     }
                 },
                 onError = { e ->
+                    progressRampJob?.cancel()
                     showAnalysisLoading = false
                     Toast.makeText(context, "업로드 실패: ${e.message}", Toast.LENGTH_LONG).show()
                 }
@@ -313,6 +380,9 @@ fun RecordScreen(
         if (isRecording || isCountdownVisible) return
 
         scope.launch {
+            exoPlayer.seekTo(0)
+            exoPlayer.pause()
+
             val startCount = settings.countdownSeconds
             if (startCount > 0) {
                 countdownNumber = startCount
@@ -326,6 +396,7 @@ fun RecordScreen(
 
             exoPlayer.seekTo(0)
             exoPlayer.play()
+            hasAutoStoppedRecording = false
 
             isRecording = true
             val name = "Kpop_${System.currentTimeMillis()}.mp4"
@@ -350,8 +421,23 @@ fun RecordScreen(
         }
     }
 
+    LaunchedEffect(hasPermissions) {
+        if (!hasPermissions || hasTriggeredAutoRecording) return@LaunchedEffect
+
+        while (videoCaptureState.value == null && !hasTriggeredAutoRecording) {
+            delay(100)
+        }
+
+        if (!hasTriggeredAutoRecording && !isRecording && !isCountdownVisible) {
+            hasTriggeredAutoRecording = true
+            startRecordingWithCountdown()
+        }
+    }
+
     if (showAnalysisLoading) {
         AnalysisWaitingScreen(
+            progress = analysisProgress,
+            statusMessage = analysisStatusMessage,
             onAnalysisComplete = { }
         )
         return
@@ -460,15 +546,6 @@ fun RecordScreen(
                     modifier = Modifier.align(Alignment.CenterStart).padding(start = 32.dp).size(56.dp).background(Color(0x33FFFFFF), CircleShape)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = "Switch Camera", tint = Color.White)
-                }
-            } else {
-                Button(
-                    onClick = { startRecordingWithCountdown() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFFB2C36)),
-                    contentPadding = PaddingValues(horizontal = 48.dp, vertical = 16.dp),
-                    modifier = Modifier.align(Alignment.Center)
-                ) {
-                    Text("따라하기", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }

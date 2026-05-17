@@ -7,6 +7,14 @@ import androidx.room.Query
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import kotlinx.coroutines.flow.Flow
 
+data class TopPracticedHistoryRow(
+    val songId: Long,
+    val partNumber: Int,
+    val artistName: String,
+    val practiceCount: Int,
+    val lastPracticedAt: String
+)
+
 @Dao
 interface HistoryDao {
 
@@ -26,4 +34,33 @@ interface HistoryDao {
     // 특정 곡에 대한 최고 점수 조회 (컬럼명 score -> total_score 변경)
     @Query("SELECT MAX(total_score) FROM PracticeResults WHERE user_uuid = :userId AND song_id = :songId")
     suspend fun getBestScore(userId: String, songId: Long): Int?
+
+    @Query(
+        """
+        SELECT
+            song_id AS songId,
+            part_number AS partNumber,
+            artist_name AS artistName,
+            COUNT(*) AS practiceCount,
+            MAX(created_at) AS lastPracticedAt
+        FROM PracticeResults
+        WHERE user_uuid = :userId
+        GROUP BY song_id, part_number, artist_name
+        ORDER BY practiceCount DESC, lastPracticedAt DESC
+        LIMIT 3
+        """
+    )
+    fun getTopPracticedHistoryRows(userId: String): Flow<List<TopPracticedHistoryRow>>
+
+    @Query(
+        """
+        SELECT * FROM PracticeResults
+        WHERE user_uuid = :userId
+          AND full_json_path LIKE '%' || :jsonFileName
+        ORDER BY created_at DESC
+        LIMIT 1
+        """
+    )
+    suspend fun getHistoryByJsonFileName(userId: String, jsonFileName: String): PracticeHistory?
+
 }

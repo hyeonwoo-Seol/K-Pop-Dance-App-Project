@@ -42,6 +42,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun LoginScreen(
     viewModel: MainViewModel, // [추가] ViewModel 주입
+    onEmailLoginAttempt: (String, String) -> Unit,
     onLoginSuccess: () -> Unit,
     onNavigateToSignUp: () -> Unit,
     onGoogleLoginSuccess: () -> Unit // 추가 정보(프로필) 입력 화면으로 이동
@@ -65,7 +66,7 @@ fun LoginScreen(
         when (loginState) {
             is LoginState.Success -> {
                 Toast.makeText(context, "로그인 성공", Toast.LENGTH_SHORT).show()
-                viewModel.resetLoginState() // 상태 초기화
+                viewModel.resetLoginState()
                 onLoginSuccess()
             }
             is LoginState.NeedProfile -> {
@@ -188,18 +189,8 @@ fun LoginScreen(
                     Button(
                         onClick = {
                             if (email.isNotBlank() && password.isNotBlank()) {
-                                scope.launch {
-                                    val result = authRepository.signInWithEmail(email, password)
-                                    if (result.isSuccess) {
-                                        // [수정] 로그인 성공 시 DB 확인 요청
-                                        val uid = result.getOrNull()?.uid
-                                        if (uid != null) {
-                                            viewModel.checkUserExists(uid)
-                                        }
-                                    } else {
-                                        errorMessage = "로그인 실패. 아이디/비번을 확인하세요."
-                                    }
-                                }
+                                errorMessage = null
+                                onEmailLoginAttempt(email, password)
                             } else {
                                 errorMessage = "이메일과 비밀번호를 입력해주세요."
                             }

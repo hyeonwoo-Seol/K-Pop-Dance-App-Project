@@ -1,3 +1,20 @@
+# Contributors
+<img width="445" height="77" alt="image" src="https://github.com/user-attachments/assets/5f91abac-ba20-4977-9945-ffc3a0c9afb8" />
+
+**hyeonwoo-seol 계정의 +7433 줄은 팀원 모두가 같이 작업한 Android App의 UI 입니다.**
+
+<img width="1655" height="889" alt="image" src="https://github.com/user-attachments/assets/43e3fb20-4702-4df4-8cd7-5190f64276f3" />
+
+# 프로젝트 내용
+
+<img width="1743" height="826" alt="image" src="https://github.com/user-attachments/assets/bb7e36d2-e5ed-418e-ac3c-02ae16f03d9d" />
+
+<img width="1771" height="855" alt="image" src="https://github.com/user-attachments/assets/b5497063-ad12-4805-bae1-b0daf20590e4" />
+
+<img width="1745" height="781" alt="image" src="https://github.com/user-attachments/assets/c48f3ddc-8b78-4894-bfbc-4b8fbb7bfe4f" />
+
+<img width="1749" height="835" alt="image" src="https://github.com/user-attachments/assets/d5917faa-c938-4b60-9177-20feda843843" />
+
 <img width="1640" height="802" alt="image" src="https://github.com/user-attachments/assets/b4f5a6c6-5754-4f7c-9c0c-51f553fbe1f8" />
 
 <img width="1627" height="791" alt="image" src="https://github.com/user-attachments/assets/89ce0476-ba6e-44e7-93ce-fc7b38247df1" />
@@ -17,11 +34,3 @@
 <img width="1582" height="697" alt="image" src="https://github.com/user-attachments/assets/ed7a4a79-5f25-4210-8fc2-f8bb979e60c2" />
 
 <img width="1676" height="914" alt="image" src="https://github.com/user-attachments/assets/816fc5cb-7586-451f-8c60-306f66c9580a" />
-
-# Contributors
-<img width="445" height="77" alt="image" src="https://github.com/user-attachments/assets/5f91abac-ba20-4977-9945-ffc3a0c9afb8" />
-
-**hyeonwoo-seol 계정의 +7433 줄은 팀원 모두가 같이 작업한 Android App의 UI 입니다.**
-
-<img width="1655" height="889" alt="image" src="https://github.com/user-attachments/assets/43e3fb20-4702-4df4-8cd7-5190f64276f3" />
-

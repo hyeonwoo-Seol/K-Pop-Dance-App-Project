@@ -3,13 +3,16 @@ package com.example.kpopdancepracticeai.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.kpopdancepracticeai.data.dto.AnalysisResultResponse
 import com.example.kpopdancepracticeai.data.entity.PracticeHistory
 import com.example.kpopdancepracticeai.data.repository.AppRepository
+import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -18,6 +21,16 @@ import java.util.Locale
 class AnalysisViewModel(
     private val repository: AppRepository
 ) : ViewModel() {
+
+    data class ChoreoFilterOption(
+        val key: String,
+        val songId: Long,
+        val partNumber: Int,
+        val artistName: String,
+        val label: String
+    )
+
+    enum class TrendRange { RECENT_7_DAYS, FULL_1_MONTH }
 
     // UI 상태: 로딩 중, 에러, 데이터 표시 등
     data class StatisticsUiState(
@@ -28,13 +41,36 @@ class AnalysisViewModel(
         val graphData: List<Float> = emptyList(), // 최근 7개 점수 (0.0 ~ 1.0)
         val graphLabels: List<String> = emptyList(), // 최근 7개 날짜 (MM/dd)
         val songMasteryData: List<Float> = emptyList(),
-        val songMasteryLabels: List<String> = emptyList()
+        val songMasteryLabels: List<String> = emptyList(),
+        val choreoOptions: List<ChoreoFilterOption> = emptyList(),
+        val selectedChoreoKey: String? = null,
+        val selectedRange: TrendRange = TrendRange.RECENT_7_DAYS,
+        val filteredTrendData: List<Float> = emptyList(),
+        val filteredTrendLabels: List<String> = emptyList(),
+        val bestGrade: String = "-",
+        val topWorstPoints: List<Pair<String, Int>> = emptyList(),
+        val topErrorJointWindowText: String = "데이터 없음",
+        val filteredPracticeCount: Int = 0
     )
 
     private val _uiState = MutableStateFlow(StatisticsUiState())
     val uiState: StateFlow<StatisticsUiState> = _uiState.asStateFlow()
 
     private var currentUserId: String? = null
+    private var allHistoryCache: List<PracticeHistory> = emptyList()
+    private var songsCache: List<SongMeta> = emptyList()
+
+    private data class SongMeta(
+        val songId: Long,
+        val titleKr: String,
+        val artistKr: String
+    )
+
+    private data class TopJointErrorWindow(
+        val jointName: String,
+        val startSecond: Int,
+        val endSecond: Int
+    )
 
     // 화면 진입 시 호출
     fun loadStatistics(userId: String) {
@@ -51,6 +87,19 @@ class AnalysisViewModel(
 
         if (currentUserId == userId) return
         currentUserId = userId
+
+        viewModelScope.launch {
+            repository.allSongs.collectLatest { songs ->
+                songsCache = songs.map {
+                    SongMeta(
+                        songId = it.songId,
+                        titleKr = it.titleKr,
+                        artistKr = it.artistKr
+                    )
+                }
+                recalculateChoreoInsights()
+            }
+        }
 
         viewModelScope.launch {
             // 1. 유저 통계 (누적 시간, 평균 정확도) 구독
@@ -71,9 +120,187 @@ class AnalysisViewModel(
         viewModelScope.launch {
             // 2. 전체 연습 기록 (히트맵, 그래프용) 구독
             repository.getAllHistory(userId).collectLatest { historyList ->
+                allHistoryCache = historyList
                 processHistoryData(historyList)
+                recalculateChoreoInsights()
             }
         }
+    }
+
+    fun selectChoreoFilter(key: String) {
+        _uiState.value = _uiState.value.copy(selectedChoreoKey = key)
+        recalculateChoreoInsights()
+    }
+
+    fun updateTrendRange(range: TrendRange) {
+        _uiState.value = _uiState.value.copy(selectedRange = range)
+        recalculateChoreoInsights()
+    }
+
+    private fun recalculateChoreoInsights() {
+        val grouped = allHistoryCache.groupBy {
+            Triple(it.songId, it.partNumber, it.artistName)
+        }
+
+        val options = grouped.keys.map { key ->
+            val resolved = resolveSongMeta(key.first, key.third)
+            val songTitle = resolved?.titleKr ?: "곡 ${key.first}"
+            val artist = resolved?.artistKr ?: key.third.ifBlank { "Unknown" }
+            val label = "$songTitle ($artist) 파트${key.second}"
+            ChoreoFilterOption(
+                key = "${key.first}_${key.second}_${key.third}",
+                songId = key.first,
+                partNumber = key.second,
+                artistName = key.third,
+                label = label
+            )
+        }.sortedBy { it.label }
+
+        val selectedKey = _uiState.value.selectedChoreoKey?.takeIf { selected ->
+            options.any { it.key == selected }
+        } ?: options.firstOrNull()?.key
+
+        val selectedOption = options.firstOrNull { it.key == selectedKey }
+        val selectedHistory = if (selectedOption == null) {
+            emptyList()
+        } else {
+            grouped[Triple(selectedOption.songId, selectedOption.partNumber, selectedOption.artistName)] ?: emptyList()
+        }
+
+        val bestGrade = getBestGrade(selectedHistory)
+        val topWorstPoints = selectedHistory
+            .flatMap { it.worstPoints ?: emptyList() }
+            .groupingBy { it }
+            .eachCount()
+            .toList()
+            .sortedByDescending { it.second }
+            .take(3)
+
+        val topErrorJointWindowText = selectedHistory
+            .maxByOrNull { it.createdAt }
+            ?.let { analyzeTopErrorJointTimeWindow(it.fullJsonPath) }
+            ?.let { "${it.jointName}: ${it.startSecond}초 ~ ${it.endSecond}초" }
+            ?: "데이터 없음"
+
+        val days = when (_uiState.value.selectedRange) {
+            TrendRange.RECENT_7_DAYS -> 7
+            TrendRange.FULL_1_MONTH -> 30
+        }
+
+        val (trendData, trendLabels) = buildDailyAverageTrend(selectedHistory, days)
+
+        _uiState.value = _uiState.value.copy(
+            choreoOptions = options,
+            selectedChoreoKey = selectedKey,
+            filteredTrendData = trendData,
+            filteredTrendLabels = trendLabels,
+            bestGrade = bestGrade,
+            topWorstPoints = topWorstPoints,
+            topErrorJointWindowText = topErrorJointWindowText,
+            filteredPracticeCount = selectedHistory.size
+        )
+    }
+
+    private fun analyzeTopErrorJointTimeWindow(fullJsonPath: String): TopJointErrorWindow? {
+        return runCatching {
+            val jsonFile = File(fullJsonPath)
+            if (!jsonFile.exists()) return null
+
+            val result = Gson().fromJson(jsonFile.readText(), AnalysisResultResponse::class.java)
+            val frames = result.frames
+            if (frames.isEmpty()) return null
+
+            val majorJoints = (5..16).toSet()
+            val errorCounts = mutableMapOf<Int, Int>()
+
+            frames.forEach { frame ->
+                frame.errors.forEachIndexed { index, isError ->
+                    if (index in majorJoints && isError == 1) {
+                        errorCounts[index] = (errorCounts[index] ?: 0) + 1
+                    }
+                }
+            }
+
+            val topJointIndex = errorCounts.maxByOrNull { it.value }?.key ?: return null
+
+            val bySecond = mutableMapOf<Int, Int>()
+            frames.forEach { frame ->
+                if (frame.errors.getOrNull(topJointIndex) == 1) {
+                    val secondBucket = frame.timestamp.toInt()
+                    bySecond[secondBucket] = (bySecond[secondBucket] ?: 0) + 1
+                }
+            }
+
+            val topSecond = bySecond.maxByOrNull { it.value }?.key ?: return null
+            TopJointErrorWindow(
+                jointName = getJointNameKorean(topJointIndex),
+                startSecond = topSecond,
+                endSecond = topSecond + 1
+            )
+        }.getOrNull()
+    }
+
+    private fun getJointNameKorean(index: Int): String {
+        return when (index) {
+            5 -> "왼쪽 어깨"
+            6 -> "오른쪽 어깨"
+            7 -> "왼쪽 팔꿈치"
+            8 -> "오른쪽 팔꿈치"
+            9 -> "왼쪽 손목"
+            10 -> "오른쪽 손목"
+            11 -> "왼쪽 골반"
+            12 -> "오른쪽 골반"
+            13 -> "왼쪽 무릎"
+            14 -> "오른쪽 무릎"
+            15 -> "왼쪽 발목"
+            16 -> "오른쪽 발목"
+            else -> "관절"
+        }
+    }
+
+    private fun buildDailyAverageTrend(history: List<PracticeHistory>, days: Int): Pair<List<Float>, List<String>> {
+        val byDate = history.groupBy { it.createdAt.substringBefore(" ") }
+        val keyFormat = SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        val labelFormat = SimpleDateFormat("MM/dd", Locale.getDefault())
+        val calendar = Calendar.getInstance().apply { add(Calendar.DAY_OF_YEAR, -(days - 1)) }
+
+        val scores = mutableListOf<Float>()
+        val labels = mutableListOf<String>()
+
+        repeat(days) {
+            val date = calendar.time
+            val key = keyFormat.format(date)
+            val list = byDate[key].orEmpty()
+            val avg = if (list.isEmpty()) 0f else (list.map { it.totalScore }.average().toFloat() / 100f)
+
+            scores += avg
+            labels += labelFormat.format(date)
+            calendar.add(Calendar.DAY_OF_YEAR, 1)
+        }
+
+        return scores to labels
+    }
+
+    private fun getBestGrade(history: List<PracticeHistory>): String {
+        val priority = mapOf("S" to 5, "A" to 4, "B" to 3, "C" to 2, "F" to 1)
+        return history
+            .map { it.grade.uppercase(Locale.getDefault()) }
+            .maxByOrNull { priority[it] ?: 0 }
+            ?: "-"
+    }
+
+    private fun resolveSongMeta(historySongId: Long, historyArtistName: String): SongMeta? {
+        val candidates = songsCache.filter { it.songId in historySongId..(historySongId + 2) }
+        if (candidates.isEmpty()) return songsCache.firstOrNull { it.songId == historySongId }
+
+        val normalizedArtist = historyArtistName.trim().lowercase(Locale.getDefault())
+        if (normalizedArtist.isNotBlank()) {
+            candidates.firstOrNull { candidate ->
+                candidate.artistKr.lowercase(Locale.getDefault()).contains(normalizedArtist)
+            }?.let { return it }
+        }
+
+        return candidates.firstOrNull { it.songId == historySongId } ?: candidates.firstOrNull()
     }
 
     private fun processHistoryData(historyList: List<PracticeHistory>) {

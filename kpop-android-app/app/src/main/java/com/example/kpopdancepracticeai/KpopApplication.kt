@@ -12,6 +12,15 @@ class KpopApplication : Application() {
 
     private val applicationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    var shouldShowHomePromoVideo: Boolean = true
+        private set
+
+    fun consumeHomePromoVideoVisibility(): Boolean {
+        val shouldShow = shouldShowHomePromoVideo
+        shouldShowHomePromoVideo = false
+        return shouldShow
+    }
+
     val database by lazy {
         AppDatabase.getDatabase(this)
     }
@@ -22,7 +31,8 @@ class KpopApplication : Application() {
             userDao = database.userDao(),
             songDao = database.songDao(), // 이 부분이 추가되어야 합니다.
             historyDao = database.historyDao(),
-            achievementDao = database.achievementDao()
+            achievementDao = database.achievementDao(),
+            userChoreoStatsDao = database.userChoreoStatsDao()
         )
     }
 
@@ -30,6 +40,7 @@ class KpopApplication : Application() {
         super.onCreate()
         applicationScope.launch {
             repository.prePopulateSongsIfNeeded()
+            repository.ensureAchievementIconsDownloaded(this@KpopApplication)
         }
     }
 }

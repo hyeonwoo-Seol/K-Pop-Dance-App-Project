@@ -2,10 +2,15 @@ package com.example.kpopdancepracticeai.ui
 
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -42,12 +47,16 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -55,6 +64,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
@@ -73,10 +83,24 @@ import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
+
+private const val PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT = "has_shown_initial_video_prompt"
+
+private fun consumeInitialVideoPromptAndGetRoute(context: Context): String {
+    val prefs = context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE)
+    return if (!prefs.getBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, false)) {
+        prefs.edit().putBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, true).apply()
+        Screen.VideoDownload.route
+    } else {
+        Screen.Home.route
+    }
+}
+
 sealed class Screen(val route: String, val label: String, val icon: ImageVector) {
     object Login : Screen("login", "로그인", Icons.Default.Home)
     object SignUp : Screen("signUp", "회원가입", Icons.Default.Person)
     object SignUpSecond : Screen("signUpSecond", "회원가입2", Icons.Default.Person)
+    object LoginAttempt : Screen("loginAttempt/{email}/{password}", "로그인 시도", Icons.Default.Home)
 
     object Home : Screen("home", "홈", Icons.Default.Home)
 
@@ -96,18 +120,19 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     object OpenSourceLicense : Screen("openSourceLicense", "오픈소스 라이선스", Icons.Outlined.Code)
 
     object SearchResults : Screen("searchResults/{query}/{difficulty}/{artistGender}/{tempo}", "검색 결과", Icons.Default.Search)
-    object SongDetail : Screen("songDetail/{songId}", "곡 상세", Icons.Default.MusicNote)
+    object SongDetail : Screen("songDetail/{songId}?originX={originX}&originY={originY}", "곡 상세", Icons.Default.MusicNote)
 
     object SongPartSelect : Screen("songPartSelect/{songId}", "곡 파트 선택", Icons.Default.MusicNote)
+    object AiPracticeTip : Screen("aiPracticeTip", "AI 팁", Icons.Default.Analytics)
 
     // 💡 [수정] URL을 전달받기 위해 경로 끝에 /{videoUrl} 추가
     object DancePractice : Screen(
-        "dancePractice/{songTitle}/{artistPart}/{difficulty}/{length}/{videoUrl}",
+        "dancePractice/{songId}/{songTitle}/{artistPart}/{difficulty}/{length}/{videoUrl}",
         "댄스 연습",
         Icons.Default.MusicNote
     )
     object Record : Screen(
-        "record/{songTitle}/{artistPart}/{difficulty}/{videoUrl}",
+        "record/{songId}/{songTitle}/{artistPart}/{difficulty}/{videoUrl}",
         "녹화",
         Icons.Default.CameraAlt
     )
@@ -135,6 +160,46 @@ val bottomNavItems = listOf(
     Screen.Profile,
 )
 
+// 프로필 > 설정 상세 화면 전환 속도(ms). 값이 클수록 느리고 부드럽게 전환됩니다.
+private const val PROFILE_SETTINGS_SLIDE_DURATION_MS = 320
+
+// 메인 화면 전환 속도(ms).
+// 홈/검색/프로필 탭 이동 전환에 적용됩니다.
+private const val MAIN_SCREEN_TRANSITION_DURATION_MS = 550
+
+// 안무 상세 화면 전환 속도(ms).
+private const val SONG_DETAIL_ENTER_TRANSITION_DURATION_MS = 610
+private const val SONG_DETAIL_EXIT_TRANSITION_DURATION_MS = 520
+
+// 초반 반응은 빠르고 마지막 감속은 부드럽게 느껴지도록 맞춘 기본 프리셋
+private const val SCREEN_TRANSITION_EASING_X1 = 0.22f
+private const val SCREEN_TRANSITION_EASING_Y1 = 1.00f
+private const val SCREEN_TRANSITION_EASING_X2 = 0.36f
+private const val SCREEN_TRANSITION_EASING_Y2 = 1.00f
+
+private val ScreenTransitionEasing = CubicBezierEasing(
+    SCREEN_TRANSITION_EASING_X1,
+    SCREEN_TRANSITION_EASING_Y1,
+    SCREEN_TRANSITION_EASING_X2,
+    SCREEN_TRANSITION_EASING_Y2
+)
+
+private fun NavBackStackEntry.isProfileRoute(): Boolean {
+    return destination.route == Screen.Profile.route
+}
+
+private fun NavBackStackEntry.isProfileSettingsRoute(): Boolean {
+    return when (destination.route) {
+        Screen.ProfileEdit.route,
+        Screen.PracticeSettings.route,
+        Screen.NotificationSettings.route,
+        Screen.PrivacySettings.route,
+        Screen.AppInfo.route,
+        Screen.Withdrawal.route -> true
+        else -> false
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AppNavigation(
@@ -142,6 +207,7 @@ fun AppNavigation(
 ) {
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    var isAiTipOverlayVisible by remember { mutableStateOf(false) }
 
     val context = LocalContext.current
     val app = context.applicationContext as KpopApplication
@@ -152,13 +218,19 @@ fun AppNavigation(
     val authRepository = remember { AuthRepository(context) }
 
     val prefs = remember { context.getSharedPreferences("app_prefs", Context.MODE_PRIVATE) }
-    val isVideoDownloaded = remember { prefs.getBoolean("is_expert_video_downloaded", false) }
+    val hasShownInitialVideoPrompt = remember { prefs.getBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, false) }
 
     val startDestination = remember {
         if (authRepository.getCurrentUser() != null) {
-            if (isVideoDownloaded) Screen.Home.route else Screen.VideoDownload.route
+            if (!hasShownInitialVideoPrompt) Screen.VideoDownload.route else Screen.Home.route
         } else {
             Screen.Login.route
+        }
+    }
+
+    androidx.compose.runtime.LaunchedEffect(startDestination) {
+        if (startDestination == Screen.VideoDownload.route) {
+            prefs.edit().putBoolean(PREF_HAS_SHOWN_INITIAL_VIDEO_PROMPT, true).apply()
         }
     }
 
@@ -173,6 +245,7 @@ fun AppNavigation(
         Screen.Login.route,
         Screen.SignUp.route,
         Screen.SignUpSecond.route,
+        Screen.LoginAttempt.route.substringBefore("/{"),
         Screen.ProfileEdit.route,
         Screen.PracticeSettings.route,
         Screen.NotificationSettings.route,
@@ -189,6 +262,8 @@ fun AppNavigation(
         Screen.AnalysisLoading.route,
         Screen.Record.route,
         Screen.Analysis.route,
+        Screen.AiPracticeTip.route,
+        Screen.VideoDownload.route,
     )
 
     val showMainBars = if (currentRoute != null) {
@@ -196,7 +271,7 @@ fun AppNavigation(
         if (isResultScreen) false
         else screensToHideBars.none { route ->
             currentRoute == route || currentRoute.startsWith("$route/")
-        }
+        } && !isAiTipOverlayVisible
     } else {
         false
     }
@@ -244,7 +319,10 @@ fun AppNavigation(
                 innerPadding = innerPadding,
                 viewModel = viewModel,
                 startDestination = startDestination,
-                authRepository = authRepository
+                authRepository = authRepository,
+                onAiTipOverlayVisibilityChanged = { isVisible ->
+                    isAiTipOverlayVisible = isVisible
+                }
             )
         }
     }
@@ -298,6 +376,10 @@ fun AppBottomNavigationBar(navController: NavController) {
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
                         ) {
+                            if (selected) {
+                                return@clickable
+                            }
+
                             navController.navigate(screen.route) {
                                 popUpTo(navController.graph.findStartDestination().id) {
                                     saveState = true
@@ -336,18 +418,57 @@ fun AppNavHost(
     innerPadding: PaddingValues,
     viewModel: MainViewModel,
     startDestination: String,
-    authRepository: AuthRepository
+    authRepository: AuthRepository,
+    onAiTipOverlayVisibilityChanged: (Boolean) -> Unit = {}
 ) {
+    val context = LocalContext.current
     NavHost(
         navController = navController,
         startDestination = startDestination,
-        modifier = modifier
+        modifier = modifier,
+        enterTransition = {
+            fadeIn(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
+        },
+        exitTransition = {
+            fadeOut(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
+        },
+        popEnterTransition = {
+            fadeIn(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
+        },
+        popExitTransition = {
+            fadeOut(
+                animationSpec = tween(
+                    durationMillis = MAIN_SCREEN_TRANSITION_DURATION_MS,
+                    easing = ScreenTransitionEasing
+                )
+            )
+        }
     ) {
         composable(Screen.Login.route) {
             LoginScreen(
                 viewModel = viewModel,
+                onEmailLoginAttempt = { email, password ->
+                    val encodedEmail = Screen.encodeArg(email)
+                    val encodedPassword = Screen.encodeArg(password)
+                    navController.navigate("loginAttempt/$encodedEmail/$encodedPassword")
+                },
                 onLoginSuccess = {
-                    navController.navigate(Screen.VideoDownload.route) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(context)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -357,6 +478,38 @@ fun AppNavHost(
                 onGoogleLoginSuccess = {
                     val dummyArg = Screen.encodeArg("GOOGLE_LOGIN")
                     navController.navigate("${Screen.SignUpSecond.route}/$dummyArg/$dummyArg")
+                }
+            )
+        }
+
+        composable(
+            route = Screen.LoginAttempt.route,
+            arguments = listOf(
+                navArgument("email") { type = NavType.StringType },
+                navArgument("password") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val email = backStackEntry.arguments?.getString("email")?.let { Screen.decodeArg(it) } ?: ""
+            val password = backStackEntry.arguments?.getString("password")?.let { Screen.decodeArg(it) } ?: ""
+
+            LoginAttemptScreen(
+                viewModel = viewModel,
+                email = email,
+                password = password,
+                onLoginSuccess = {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(context)) {
+                        popUpTo(Screen.Login.route) { inclusive = true }
+                    }
+                },
+                onNeedProfile = { signupEmail, signupPassword ->
+                    val encodedEmail = Screen.encodeArg(signupEmail)
+                    val encodedPassword = Screen.encodeArg(signupPassword)
+                    navController.navigate("${Screen.SignUpSecond.route}/$encodedEmail/$encodedPassword") {
+                        popUpTo(Screen.Login.route) { inclusive = false }
+                    }
+                },
+                onBackToLogin = {
+                    navController.popBackStack(Screen.Login.route, false)
                 }
             )
         }
@@ -394,7 +547,7 @@ fun AppNavHost(
                 email = email,
                 password = password,
                 onSignUpComplete = { _, _ ->
-                    navController.navigate(Screen.VideoDownload.route) {
+                    navController.navigate(consumeInitialVideoPromptAndGetRoute(context)) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 }
@@ -410,10 +563,18 @@ fun AppNavHost(
                         navController.navigate("searchResults/$encodedQuery/all/all/all")
                     }
                 },
-                onSongClick = { songId ->
-                    navController.navigate("songDetail/$songId")
+                onSongClick = { songId, originX, originY ->
+                    navController.navigate("songDetail/$songId?originX=$originX&originY=$originY")
                 },
-                modifier = Modifier.padding(innerPadding)
+                paddingValues = innerPadding,
+                onAiTipOverlayVisibilityChanged = onAiTipOverlayVisibilityChanged
+            )
+        }
+
+        composable(Screen.AiPracticeTip.route) {
+            AiPracticeTipScreen(
+                paddingValues = innerPadding,
+                onBackClick = { navController.popBackStack() }
             )
         }
 
@@ -446,24 +607,254 @@ fun AppNavHost(
         }
 
 
-        composable(Screen.ProfileEdit.route) {
+        composable(
+            route = Screen.ProfileEdit.route,
+            enterTransition = {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            }
+        ) {
             ProfileEditScreen(
                 onBackClick = { navController.popBackStack() },
                 viewModel = viewModel
             )
         }
 
-        composable(Screen.PracticeSettings.route) {
+        composable(
+            route = Screen.PracticeSettings.route,
+            enterTransition = {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            }
+        ) {
             PracticeSettingsScreen(onBackClick = { navController.popBackStack() })
         }
-        composable(Screen.NotificationSettings.route) {
+        composable(
+            route = Screen.NotificationSettings.route,
+            enterTransition = {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            }
+        ) {
             NotificationSettingsScreen(onBackClick = { navController.popBackStack() })
         }
-        composable(Screen.PrivacySettings.route) {
+        composable(
+            route = Screen.PrivacySettings.route,
+            enterTransition = {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            }
+        ) {
             PrivacySettingsScreen(onBackClick = { navController.popBackStack() })
         }
 
-        composable(Screen.AppInfo.route) {
+        composable(
+            route = Screen.AppInfo.route,
+            enterTransition = {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            }
+        ) {
             AppInfoScreen(
                 onBackClick = { navController.popBackStack() },
                 onNavigateToFaq = { navController.navigate("faq") },
@@ -497,7 +888,53 @@ fun AppNavHost(
             )
         }
 
-        composable(Screen.Withdrawal.route) {
+        composable(
+            route = Screen.Withdrawal.route,
+            enterTransition = {
+                if (initialState.isProfileRoute() || initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            exitTransition = {
+                if (targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Left,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popEnterTransition = {
+                if (initialState.isProfileSettingsRoute()) {
+                    slideIntoContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            },
+            popExitTransition = {
+                if (targetState.isProfileRoute() || targetState.isProfileSettingsRoute()) {
+                    slideOutOfContainer(
+                        AnimatedContentTransitionScope.SlideDirection.Right,
+                        animationSpec = tween(
+                            durationMillis = PROFILE_SETTINGS_SLIDE_DURATION_MS,
+                            easing = ScreenTransitionEasing
+                        )
+                    )
+                } else null
+            }
+        ) {
             WithdrawalScreen(
                 onBackClick = { navController.popBackStack() },
                 onWithdrawConfirm = {
@@ -542,7 +979,51 @@ fun AppNavHost(
         }
         composable(
             route = Screen.SongDetail.route,
-            arguments = listOf(navArgument("songId") { type = NavType.StringType })
+            arguments = listOf(
+                navArgument("songId") { type = NavType.StringType },
+                navArgument("originX") {
+                    type = NavType.FloatType
+                    defaultValue = 0.5f
+                },
+                navArgument("originY") {
+                    type = NavType.FloatType
+                    defaultValue = 0.5f
+                }
+            ),
+            enterTransition = {
+                val originX = targetState.arguments?.getFloat("originX") ?: 0.5f
+                val originY = targetState.arguments?.getFloat("originY") ?: 0.5f
+                scaleIn(
+                    initialScale = 0.75f,
+                    transformOrigin = TransformOrigin(originX, originY),
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                ) + fadeIn(
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_ENTER_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                )
+            },
+            popExitTransition = {
+                val originX = initialState.arguments?.getFloat("originX") ?: 0.5f
+                val originY = initialState.arguments?.getFloat("originY") ?: 0.5f
+                scaleOut(
+                    targetScale = 0.75f,
+                    transformOrigin = TransformOrigin(originX, originY),
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                ) + fadeOut(
+                    animationSpec = tween(
+                        durationMillis = SONG_DETAIL_EXIT_TRANSITION_DURATION_MS,
+                        easing = ScreenTransitionEasing
+                    )
+                )
+            }
         ) { backStackEntry ->
             val songId = backStackEntry.arguments?.getString("songId") ?: ""
             SongDetailScreen(
@@ -562,13 +1043,13 @@ fun AppNavHost(
                 viewModel = viewModel,
                 onBackClick = { navController.popBackStack() },
                 // 💡 [수정] 5번째 인자인 URL(videoUrl)도 함께 인코딩해서 라우터로 넘겨줍니다.
-                onNavigateToPractice = { songTitle, artistPart, difficulty, length, videoUrl ->
+                onNavigateToPractice = { songId, songTitle, artistPart, difficulty, length, videoUrl ->
                     val encodedTitle = Screen.encodeArg(songTitle)
                     val encodedArtistPart = Screen.encodeArg(artistPart)
                     val encodedDifficulty = Screen.encodeArg(difficulty)
                     val encodedLength = Screen.encodeArg(length)
                     val encodedUrl = Screen.encodeArg(videoUrl)
-                    navController.navigate("dancePractice/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength/$encodedUrl")
+                    navController.navigate("dancePractice/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedLength/$encodedUrl")
                 },
                 onNavigateToResult = { jsonFileName, videoPath ->
                     val encodedJson = Screen.encodeArg(jsonFileName)
@@ -580,6 +1061,7 @@ fun AppNavHost(
         composable(
             route = Screen.DancePractice.route,
             arguments = listOf(
+                navArgument("songId") { type = NavType.LongType },
                 navArgument("songTitle") { type = NavType.StringType },
                 navArgument("artistPart") { type = NavType.StringType },
                 navArgument("difficulty") { type = NavType.StringType },
@@ -588,31 +1070,67 @@ fun AppNavHost(
                 navArgument("videoUrl") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val songId = backStackEntry.arguments?.getLong("songId") ?: 0L
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
             val length = backStackEntry.arguments?.getString("length")?.let { Screen.decodeArg(it) } ?: ""
             val videoUrl = backStackEntry.arguments?.getString("videoUrl")?.let { Screen.decodeArg(it) } ?: ""
 
-            PracticeScreenMobile(
-                songTitle = songTitle,
-                artistPart = artistPart,
-                difficulty = difficulty,
-                length = length,
-                videoUrl = videoUrl,
-                onBackClick = { navController.popBackStack() },
-                onRecordClick = {
-                    val encodedTitle = Screen.encodeArg(songTitle)
-                    val encodedArtistPart = Screen.encodeArg(artistPart)
-                    val encodedDifficulty = Screen.encodeArg(difficulty)
-                    val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
-                    navController.navigate("record/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl")
-                },
-                onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
-            )
+            val configuration = LocalConfiguration.current
+            val isTablet = configuration.smallestScreenWidthDp >= 600
+
+            if (isTablet) {
+                PracticeScreenTablet(
+                    songId = songId,
+                    songTitle = songTitle,
+                    artistPart = artistPart,
+                    difficulty = difficulty,
+                    length = length,
+                    videoUrl = videoUrl,
+                    onBackClick = { navController.popBackStack() },
+                    onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) },
+                    onNavigateHome = { navController.popBackStack(Screen.Home.route, false) },
+                    mainViewModel = viewModel,
+                    onRecordingComplete = { resultString ->
+                        val dataParts = resultString.split("|")
+                        val rawPath = dataParts[0]
+                        val videoUriString = if (dataParts.size > 1) dataParts[1] else ""
+                        val jsonFileName = rawPath.split("/").last()
+                        val encodedJson = Screen.encodeArg(jsonFileName)
+                        val encodedVideo = Screen.encodeArg(videoUriString)
+
+                        navController.navigate("practiceResult/$encodedJson/$encodedVideo") {
+                            popUpTo(Screen.DancePractice.route) { inclusive = true }
+                        }
+                    }
+                )
+            } else {
+                PracticeScreenMobile(
+                    songId = songId,
+                    songTitle = songTitle,
+                    artistPart = artistPart,
+                    difficulty = difficulty,
+                    length = length,
+                    videoUrl = videoUrl,
+                    onBackClick = { navController.popBackStack() },
+                    onRecordClick = {
+                        val encodedTitle = Screen.encodeArg(songTitle)
+                        val encodedArtistPart = Screen.encodeArg(artistPart)
+                        val encodedDifficulty = Screen.encodeArg(difficulty)
+                        val encodedUrl = Screen.encodeArg(videoUrl) // 💡 전달받은 URL을 RecordScreen으로 다시 패스!
+                        navController.navigate("record/$songId/$encodedTitle/$encodedArtistPart/$encodedDifficulty/$encodedUrl") {
+                            popUpTo(Screen.DancePractice.route) { inclusive = true }
+                        }
+                    },
+                    onSettingsClick = { navController.navigate(Screen.PracticeSettings.route) }
+                )
+            }
         }
         composable(Screen.AnalysisLoading.route) {
             AnalysisWaitingScreen(
+                progress = 0f,
+                statusMessage = "분석 준비 중입니다...",
                 onAnalysisComplete = { }
             )
         }
@@ -644,6 +1162,7 @@ fun AppNavHost(
         composable(
             route = Screen.Record.route,
             arguments = listOf(
+                navArgument("songId") { type = NavType.LongType },
                 navArgument("songTitle") { type = NavType.StringType },
                 navArgument("artistPart") { type = NavType.StringType },
                 navArgument("difficulty") { type = NavType.StringType },
@@ -651,6 +1170,7 @@ fun AppNavHost(
                 navArgument("videoUrl") { type = NavType.StringType }
             )
         ) { backStackEntry ->
+            val songId = backStackEntry.arguments?.getLong("songId") ?: 0L
             val songTitle = backStackEntry.arguments?.getString("songTitle")?.let { Screen.decodeArg(it) } ?: ""
             val artistPart = backStackEntry.arguments?.getString("artistPart")?.let { Screen.decodeArg(it) } ?: ""
             val difficulty = backStackEntry.arguments?.getString("difficulty")?.let { Screen.decodeArg(it) } ?: ""
@@ -661,6 +1181,7 @@ fun AppNavHost(
             val partName = parts.getOrNull(1) ?: artistPart
 
             RecordScreen(
+                songId = songId,
                 songTitle = songTitle,
                 difficulty = difficulty,
                 artist = artistName,

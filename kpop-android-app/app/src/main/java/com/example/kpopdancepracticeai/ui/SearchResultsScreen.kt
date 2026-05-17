@@ -1,5 +1,9 @@
 package com.example.kpopdancepracticeai.ui
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -13,7 +17,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.SearchOff
@@ -26,8 +30,10 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -67,7 +73,7 @@ fun SearchResultsScreen(
         modifier = Modifier
             .fillMaxSize()
             .padding(horizontal = 16.dp),
-        contentPadding = paddingValues,
+        contentPadding = rememberResponsiveScaffoldPadding(paddingValues),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         item {
@@ -95,8 +101,8 @@ fun SearchResultsScreen(
                 EmptySearchResult()
             }
             is SearchUiState.Success -> {
-                items(state.songs, key = { it.songId }) { song ->
-                    SearchSongItem(song = song) {
+                itemsIndexed(state.songs, key = { _, song -> song.songId }) { index, song ->
+                    SearchSongItem(song = song, index = index) {
                         navController.navigate("songPartSelect/${song.songId}")
                     }
                 }
@@ -108,21 +114,37 @@ fun SearchResultsScreen(
 }
 
 @Composable
-private fun SearchSongItem(song: Song, onClick: () -> Unit) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+private fun SearchSongItem(song: Song, index: Int, onClick: () -> Unit) {
+    val visibleState = remember(song.songId) {
+        MutableTransitionState<Boolean>(false).apply {
+            targetState = true
+        }
+    }
+
+    AnimatedVisibility(
+        visibleState = visibleState,
+        enter = slideInVertically(
+            initialOffsetY = { it / 3 },
+            animationSpec = tween(durationMillis = 280, delayMillis = index * 40)
+        ) + fadeIn(
+            animationSpec = tween(durationMillis = 280, delayMillis = index * 40)
+        )
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = song.titleKr, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(text = song.artistKr, style = MaterialTheme.typography.bodyMedium)
-            Spacer(modifier = Modifier.height(8.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text = "난이도: ${song.difficulty}", style = MaterialTheme.typography.labelMedium)
-                Text(text = "템포: ${song.tempo}", style = MaterialTheme.typography.labelMedium)
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick),
+            shape = RoundedCornerShape(12.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Text(text = song.titleKr, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(text = song.artistKr, style = MaterialTheme.typography.bodyMedium)
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "난이도: ${song.difficulty}", style = MaterialTheme.typography.labelMedium)
+                    Text(text = "템포: ${song.tempo}", style = MaterialTheme.typography.labelMedium)
+                }
             }
         }
     }

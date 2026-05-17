@@ -44,6 +44,7 @@ import androidx.media3.ui.PlayerView
 import com.example.kpopdancepracticeai.data.dto.FrameData
 import com.example.kpopdancepracticeai.util.DataConverter
 import com.example.kpopdancepracticeai.util.JsonResultLoader
+import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -78,6 +79,20 @@ fun PracticeResultScreen(
 
     // 신체 부위별 점수 (순서: 0.몸통, 1.오른팔, 2.오른다리, 3.왼다리, 4.왼팔)
     var partScores by remember { mutableStateOf(if (isPreview) listOf(90f, 85f, 75f, 88f, 82f) else listOf(0f, 0f, 0f, 0f, 0f)) }
+
+    var achievementItems by remember {
+        mutableStateOf(
+            if (isPreview) {
+                listOf(
+                    AchievementUiModel("preview_1", "첫 완주", "", 1, 1, true, 1.0f, "100%"),
+                    AchievementUiModel("preview_2", "정확도 마스터", "", 3, 4, false, 0.75f, "75%"),
+                    AchievementUiModel("preview_3", "연습벌레", "", 6, 10, false, 0.60f, "60%")
+                )
+            } else emptyList()
+        )
+    }
+    var bestSongTitle by remember { mutableStateOf(if (isPreview) "Get Up - NewJeans" else "기록 없음") }
+    var bestSongScore by remember { mutableIntStateOf(if (isPreview) 92 else 0) }
 
     var currentKeyPoints by remember { mutableStateOf<List<KeyPoint>>(emptyList()) }
     var currentErrors by remember { mutableStateOf<List<Int>>(emptyList()) }
@@ -133,10 +148,28 @@ fun PracticeResultScreen(
 
                     val joints = analyzeTop3WorstJoints(allFrames)
                     if (joints.isNotEmpty()) worstJoints = joints
+
                 }
             } catch (e: Exception) {
                 Log.e("PracticeResult", "JSON 파싱 에러", e)
             }
+        }
+    }
+
+
+    LaunchedEffect(viewModel, jsonFileName) {
+        if (isPreview || viewModel == null || jsonFileName.isBlank()) return@LaunchedEffect
+        val userId = viewModel.currentUserProfile.value?.userUuid ?: return@LaunchedEffect
+        runCatching {
+            viewModel.getPracticeResultSummary(userId, jsonFileName)
+        }.onSuccess { summary ->
+            if (summary != null) {
+                achievementItems = summary.achievements
+                bestSongTitle = summary.songTitle
+                bestSongScore = summary.bestScore
+            }
+        }.onFailure {
+            Log.e("PracticeResult", "결과 요약 로드 실패", it)
         }
     }
 
@@ -325,6 +358,7 @@ fun PracticeResultScreen(
                         TopErrorJointItem(i + 1, dJoints.getOrNull(i) ?: "데이터 없음", colors[i])
                         if (i < 2) Spacer(modifier = Modifier.height(12.dp))
                     }
+
                 }
 
                 // 업적 진행도
@@ -336,11 +370,25 @@ fun PracticeResultScreen(
                     }
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    AchievementItem("🏃‍♀️", "첫 완주", "100%", true, 1.0f)
-                    Spacer(modifier = Modifier.height(24.dp))
-                    AchievementItem("🎯", "정확도 마스터", "75%", false, 0.75f)
-                    Spacer(modifier = Modifier.height(24.dp))
-                    AchievementItem("💪", "연습벌레", "60%", false, 0.60f)
+                    val fallbackAchievements = listOf(
+                        AchievementUiModel("fallback_1", "첫 완주", "", 1, 1, true, 1.0f, "100%"),
+                        AchievementUiModel("fallback_2", "정확도 마스터", "", 3, 4, false, 0.75f, "75%"),
+                        AchievementUiModel("fallback_3", "연습벌레", "", 6, 10, false, 0.60f, "60%")
+                    )
+                    val displayAchievements = if (achievementItems.isEmpty()) fallbackAchievements else achievementItems
+
+                    displayAchievements.take(3).forEachIndexed { index, achievement ->
+                        val icon = achievementIcon(achievement.title)
+                        val progressPercent = "${(achievement.progress * 100).toInt()}%"
+                        AchievementItem(
+                            icon = icon,
+                            title = achievement.title,
+                            percentStr = progressPercent,
+                            isCompleted = achievement.isUnlocked,
+                            progress = achievement.progress
+                        )
+                        if (index < 2) Spacer(modifier = Modifier.height(24.dp))
+                    }
                 }
 
                 // 최고 기록
@@ -360,10 +408,10 @@ fun PracticeResultScreen(
                             Spacer(modifier = Modifier.width(12.dp))
                             Column {
                                 Text("이 곡 최고 기록", style = TextStyle(fontSize = 14.sp, color = Color(0xff717182)))
-                                Text("Get Up - NewJeans", style = TextStyle(fontSize = 12.sp, color = Color(0xff717182)))
+                                Text(bestSongTitle, style = TextStyle(fontSize = 12.sp, color = Color(0xff717182)))
                             }
                         }
-                        Text("92.3%", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp, color = Color(0xffd08700)))
+                        Text("${bestSongScore}%", style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 28.sp, color = Color(0xffd08700)))
                     }
                 }
 
@@ -467,6 +515,17 @@ fun AchievementItem(icon: String, title: String, percentStr: String, isCompleted
         Box(modifier = Modifier.fillMaxWidth().height(10.dp).background(Color(0x33030213), CircleShape).clip(CircleShape)) {
             Box(modifier = Modifier.fillMaxWidth(progress).fillMaxHeight().background(Color(0xff030213)))
         }
+    }
+}
+
+
+private fun achievementIcon(title: String): String {
+    return when {
+        title.contains("완주") -> "🏃‍♀️"
+        title.contains("정확") -> "🎯"
+        title.contains("연습") -> "💪"
+        title.contains("기록") -> "📈"
+        else -> "🏆"
     }
 }
 

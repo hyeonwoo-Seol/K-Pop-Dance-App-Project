@@ -23,9 +23,6 @@ data class Badge(
     @ColumnInfo(name = "description")
     val description: String,
 
-    @ColumnInfo(name = "iconResName")
-    val iconResName: String,
-
     @ColumnInfo(name = "category")
     val category: String,
 
@@ -33,5 +30,8 @@ data class Badge(
     val isUnlocked: Boolean = false,
 
     @ColumnInfo(name = "obtainedAt")
-    val obtainedAt: Long? = null
+    val obtainedAt: Long? = null,
+
+    @ColumnInfo(name = "is_selected")
+    val isSelected: Boolean = false
 )
