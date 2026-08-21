@@ -10,8 +10,15 @@ import os
 import copy
 from scipy.spatial.distance import euclidean
 from fastdtw import fastdtw
+from temporal_filter import build_temporal_error_flags
 
 class Scoring:
+    # Temporal error-flag defaults. At 30 FPS, a 12-frame EMA spans about 0.4s.
+    ERROR_EMA_WINDOW = 12
+    ERROR_ENTER_THRESHOLD = 65.0
+    ERROR_EXIT_THRESHOLD = 75.0
+    MAX_SHORT_ERROR_FRAMES = 4
+
     # >> 관절 인덱스 매핑 (YOLO v11 기준)
     # >> Index_이름매핑.txt 내용을 바탕으로 매핑
     KEYPOINT_NAMES = {
@@ -44,8 +51,24 @@ class Scoring:
         "Torso": ["torso_angle"]
     }
 
-    def __init__(self):
-        pass
+    def __init__(
+        self,
+        error_ema_window=ERROR_EMA_WINDOW,
+        error_enter_threshold=ERROR_ENTER_THRESHOLD,
+        error_exit_threshold=ERROR_EXIT_THRESHOLD,
+        max_short_error_frames=MAX_SHORT_ERROR_FRAMES,
+    ):
+        if error_ema_window < 1:
+            raise ValueError("error_ema_window must be at least 1")
+        if error_enter_threshold >= error_exit_threshold:
+            raise ValueError("error_enter_threshold must be lower than error_exit_threshold")
+        if max_short_error_frames < 0:
+            raise ValueError("max_short_error_frames cannot be negative")
+
+        self.error_ema_window = error_ema_window
+        self.error_enter_threshold = error_enter_threshold
+        self.error_exit_threshold = error_exit_threshold
+        self.max_short_error_frames = max_short_error_frames
 
     def compare(self, user_json_path, expert_json_path):
         print(f"[Scoring] 점수 계산 시작: User({os.path.basename(user_json_path)}) vs Expert({os.path.basename(expert_json_path)})")
@@ -304,8 +327,11 @@ class Scoring:
         if aligned_user_frames:
              frame_scores = [0.0] * len(aligned_user_frames)
 
-        # [수정] 에러 판별 점수 임계값 (환산 점수가 70점 미만일 경우 에러로 간주)
-        ERROR_SCORE_THRESHOLD = 70.0 
+        # A user frame can appear multiple times in the DTW path. Keep the
+        # corresponding joint scores so one low-scoring match cannot mark the
+        # entire frame as an error by itself.
+        joint_score_sums = np.zeros((len(aligned_user_frames), 18), dtype=float)
+        joint_score_counts = np.zeros(len(aligned_user_frames), dtype=int)
 
         for u_idx, e_idx in path:
             # === Feature(각도) 비교 ===
@@ -335,20 +361,39 @@ class Scoring:
                 frame_score = self._convert_distance_to_score(mean_diff, 1)
                 frame_scores[u_idx] = float(f"{frame_score:.1f}")
         
-        # [수정] DTW Path 순회 후, 각 프레임별 에러를 점수 기준으로 확정
-        final_frame_errors = [[0]*18 for _ in range(len(aligned_user_frames))]
-        
+        # Aggregate raw per-joint scores for every user frame in the DTW path.
         for (u_idx, e_idx) in path:
              if u_idx < len(aligned_user_frames) and e_idx < len(expert_norm_kps):
                 u_kp = user_norm_kps[u_idx]
                 e_kp = expert_norm_kps[e_idx]
                 dists = np.linalg.norm(u_kp - e_kp, axis=1)
-                for k in range(18):
-                    # 개별 관절의 거리 오차를 점수로 변환
-                    kp_score = self._convert_kp_distance_to_score(dists[k])
-                    # 변환된 점수가 임계값(70점) 미만일 때만 에러 1로 마킹
-                    if kp_score < ERROR_SCORE_THRESHOLD:
-                        final_frame_errors[u_idx][k] = 1
+                joint_score_sums[u_idx] += [
+                    self._convert_kp_distance_to_score(distance)
+                    for distance in dists
+                ]
+                joint_score_counts[u_idx] += 1
+
+        raw_joint_scores = []
+        for frame_index in range(len(aligned_user_frames)):
+            match_count = joint_score_counts[frame_index]
+            if match_count > 0:
+                raw_joint_scores.append(
+                    (joint_score_sums[frame_index] / match_count).tolist()
+                )
+            else:
+                # No DTW match means there is no evidence to mark an error.
+                raw_joint_scores.append([100.0] * 18)
+
+        # Raw joint scores -> 12-frame EMA -> hysteresis -> remove error runs
+        # of four frames or fewer. The result keeps the AWS contract:
+        # 0 = normal, 1 = error.
+        final_frame_errors = build_temporal_error_flags(
+            raw_joint_scores,
+            ema_window=self.error_ema_window,
+            error_enter_threshold=self.error_enter_threshold,
+            error_exit_threshold=self.error_exit_threshold,
+            max_short_error_frames=self.max_short_error_frames,
+        )
 
         # 1. 부위별 정확도 점수 환산 (0~100점)
         part_accuracies = {}
