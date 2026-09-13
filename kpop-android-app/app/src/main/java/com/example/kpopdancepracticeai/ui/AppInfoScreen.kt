@@ -16,6 +16,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.HelpOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -43,7 +44,8 @@ fun AppInfoScreen(
     onNavigateToFaq: () -> Unit,
     onNavigateToTerms: () -> Unit,
     onNavigateToPrivacyPolicy: () -> Unit,
-    onNavigateToOpenSource: () -> Unit // ⭐️ 이 부분이 추가되었습니다.
+    onNavigateToOpenSource: () -> Unit,
+    onNavigateToJointTracking: () -> Unit
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as KpopApplication
@@ -216,6 +218,13 @@ fun AppInfoScreen(
                                         }
                                     }
                                 )
+                                SettingsDivider()
+                                SettingsClickableItem(
+                                    title = "관절 추적 시각화",
+                                    description = "촬영한 영상에서 AI가 추출한 관절을 오버레이로 확인합니다.",
+                                    icon = Icons.Outlined.Visibility,
+                                    onClick = onNavigateToJointTracking
+                                )
                             }
                         }
                     }
@@ -270,7 +279,8 @@ fun AppInfoScreenPreview() {
             onNavigateToFaq = {},
             onNavigateToTerms = {},
             onNavigateToPrivacyPolicy = {},
-            onNavigateToOpenSource = {}
+            onNavigateToOpenSource = {},
+            onNavigateToJointTracking = {}
         )
     }
 }

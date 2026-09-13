@@ -26,6 +26,27 @@ private val HiddenOverlayParts = setOf(
     BodyPart.NECK
 )
 
+internal data class OrientedVideoPoint(val x: Float, val y: Float)
+
+internal fun normalizeVideoRotationDegrees(rotationDegrees: Int): Int {
+    return ((rotationDegrees % 360) + 360) % 360
+}
+
+internal fun orientVideoPoint(
+    x: Float,
+    y: Float,
+    videoWidth: Float,
+    videoHeight: Float,
+    rotationDegrees: Int
+): OrientedVideoPoint {
+    return when (normalizeVideoRotationDegrees(rotationDegrees)) {
+        90 -> OrientedVideoPoint(videoHeight - y, x)
+        180 -> OrientedVideoPoint(videoWidth - x, videoHeight - y)
+        270 -> OrientedVideoPoint(y, videoWidth - x)
+        else -> OrientedVideoPoint(x, y)
+    }
+}
+
 @Composable
 fun SkeletonOverlay(
     keyPoints: List<KeyPoint>,
@@ -35,7 +56,8 @@ fun SkeletonOverlay(
     jointRadius: Float = 12f,
     lineWidth: Float = 8f,
     sourceVideoWidth: Int? = null,
-    sourceVideoHeight: Int? = null
+    sourceVideoHeight: Int? = null,
+    sourceVideoRotationDegrees: Int = 0
 ) {
     // 에러 발생 시 깜빡이는 효과 (Pulse Animation) 설정
     val infiniteTransition = rememberInfiniteTransition(label = "ErrorPulse")
@@ -51,19 +73,30 @@ fun SkeletonOverlay(
         val videoWidth = (sourceVideoWidth ?: 0).toFloat().takeIf { it > 0f } ?: canvasWidth
         val videoHeight = (sourceVideoHeight ?: 0).toFloat().takeIf { it > 0f } ?: canvasHeight
         val sourceMaxDim = max(videoWidth, videoHeight)
+        val normalizedRotation = normalizeVideoRotationDegrees(sourceVideoRotationDegrees)
+        val swapsVideoAxes = normalizedRotation == 90 || normalizedRotation == 270
+        val orientedVideoWidth = if (swapsVideoAxes) videoHeight else videoWidth
+        val orientedVideoHeight = if (swapsVideoAxes) videoWidth else videoHeight
 
         // PlayerView의 FIT(레터박스) 표시 영역에 맞춰 오버레이를 동일하게 매핑
-        val scale = min(canvasWidth / videoWidth, canvasHeight / videoHeight)
-        val displayWidth = videoWidth * scale
-        val displayHeight = videoHeight * scale
+        val scale = min(canvasWidth / orientedVideoWidth, canvasHeight / orientedVideoHeight)
+        val displayWidth = orientedVideoWidth * scale
+        val displayHeight = orientedVideoHeight * scale
         val offsetX = (canvasWidth - displayWidth) / 2f
         val offsetY = (canvasHeight - displayHeight) / 2f
 
         val pointMap = keyPoints.associate { point ->
             val sourceX = point.x * sourceMaxDim
             val sourceY = point.y * sourceMaxDim
-            val px = sourceX * scale + offsetX
-            val py = sourceY * scale + offsetY
+            val orientedPoint = orientVideoPoint(
+                x = sourceX,
+                y = sourceY,
+                videoWidth = videoWidth,
+                videoHeight = videoHeight,
+                rotationDegrees = normalizedRotation
+            )
+            val px = orientedPoint.x * scale + offsetX
+            val py = orientedPoint.y * scale + offsetY
             point.type to Offset(px, py)
         }
         val confidenceMap = keyPoints.associate { it.type to it.confidence }

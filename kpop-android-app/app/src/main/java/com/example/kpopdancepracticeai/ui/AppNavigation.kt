@@ -144,6 +144,16 @@ sealed class Screen(val route: String, val label: String, val icon: ImageVector)
     )
 
     object AnalysisLoading : Screen("analysisLoading", "분석 중", Icons.Default.Analytics)
+    object JointTrackingRecord : Screen(
+        "jointTrackingRecord",
+        "관절 추적 촬영",
+        Icons.Default.CameraAlt
+    )
+    object JointTrackingResult : Screen(
+        "jointTrackingResult/{jsonFileName}/{videoPath}",
+        "관절 추적 결과",
+        Icons.Default.Analytics
+    )
     companion object {
         fun encodeArg(arg: String): String {
             return URLEncoder.encode(arg, StandardCharsets.UTF_8.toString())
@@ -261,6 +271,8 @@ fun AppNavigation(
         Screen.DancePractice.route,
         Screen.AnalysisLoading.route,
         Screen.Record.route,
+        Screen.JointTrackingRecord.route,
+        Screen.JointTrackingResult.route,
         Screen.Analysis.route,
         Screen.AiPracticeTip.route,
         Screen.VideoDownload.route,
@@ -860,7 +872,10 @@ fun AppNavHost(
                 onNavigateToFaq = { navController.navigate("faq") },
                 onNavigateToTerms = { navController.navigate(Screen.TermsOfService.route) },
                 onNavigateToPrivacyPolicy = { navController.navigate(Screen.PrivacyPolicy.route) },
-                onNavigateToOpenSource = { navController.navigate(Screen.OpenSourceLicense.route) }
+                onNavigateToOpenSource = { navController.navigate(Screen.OpenSourceLicense.route) },
+                onNavigateToJointTracking = {
+                    navController.navigate(Screen.JointTrackingRecord.route)
+                }
             )
         }
 
@@ -1135,6 +1150,29 @@ fun AppNavHost(
             )
         }
         composable(
+            route = Screen.JointTrackingResult.route,
+            arguments = listOf(
+                navArgument("jsonFileName") { type = NavType.StringType },
+                navArgument("videoPath") { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val jsonFileName = backStackEntry.arguments
+                ?.getString("jsonFileName")
+                ?.let { Screen.decodeArg(it) }
+                ?: ""
+            val videoPath = backStackEntry.arguments
+                ?.getString("videoPath")
+                ?.let { Screen.decodeArg(it) }
+                ?: ""
+
+            JointTrackingResultScreen(
+                jsonFileName = jsonFileName,
+                videoPath = videoPath,
+                onBackClick = { navController.popBackStack() },
+                onHomeClick = { navController.popBackStack(Screen.Home.route, false) }
+            )
+        }
+        composable(
             route = Screen.PracticeResult.route,
             arguments = listOf(
                 navArgument("jsonFileName") { type = NavType.StringType },
@@ -1199,6 +1237,30 @@ fun AppNavHost(
                     val encodedVideo = Screen.encodeArg(videoUriString)
                     navController.navigate("practiceResult/$encodedJson/$encodedVideo") {
                         popUpTo(Screen.Record.route) { inclusive = true }
+                    }
+                }
+            )
+        }
+        composable(Screen.JointTrackingRecord.route) {
+            RecordScreen(
+                songTitle = "관절 추적 시각화",
+                difficulty = "",
+                artist = "",
+                part = "",
+                expertVideoUrl = "",
+                onBack = { navController.popBackStack() },
+                onNavigateHome = { navController.popBackStack() },
+                mainViewModel = viewModel,
+                isJointVisualization = true,
+                onRecordingComplete = { resultString ->
+                    val dataParts = resultString.split("|")
+                    val jsonFileName = dataParts.firstOrNull().orEmpty().substringAfterLast("/")
+                    val videoUriString = dataParts.getOrNull(1).orEmpty()
+                    val encodedJson = Screen.encodeArg(jsonFileName)
+                    val encodedVideo = Screen.encodeArg(videoUriString)
+
+                    navController.navigate("jointTrackingResult/$encodedJson/$encodedVideo") {
+                        popUpTo(Screen.JointTrackingRecord.route) { inclusive = true }
                     }
                 }
             )

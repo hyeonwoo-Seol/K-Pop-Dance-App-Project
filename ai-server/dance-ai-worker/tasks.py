@@ -18,6 +18,10 @@ from celery_app import app
 from config import Config
 from pose_estimation import PoseEstimator
 from scoring import Scoring
+from analysis_mode import (
+    is_joint_visualization_request,
+    prepare_joint_visualization_result,
+)
 
 # >> 로깅 설정
 # >> 기존 print 대신 logging을 사용하여 레벨별 로그 관리 및 파일 저장이 용이하도록 변경
@@ -327,7 +331,13 @@ def pose_estimation_task(video_path, song_id, user_id, timestamp):
 
     # 1. 파일명 파싱 (Helper Class 사용)
     full_song_identifier, expert_json_filename = VideoMetadataParser.parse(video_path, song_id, user_id)
-    logger.info(f"[Info] 타겟 전문가 데이터 파일: {expert_json_filename}")
+    is_joint_visualization = is_joint_visualization_request(
+        video_path, song_id, user_id
+    )
+    if is_joint_visualization:
+        logger.info("[Info] 관절 추적 시각화 요청: 전문가 비교와 채점을 건너뜁니다.")
+    else:
+        logger.info(f"[Info] 타겟 전문가 데이터 파일: {expert_json_filename}")
 
     # [안전장치] 모델 로드 체크
     if pose_estimator is None:
@@ -355,41 +365,44 @@ def pose_estimation_task(video_path, song_id, user_id, timestamp):
         except Exception as pe_err:
             raise RuntimeError(f"Pose Estimation 실패: {pe_err}")
         
-        # 3. 전문가 데이터 준비 (S3 Manager 사용)
-        expert_json_path = os.path.join(Config.EXPERT_DIR, expert_json_filename)
         s3_manager = S3Manager()
-        
-        # 로컬에 없으면 다운로드 시도
-        if not os.path.exists(expert_json_path) and Config.USE_AWS:
-            logger.info(f"[Info] 전문가 데이터가 로컬에 없습니다. S3 다운로드 시도: {expert_json_filename}")
-            try:
-                # expert_bucket = "kpop-dance-app-data"
-                expert_bucket = Config.S3_BUCKET_NAME
-                expert_key = f"expert/{expert_json_filename}"
-                s3_manager.download_file(expert_bucket, expert_key, expert_json_path)
-            except Exception as dl_err:
-                logger.warning(f"[Warning] 전문가 데이터 다운로드 실패: {dl_err}")
-
-        # 전문가 데이터 부재 시 Fallback (Test Mode)
-        if not os.path.exists(expert_json_path):
-            logger.info(f"[Info] 전문가 데이터({expert_json_path})가 없어 사용자 데이터를 비교 대상으로 사용합니다 (Test Mode).")
-            expert_json_path = temp_json_path
-
-        # 4. Scoring 수행
         score_data = None
-        if scoring_engine:
-            try:
-                score_data = scoring_engine.compare(temp_json_path, expert_json_path)
-            except Exception as sc_err:
-                logger.error(f"Scoring Engine 오류: {sc_err}")
-                # 채점 실패 시에도 기본 데이터는 남기기 위해 진행하거나 에러 처리
+
+        if not is_joint_visualization:
+            # 3. 전문가 데이터 준비 (S3 Manager 사용)
+            expert_json_path = os.path.join(Config.EXPERT_DIR, expert_json_filename)
+
+            # 로컬에 없으면 다운로드 시도
+            if not os.path.exists(expert_json_path) and Config.USE_AWS:
+                logger.info(f"[Info] 전문가 데이터가 로컬에 없습니다. S3 다운로드 시도: {expert_json_filename}")
+                try:
+                    expert_bucket = Config.S3_BUCKET_NAME
+                    expert_key = f"expert/{expert_json_filename}"
+                    s3_manager.download_file(expert_bucket, expert_key, expert_json_path)
+                except Exception as dl_err:
+                    logger.warning(f"[Warning] 전문가 데이터 다운로드 실패: {dl_err}")
+
+            # 전문가 데이터 부재 시 Fallback (Test Mode)
+            if not os.path.exists(expert_json_path):
+                logger.info(f"[Info] 전문가 데이터({expert_json_path})가 없어 사용자 데이터를 비교 대상으로 사용합니다 (Test Mode).")
+                expert_json_path = temp_json_path
+
+            # 4. Scoring 수행
+            if scoring_engine:
+                try:
+                    score_data = scoring_engine.compare(temp_json_path, expert_json_path)
+                except Exception as sc_err:
+                    logger.error(f"Scoring Engine 오류: {sc_err}")
+                    # 채점 실패 시에도 기본 데이터는 남기기 위해 진행하거나 에러 처리
         
         # 5. 최종 결과 JSON 구성
         final_data = {}
         with open(temp_json_path, 'r', encoding='utf-8') as f:
             final_data = json.load(f)
         
-        if score_data:
+        if is_joint_visualization:
+            final_data = prepare_joint_visualization_result(final_data)
+        elif score_data:
             final_data["summary"]["total_score"] = score_data["total_score"]
             final_data["summary"]["worst_points"] = score_data["worst_points"]
             final_data["summary"]["part_accuracies"] = score_data["part_accuracies"]
@@ -412,7 +425,10 @@ def pose_estimation_task(video_path, song_id, user_id, timestamp):
         with open(result_json_path, 'w', encoding='utf-8') as f:
             json.dump(final_data, f, indent=None)
 
-        logger.info(f"[Task 2] 분석 및 점수 계산 완료: {final_data['summary']['total_score']}점 (Grade: {final_data['summary']['accuracy_grade']})")
+        if is_joint_visualization:
+            logger.info("[Task 2] 관절 추적 시각화 JSON 생성 완료")
+        else:
+            logger.info(f"[Task 2] 분석 및 점수 계산 완료: {final_data['summary']['total_score']}점 (Grade: {final_data['summary']['accuracy_grade']})")
 
         # 6. 결과 업로드 (S3 Manager 사용)
         s3_url = ""
