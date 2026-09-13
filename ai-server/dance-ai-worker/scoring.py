@@ -385,8 +385,10 @@ class Scoring:
                 raw_joint_scores.append([100.0] * 18)
 
         # Raw joint scores -> 12-frame EMA -> hysteresis -> remove error runs
-        # of four frames or fewer. The result keeps the AWS contract:
-        # 0 = normal, 1 = error.
+        # of four frames or fewer -> consolidate each 10-frame window. A window
+        # is an error only with at least eight error flags; three normal flags
+        # make it normal. The result keeps the AWS contract: 0 = normal,
+        # 1 = error.
         final_frame_errors = build_temporal_error_flags(
             raw_joint_scores,
             ema_window=self.error_ema_window,

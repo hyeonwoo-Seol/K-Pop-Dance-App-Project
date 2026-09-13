@@ -77,6 +77,46 @@ def suppress_short_error_runs(flags, max_short_error_frames=4):
     return filtered
 
 
+def consolidate_flag_windows(
+    flags,
+    window_size=10,
+    min_error_flags=8,
+    min_normal_flags=3,
+):
+    """Assign one flag to each window using error/normal count thresholds.
+
+    A full 10-frame window becomes all errors only when it contains at least
+    eight error flags. Otherwise, three or more normal flags make the entire
+    window normal. A trailing partial window is left unchanged when neither
+    absolute threshold can be met.
+    """
+    if window_size < 1:
+        raise ValueError("window_size must be at least 1")
+    if not 1 <= min_error_flags <= window_size:
+        raise ValueError("min_error_flags must be between 1 and window_size")
+    if not 1 <= min_normal_flags <= window_size:
+        raise ValueError("min_normal_flags must be between 1 and window_size")
+    if min_error_flags + min_normal_flags <= window_size:
+        raise ValueError("error and normal thresholds must not overlap")
+    if any(flag not in (0, 1) for flag in flags):
+        raise ValueError("flags must contain only 0 or 1")
+
+    consolidated = list(flags)
+
+    for start in range(0, len(consolidated), window_size):
+        end = min(start + window_size, len(consolidated))
+        window = consolidated[start:end]
+        error_count = sum(window)
+        normal_count = len(window) - error_count
+
+        if error_count >= min_error_flags:
+            consolidated[start:end] = [1] * len(window)
+        elif normal_count >= min_normal_flags:
+            consolidated[start:end] = [0] * len(window)
+
+    return consolidated
+
+
 def build_temporal_error_flags(
     joint_scores_by_frame,
     ema_window=12,
@@ -106,6 +146,7 @@ def build_temporal_error_flags(
             flags,
             max_short_error_frames=max_short_error_frames,
         )
+        flags = consolidate_flag_windows(flags)
 
         for frame_index, flag in enumerate(flags):
             flags_by_frame[frame_index][joint_index] = flag
