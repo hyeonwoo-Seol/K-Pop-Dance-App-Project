@@ -1,5 +1,7 @@
 package com.example.kpopdancepracticeai.ui
 
+import android.content.Context
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.util.Log
 import androidx.annotation.OptIn
@@ -46,8 +48,10 @@ import com.example.kpopdancepracticeai.util.DataConverter
 import com.example.kpopdancepracticeai.util.JsonResultLoader
 import com.example.kpopdancepracticeai.viewmodel.AchievementUiModel
 import com.example.kpopdancepracticeai.viewmodel.MainViewModel
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.PI
 import kotlin.math.abs
@@ -63,7 +67,8 @@ fun PracticeResultScreen(
     viewModel: MainViewModel? = null,
     onBackClick: () -> Unit = {},
     onReplayClick: () -> Unit = {},
-    onHomeClick: () -> Unit = {}
+    onHomeClick: () -> Unit = {},
+    visualizationOnly: Boolean = false
 ) {
     val context = LocalContext.current
     val isPreview = LocalInspectionMode.current
@@ -99,6 +104,7 @@ fun PracticeResultScreen(
     var isPlaying by remember { mutableStateOf(false) }
     var sourceVideoWidth by remember { mutableIntStateOf(0) }
     var sourceVideoHeight by remember { mutableIntStateOf(0) }
+    var sourceVideoRotationDegrees by remember { mutableIntStateOf(0) }
 
     // --- 2. 플레이어 및 데이터 로드 ---
     var exoPlayer: ExoPlayer? by remember { mutableStateOf(null) }
@@ -178,6 +184,9 @@ fun PracticeResultScreen(
         if (videoPath.isNotBlank() && exoPlayer != null) {
             try {
                 val uri = Uri.parse(videoPath)
+                sourceVideoRotationDegrees = withContext(Dispatchers.IO) {
+                    readVideoRotationDegrees(context, videoPath, uri)
+                }
                 val mediaItem = if (videoPath.startsWith("/")) MediaItem.fromUri(Uri.fromFile(File(videoPath))) else MediaItem.fromUri(uri)
                 exoPlayer?.setMediaItem(mediaItem)
                 exoPlayer?.prepare()
@@ -227,7 +236,8 @@ fun PracticeResultScreen(
                     errors = currentErrors,
                     modifier = Modifier.fillMaxSize(),
                     sourceVideoWidth = sourceVideoWidth,
-                    sourceVideoHeight = sourceVideoHeight
+                    sourceVideoHeight = sourceVideoHeight,
+                    sourceVideoRotationDegrees = sourceVideoRotationDegrees
                 )
             }
             IconButton(
@@ -235,6 +245,66 @@ fun PracticeResultScreen(
                 modifier = Modifier.padding(32.dp).background(Color.Black.copy(alpha = 0.5f), CircleShape)
             ) {
                 Icon(Icons.Default.Close, contentDescription = "닫기", tint = Color.White)
+            }
+        }
+    } else if (visualizationOnly) {
+        Scaffold(containerColor = MaterialTheme.colorScheme.background) { innerPadding ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(innerPadding)
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    IconButton(onClick = onBackClick) {
+                        Icon(
+                            Icons.Default.ArrowBack,
+                            contentDescription = "뒤로 가기",
+                            tint = MaterialTheme.colorScheme.onBackground
+                        )
+                    }
+                    Text(
+                        text = "관절 추적 시각화",
+                        modifier = Modifier.weight(1f),
+                        style = TextStyle(fontWeight = FontWeight.Bold, fontSize = 22.sp),
+                        color = MaterialTheme.colorScheme.onBackground,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.size(48.dp))
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+                Text("AI 관절 추출이 완료되었습니다.", fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "녹화 영상 위에 추출된 관절을 겹쳐서 확인해 보세요.",
+                    color = Color(0xff717182),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.height(32.dp))
+                Button(
+                    onClick = {
+                        showOverlay = true
+                        exoPlayer?.seekTo(0)
+                        exoPlayer?.play()
+                    },
+                    enabled = exoPlayer != null && allFrames.isNotEmpty(),
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xff9810fa))
+                ) {
+                    Icon(Icons.Default.PlayArrow, contentDescription = null)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("오버레이 보기", fontWeight = FontWeight.Bold)
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                TextButton(onClick = onHomeClick) {
+                    Text("홈으로 이동")
+                }
+                Spacer(modifier = Modifier.weight(1f))
             }
         }
     } else {
@@ -611,4 +681,45 @@ fun PracticeResultScreenPreview() {
         videoPath = "",
         score = 87
     )
+}
+
+@Composable
+fun JointTrackingResultScreen(
+    jsonFileName: String,
+    videoPath: String,
+    onBackClick: () -> Unit,
+    onHomeClick: () -> Unit
+) {
+    PracticeResultScreen(
+        jsonFileName = jsonFileName,
+        videoPath = videoPath,
+        onBackClick = onBackClick,
+        onHomeClick = onHomeClick,
+        visualizationOnly = true
+    )
+}
+
+private fun readVideoRotationDegrees(
+    context: Context,
+    videoPath: String,
+    uri: Uri
+): Int {
+    val retriever = MediaMetadataRetriever()
+    return try {
+        if (videoPath.startsWith("/")) {
+            retriever.setDataSource(videoPath)
+        } else {
+            retriever.setDataSource(context, uri)
+        }
+        normalizeVideoRotationDegrees(
+            retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+                ?.toIntOrNull()
+                ?: 0
+        )
+    } catch (e: Exception) {
+        Log.w("PracticeResult", "영상 회전 메타데이터를 읽지 못했습니다: $videoPath", e)
+        0
+    } finally {
+        retriever.release()
+    }
 }

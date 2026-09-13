@@ -88,6 +88,8 @@ import kotlinx.coroutines.launch
 import java.io.File
 import java.net.URLDecoder
 
+private const val JOINT_VISUALIZATION_IDENTIFIER = "jointviz_demo_0"
+
 private fun extractExpertIdentifier(
     expertVideoUrl: String,
     songTitle: String,
@@ -129,7 +131,8 @@ fun RecordScreen(
     onNavigateHome: () -> Unit = onBack,
     onRecordingComplete: (String) -> Unit = {},
     mainViewModel: MainViewModel,
-    settingsViewModel: SettingsViewModel = viewModel()
+    settingsViewModel: SettingsViewModel = viewModel(),
+    isJointVisualization: Boolean = false
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -186,7 +189,7 @@ fun RecordScreen(
     }
 
     LaunchedEffect(expertVideoUrl) {
-        if (expertVideoUrl.isNotBlank()) {
+        if (!isJointVisualization && expertVideoUrl.isNotBlank()) {
             try {
                 exoPlayer.setMediaItem(MediaItem.fromUri(Uri.parse(expertVideoUrl)))
                 exoPlayer.repeatMode = Player.REPEAT_MODE_OFF
@@ -203,6 +206,7 @@ fun RecordScreen(
         val playbackListener = object : Player.Listener {
             override fun onPlaybackStateChanged(playbackState: Int) {
                 if (
+                    !isJointVisualization &&
                     playbackState == Player.STATE_ENDED &&
                     isRecording &&
                     !hasAutoStoppedRecording
@@ -241,7 +245,11 @@ fun RecordScreen(
 
         val uri = recordEvent.outputResults.outputUri
         val userId = userProfile?.userUuid ?: authUserId ?: "none"
-        val expertIdentifier = extractExpertIdentifier(expertVideoUrl, songTitle, artist, part)
+        val expertIdentifier = if (isJointVisualization) {
+            JOINT_VISUALIZATION_IDENTIFIER
+        } else {
+            extractExpertIdentifier(expertVideoUrl, songTitle, artist, part)
+        }
         val partNum = expertIdentifier.substringAfterLast("_", "0").ifBlank { "0" }
         val partNumberForDb = partNum.toIntOrNull() ?: 0
         val timestamp = System.currentTimeMillis()
@@ -254,21 +262,27 @@ fun RecordScreen(
         scope.launch {
             if (!settings.isServerUploadEnabled) {
                 Toast.makeText(context, "서버 전송 동의가 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
-                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
+                if (!isJointVisualization) {
+                    mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
+                }
                 onNavigateHome()
                 return@launch
             }
 
             if (!settings.isAutoUpload) {
                 Toast.makeText(context, "자동 전송이 꺼져 있어 로컬에 저장합니다.", Toast.LENGTH_SHORT).show()
-                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
+                if (!isJointVisualization) {
+                    mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
+                }
                 onNavigateHome()
                 return@launch
             }
 
             if (settings.isWifiOnlyUpload && !NetworkUtils.isWifiConnected(context)) {
                 Toast.makeText(context, "WIFI 전용 업로드 설정으로 로컬 저장 후 홈으로 이동합니다.", Toast.LENGTH_SHORT).show()
-                mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
+                if (!isJointVisualization) {
+                    mainViewModel.markPracticePartCompleted(userId, songIdForDbLong, partNumberForDb, artist)
+                }
                 onNavigateHome()
                 return@launch
             }
@@ -290,7 +304,11 @@ fun RecordScreen(
                 onComplete = {
                     Toast.makeText(context, "업로드 성공!", Toast.LENGTH_SHORT).show()
                     analysisProgress = 0.2f
-                    analysisStatusMessage = "서버에서 AI 분석 중..."
+                    analysisStatusMessage = if (isJointVisualization) {
+                        "AI가 관절 포인트 추출 중..."
+                    } else {
+                        "서버에서 AI 분석 중..."
+                    }
 
                     progressRampJob?.cancel()
                     progressRampJob = scope.launch {
@@ -306,7 +324,11 @@ fun RecordScreen(
                             userId = userId,
                             timestamp = timestamp,
                             onProgress = { msg ->
-                                analysisStatusMessage = msg
+                                analysisStatusMessage = if (isJointVisualization) {
+                                    msg.replace("분석", "관절 추출")
+                                } else {
+                                    msg
+                                }
                                 analysisProgress = (analysisProgress + 0.03f).coerceAtMost(0.95f)
                             },
                             onComplete = { resultS3Key ->
@@ -321,34 +343,44 @@ fun RecordScreen(
 
                                         val jsonString = uploader.downloadResultJson(resultS3Key)
                                         val jsonFileName = uploader.extractResultFileName(resultS3Key)
-                                        val response = Gson().fromJson(
-                                            jsonString,
-                                            AnalysisResultResponse::class.java
-                                        )
+                                        if (!isJointVisualization) {
+                                            val response = Gson().fromJson(
+                                                jsonString,
+                                                AnalysisResultResponse::class.java
+                                            )
 
-                                        val metadata = FilenameParser.ParsedMetadata(
-                                            userId = userId,
-                                            songId = songIdForDb,
-                                            artist = artist,
-                                            partNumber = partNum
-                                        )
+                                            val metadata = FilenameParser.ParsedMetadata(
+                                                userId = userId,
+                                                songId = songIdForDb,
+                                                artist = artist,
+                                                partNumber = partNum
+                                            )
 
-                                        val jsonPath = File(
-                                            File(context.filesDir, "analysis_results"),
-                                            jsonFileName
-                                        ).absolutePath
+                                            val jsonPath = File(
+                                                File(context.filesDir, "analysis_results"),
+                                                jsonFileName
+                                            ).absolutePath
 
-                                        val historyEntity = AnalysisMapper.mapToPracticeHistory(
-                                            analysisResult = response,
-                                            metadata = metadata,
-                                            videoPath = uri.toString(),
-                                            fullJsonPath = jsonPath
-                                        )
-                                        mainViewModel.savePracticeResult(historyEntity)
+                                            val historyEntity = AnalysisMapper.mapToPracticeHistory(
+                                                analysisResult = response,
+                                                metadata = metadata,
+                                                videoPath = uri.toString(),
+                                                fullJsonPath = jsonPath
+                                            )
+                                            mainViewModel.savePracticeResult(historyEntity)
+                                        }
 
-                                        analysisStatusMessage = "분석 완료!"
+                                        analysisStatusMessage = if (isJointVisualization) {
+                                            "관절 추출 완료!"
+                                        } else {
+                                            "분석 완료!"
+                                        }
                                         showAnalysisLoading = false
-                                        Toast.makeText(context, "분석 완료!", Toast.LENGTH_SHORT).show()
+                                        Toast.makeText(
+                                            context,
+                                            if (isJointVisualization) "관절 추출 완료!" else "분석 완료!",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
                                         onRecordingComplete("$jsonFileName|${uri}")
                                     } catch (e: Exception) {
                                         progressRampJob?.cancel()
@@ -380,8 +412,10 @@ fun RecordScreen(
         if (isRecording || isCountdownVisible) return
 
         scope.launch {
-            exoPlayer.seekTo(0)
-            exoPlayer.pause()
+            if (!isJointVisualization) {
+                exoPlayer.seekTo(0)
+                exoPlayer.pause()
+            }
 
             val startCount = settings.countdownSeconds
             if (startCount > 0) {
@@ -394,12 +428,18 @@ fun RecordScreen(
                 isCountdownVisible = false
             }
 
-            exoPlayer.seekTo(0)
-            exoPlayer.play()
+            if (!isJointVisualization) {
+                exoPlayer.seekTo(0)
+                exoPlayer.play()
+            }
             hasAutoStoppedRecording = false
 
             isRecording = true
-            val name = "Kpop_${System.currentTimeMillis()}.mp4"
+            val name = if (isJointVisualization) {
+                "JointTracking_${System.currentTimeMillis()}.mp4"
+            } else {
+                "Kpop_${System.currentTimeMillis()}.mp4"
+            }
             val contentValues = ContentValues().apply {
                 put(MediaStore.MediaColumns.DISPLAY_NAME, name)
                 put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
@@ -457,16 +497,18 @@ fun RecordScreen(
     }
 
     Box(modifier = Modifier.fillMaxSize().background(Color.Black)) {
-        AndroidView(
-            factory = { PlayerView(it).apply { player = exoPlayer; useController = false } },
-            modifier = Modifier.fillMaxSize(),
-            update = { if (it.player != exoPlayer) it.player = exoPlayer }
-        )
+        if (!isJointVisualization) {
+            AndroidView(
+                factory = { PlayerView(it).apply { player = exoPlayer; useController = false } },
+                modifier = Modifier.fillMaxSize(),
+                update = { if (it.player != exoPlayer) it.player = exoPlayer }
+            )
+        }
 
-        val cameraModifier = if (isRecording) {
-            Modifier.align(Alignment.BottomEnd).padding(bottom = 140.dp, end = 20.dp).size(120.dp, 180.dp).clip(RoundedCornerShape(12.dp)).border(2.dp, Color.White, RoundedCornerShape(12.dp))
-        } else {
-            Modifier.align(Alignment.BottomEnd).size(1.dp).alpha(0f)
+        val cameraModifier = when {
+            isJointVisualization -> Modifier.fillMaxSize()
+            isRecording -> Modifier.align(Alignment.BottomEnd).padding(bottom = 140.dp, end = 20.dp).size(120.dp, 180.dp).clip(RoundedCornerShape(12.dp)).border(2.dp, Color.White, RoundedCornerShape(12.dp))
+            else -> Modifier.align(Alignment.BottomEnd).size(1.dp).alpha(0f)
         }
 
         Box(modifier = cameraModifier) {
@@ -501,13 +543,23 @@ fun RecordScreen(
                 Spacer(modifier = Modifier.size(8.dp))
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(songTitle, color = Color.White, fontSize = 20.sp)
-                        Spacer(modifier = Modifier.size(12.dp))
-                        Box(modifier = Modifier.background(Color(0x33F0B100), RoundedCornerShape(8.dp)).border(1.dp, Color(0x80F0B100), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
-                            Text(difficulty, color = Color(0xFFFFDF20), fontSize = 12.sp)
+                        Text(
+                            if (isJointVisualization) "관절 추적 시각화" else songTitle,
+                            color = Color.White,
+                            fontSize = 20.sp
+                        )
+                        if (!isJointVisualization) {
+                            Spacer(modifier = Modifier.size(12.dp))
+                            Box(modifier = Modifier.background(Color(0x33F0B100), RoundedCornerShape(8.dp)).border(1.dp, Color(0x80F0B100), RoundedCornerShape(8.dp)).padding(horizontal = 8.dp, vertical = 2.dp)) {
+                                Text(difficulty, color = Color(0xFFFFDF20), fontSize = 12.sp)
+                            }
                         }
                     }
-                    Text("$artist · $part", color = Color(0xFFD1D5DC), fontSize = 14.sp)
+                    Text(
+                        if (isJointVisualization) "촬영을 종료하면 AI 관절 추출을 시작합니다." else "$artist · $part",
+                        color = Color(0xFFD1D5DC),
+                        fontSize = 14.sp
+                    )
                 }
             }
         }
